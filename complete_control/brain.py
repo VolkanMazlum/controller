@@ -474,14 +474,18 @@ spikedetector_fbk_pos = nest.Create("spike_detector", params={"withgid": True,"w
 spikedetector_fbk_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback neg"})
 spikedetector_fbk_cereb_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum pos"})
 spikedetector_fbk_cereb_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum neg"})
-spikedetector_io_input_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive pos"})
-spikedetector_io_input_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive neg"})
+spikedetector_io_forw_input_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw pos"})
+spikedetector_io_forw_input_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw neg"})
+spikedetector_io_inv_input_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Inv pos"})
+spikedetector_io_inv_input_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Inv neg"})
 spikedetector_stEst_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator pos"})
 spikedetector_stEst_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator neg"})
 spikedetector_planner_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Planner pos"})
 spikedetector_planner_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Planner neg"})
 spikedetector_pred_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb pred pos"})
 spikedetector_pred_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb pred neg"})
+spikedetector_motor_pred_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb motor pred pos"})
+spikedetector_motor_pred_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb motor pred neg"})
 spikedetector_stEst_max_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator Max pos"})
 spikedetector_stEst_max_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator Max neg"})
 spikedetector_fbk_smoothed_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed pos"})
@@ -491,14 +495,18 @@ nest.Connect(sn_p[cereb_controlled_joint].pop, spikedetector_fbk_pos)
 nest.Connect(sn_n[cereb_controlled_joint].pop, spikedetector_fbk_neg)
 nest.Connect(feedback_p, spikedetector_fbk_cereb_pos)
 nest.Connect(feedback_n, spikedetector_fbk_cereb_neg)
-nest.Connect(error_p, spikedetector_io_input_pos)
-nest.Connect(error_n, spikedetector_io_input_neg)
+nest.Connect(error_inv_p, spikedetector_io_forw_input_pos)
+nest.Connect(error_inv_n, spikedetector_io_forw_input_neg)
+nest.Connect(error_p, spikedetector_io_inv_input_pos)
+nest.Connect(error_n, spikedetector_io_inv_input_neg)
 nest.Connect(se.out_p[cereb_controlled_joint].pop, spikedetector_stEst_pos)
 nest.Connect(se.out_n[cereb_controlled_joint].pop, spikedetector_stEst_neg)
 nest.Connect(planner.pops_p[cereb_controlled_joint].pop, spikedetector_planner_pos)
 nest.Connect(planner.pops_n[cereb_controlled_joint].pop, spikedetector_planner_neg)
 nest.Connect(prediction_p, spikedetector_pred_pos)
 nest.Connect(prediction_n, spikedetector_pred_neg)
+nest.Connect(motor_prediction_p, spikedetector_motor_pred_pos)
+nest.Connect(motor_prediction_n, spikedetector_motor_pred_pos)
 nest.Connect(stEst.pops_p[cereb_controlled_joint].pop, spikedetector_stEst_max_pos)
 nest.Connect(stEst.pops_n[cereb_controlled_joint].pop, spikedetector_stEst_max_neg)
 nest.Connect(fbk_smoothed_p, spikedetector_fbk_smoothed_pos)
@@ -685,7 +693,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 ######## Plotting Cerebellar neurons ########
 ## Collapsing data files into one file
 names = []
-network_neurons = ["Input inferior Olive pos","Input inferior Olive neg","Feedback pos","Feedback neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg"]
+network_neurons = ["Input inferior Olive Forw pos","Input inferior Olive Forw neg","Input inferior Olive Inv pos","Input inferior Olive Inv neg","Feedback pos","Feedback neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb motor pred pos","Cereb motor pred neg","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg"]
 cereb_neurons = ["granule_cell","golgi_cell","dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","dcn_cell_GABA","mossy_fibers",'io_cell',"glomerulus","dcn_cell_Gly-I"]
 
 for t in tags:
@@ -774,90 +782,93 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     print('Start making plots')
     for name_id, cell in enumerate(names):
         list1 = []
-        list1 = [list1.append(tag + '_' + a) for tag in tags for a in ["granule_cell","golgi_cell","glomerulus","dcn_cell_Gly-I"]]
+        list1 = [tag + '_' + a for tag in tags for a in ["granule_cell","golgi_cell","glomerulus","dcn_cell_Gly-I"]]
         if cell in list1:
             continue
         if (IDs[cell].keys()):
             beginning = 0
             bin_duration = 10
             list2 = []
-            list2 = [list2.append(tag + '_' + a) for tag in tags for a in ["dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","io_cell"]]
-        
+            list2 = [tag + '_' + a for tag in tags for a in ["dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","io_cell"]]
+            print(list2)
             if cell in list2:
-                print('skip')
-                # freq_pos = []
-                # freq_neg = []
-                # plt.figure(figsize=(10,8))
-                # for start in range(beginning, total_len*n_trial, bin_duration):
-                #     n_spikes_pos = 0
-                #     n_spikes_neg = 0
-                #     end = start + bin_duration
-                #     for key in IDs[cell].keys():
-                #         times = [i for i in IDs[cell][key] if i>=start and i< end]
-                #         if float(key) in cerebellum.Nest_ids[cell]["positive"]:
-                #             n_spikes_pos += len(times)
-                #         elif float(key) in cerebellum.Nest_ids[cell]["negative"]:
-                #             n_spikes_neg += len(times)
-                #         else:
-                #             #print(d)
-                #             pass
-                #     freq_bin_pos = n_spikes_pos/(bin_duration/1000*len(cerebellum.Nest_ids[cell]["positive"]))
-                #     freq_bin_neg = n_spikes_neg/(bin_duration/1000*len(cerebellum.Nest_ids[cell]["negative"]))
-                #     freq_pos.append(freq_bin_pos)
-                #     freq_neg.append(freq_bin_neg)
-                # x = range(beginning, total_len*n_trial, bin_duration)
-                # plt.plot(x,freq_pos,'b', label='positive')
-                # plt.plot(x,freq_neg,'r', label='negative')
-                # plt.title('Spike frequency ' + names[name_id], size =25)
-                # plt.xlabel('Time [ms]', size =25)
-                # plt.ylabel('Frequency [Hz]', size =25)
-                # plt.xlim(0,total_len*n_trial)
-                # plt.xticks(fontsize=25)
-                # plt.yticks(fontsize=25)
+                if cell[0]==tags[0][0]:
+                    cereb = cerebellum_forw
+                else:
+                    cereb = cerebellum
+                freq_pos = []
+                freq_neg = []
+                plt.figure(figsize=(10,8))
+                for start in range(beginning, total_len*n_trial, bin_duration):
+                    n_spikes_pos = 0
+                    n_spikes_neg = 0
+                    end = start + bin_duration
+                    for key in IDs[cell].keys():
+                        times = [i for i in IDs[cell][key] if i>=start and i< end]
+                        if float(key) in cereb.Nest_ids[cell]["positive"]:
+                            n_spikes_pos += len(times)
+                        elif float(key) in cereb.Nest_ids[cell]["negative"]:
+                            n_spikes_neg += len(times)
+                        else:
+                            #print(d)
+                            pass
+                    freq_bin_pos = n_spikes_pos/(bin_duration/1000*len(cereb.Nest_ids[cell]["positive"]))
+                    freq_bin_neg = n_spikes_neg/(bin_duration/1000*len(cereb.Nest_ids[cell]["negative"]))
+                    freq_pos.append(freq_bin_pos)
+                    freq_neg.append(freq_bin_neg)
+                x = range(beginning, total_len*n_trial, bin_duration)
+                plt.plot(x,freq_pos,'b', label='positive')
+                plt.plot(x,freq_neg,'r', label='negative')
+                plt.title('Spike frequency ' + names[name_id], size =25)
+                plt.xlabel('Time [ms]', size =25)
+                plt.ylabel('Frequency [Hz]', size =25)
+                plt.xlim(0,total_len*n_trial)
+                plt.xticks(fontsize=25)
+                plt.yticks(fontsize=25)
 
-                # start = 0
-                # end = total_len*n_trial
-                # n_spikes_pos = 0
-                # n_spikes_neg = 0
-                # for key in IDs[cell].keys():
-                #     times = [i for i in IDs[cell][key] if i>=start and i< end]
-                #     if float(key) in cerebellum.Nest_ids[cell]["positive"]:
-                #         n_spikes_pos += len(times)
-                #     elif float(key) in cerebellum.Nest_ids[cell]["negative"]:
-                #         n_spikes_neg += len(times)
-                #     else:
-                #         print('STRANO')
-                #         pass
-                # mean_freq_pos = n_spikes_pos/((end-start)/1000*len(cerebellum.Nest_ids[cell]["positive"]))
-                # mean_freq_neg = n_spikes_neg/((end-start)/1000*len(cerebellum.Nest_ids[cell]["negative"]))
-                # x = [start,end]
-                # y = [mean_freq_pos]*len(x)
-                # plt.plot(x,y,'b',linewidth = 3)
-                # y = [mean_freq_neg]*len(x)
-                # plt.plot(x,y,'r',linewidth = 3)
-                # plt.legend()
-                # plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
+                start = 0
+                end = total_len*n_trial
+                n_spikes_pos = 0
+                n_spikes_neg = 0
+                for key in IDs[cell].keys():
+                    times = [i for i in IDs[cell][key] if i>=start and i< end]
+                    if float(key) in cereb.Nest_ids[cell]["positive"]:
+                        n_spikes_pos += len(times)
+                    elif float(key) in cereb.Nest_ids[cell]["negative"]:
+                        n_spikes_neg += len(times)
+                    else:
+                        print('STRANO')
+                        pass
+                mean_freq_pos = n_spikes_pos/((end-start)/1000*len(cereb.Nest_ids[cell]["positive"]))
+                mean_freq_neg = n_spikes_neg/((end-start)/1000*len(cereb.Nest_ids[cell]["negative"]))
+                x = [start,end]
+                y = [mean_freq_pos]*len(x)
+                plt.plot(x,y,'b',linewidth = 3)
+                y = [mean_freq_neg]*len(x)
+                plt.plot(x,y,'r',linewidth = 3)
+                plt.legend()
+                plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
 
-                # # Mean frequency computed considering each neuron (not the entire population)
-                # freq_pos = []
-                # freq_neg = []
-                # start = 0
-                # end = n_trial*total_len
-                # for key in IDs[cell].keys():
-                #     times = [i for i in IDs[cell][key] if i>=start and i<= end]
-                #     if float(key) in cerebellum.Nest_ids[cell]["positive"]:
-                #         freq_pos.append(len(times)/((end-start)/1000))
-                #     elif float(key) in cerebellum.Nest_ids[cell]["negative"]:
-                #         freq_neg.append(len(times)/((end-start)/1000))
-                #     else:
-                #         print('STRANO')
-                #         pass
-                # if len(freq_pos) < len(cerebellum.Nest_ids[cell]["positive"]):
-                #     freq_pos.extend([0]*(len(cerebellum.Nest_ids[cell]["positive"])-len(freq_pos)))
-                # if len(freq_neg) <  len(cerebellum.Nest_ids[cell]["negative"]):
-                #     freq_neg.extend([0]*( len(cerebellum.Nest_ids[cell]["negative"])-len(freq_neg)))
-                # print('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
-                # print('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
+                # Mean frequency computed considering each neuron (not the entire population)
+                freq_pos = []
+                freq_neg = []
+                start = 0
+                end = n_trial*total_len
+                for key in IDs[cell].keys():
+                    times = [i for i in IDs[cell][key] if i>=start and i<= end]
+                    if float(key) in cereb.Nest_ids[cell]["positive"]:
+                        freq_pos.append(len(times)/((end-start)/1000))
+                    elif float(key) in cereb.Nest_ids[cell]["negative"]:
+                        freq_neg.append(len(times)/((end-start)/1000))
+                    else:
+                        print('STRANO')
+                        pass
+                if len(freq_pos) < len(cereb.Nest_ids[cell]["positive"]):
+                    freq_pos.extend([0]*(len(cereb.Nest_ids[cell]["positive"])-len(freq_pos)))
+                if len(freq_neg) <  len(cereb.Nest_ids[cell]["negative"]):
+                    freq_neg.extend([0]*( len(cereb.Nest_ids[cell]["negative"])-len(freq_neg)))
+                print('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
+                print('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
 
             else:
                 freq = []

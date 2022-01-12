@@ -94,13 +94,13 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 50.0 #500
+        self._timeMax = 500.0 #500
 
         # Pause after movement (milliseconds)
-        self._timePause = 20.0 #200
+        self._timePause = 200.0 #200
 
         # Number of trials
-        self._n_trials = 1
+        self._n_trials = 10
 
     @property
     def resolution(self):

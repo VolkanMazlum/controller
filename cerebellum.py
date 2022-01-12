@@ -28,6 +28,9 @@ class Cerebellum:
         # Reconfigure scaffold
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
+        self.suffix = suffix
+        self.multi = multi
+        
         '''
         if mpi4py.MPI.COMM_WORLD.rank == 0:
             reconfigured_obj = JSONConfig(filename_config)
@@ -62,6 +65,10 @@ class Cerebellum:
 
     def find_cells(self):
 
+        if self.multi:
+            suffix = self.suffix + '_'
+        else:
+            suffix = ''
         # Find bsb ids
         self.S_GR = self.scaffold_model.get_placement_set("granule_cell").identifiers
         self.S_Go = self.scaffold_model.get_placement_set("golgi_cell").identifiers
@@ -100,11 +107,11 @@ class Cerebellum:
         N_PCn = self.tuning_adapter.get_nest_ids(S_PCn)
 
         self.Nest_ids = {
-            "dcn_cell_glut_large":{"positive":self.N_DCNp, "negative":self.N_DCNn},
-            "purkinje_cell":{"positive":N_PCp, "negative":N_PCn},
-            "basket_cell":{"positive":N_BCp, "negative":N_BCn},
-            "stellate_cell":{"positive":N_SCp, "negative":N_SCn},
-            "io_cell":{"positive":self.N_IOp, "negative":self.N_IOn},
+            suffix + "dcn_cell_glut_large":{"positive":self.N_DCNp, "negative":self.N_DCNn},
+            suffix + "purkinje_cell":{"positive":N_PCp, "negative":N_PCn},
+            suffix + "basket_cell":{"positive":N_BCp, "negative":N_BCn},
+            suffix + "stellate_cell":{"positive":N_SCp, "negative":N_SCn},
+            suffix + "io_cell":{"positive":self.N_IOp, "negative":self.N_IOn},
         }
 
     def subdivide_bc(self, S_PCn, S_PCp, S_IOn, S_IOp):

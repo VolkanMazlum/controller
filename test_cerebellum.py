@@ -28,6 +28,7 @@ filename_h5 = "/home/benedetta/control_loops/hdf5/300x_200z_claudia_dcn_test_3.h
 filename_config = '/home/benedetta/control_loops/configurations/mouse_cerebellum_cortex_update_dcn_copy_post_stepwise_colonna_R.json'
 cerebellum = Cerebellum(filename_h5, filename_config, 1, "test")
 
+print(cerebellum.Nest_ids.keys())
 ###### Configure simulation parameters ######
 flagSaveFig = False
 SCATTER_PLOT = True
@@ -60,6 +61,10 @@ for t in tags:
     #print(names.append(t + '_' + n))
 names.extend(network_neurons)
 
+list2=[]
+list2 = [tag + '_' + a for tag in tags for a in ["dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","io_cell"]]
+print(list2)
+            
 #names = ["granule_cell","golgi_cell","dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","dcn_cell_GABA","mossy_fibers",'io_cell',"glomerulus","dcn_cell_Gly-I"]
 files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
 
