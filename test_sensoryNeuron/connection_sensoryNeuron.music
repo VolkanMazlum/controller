@@ -1,0 +1,11 @@
+# Applications
+[plant]
+  binary=./send_sensoryNeuron.py
+  np=1
+
+[nest]
+  binary=./receive_sensoryNeuron.py
+  np=1
+
+# How ports are connected
+plant.out -> nest.spikes_in [80]
