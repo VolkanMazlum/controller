@@ -35,7 +35,7 @@ nest.Install("cerebmodule")
 saveFig = True
 ScatterPlot = True
 pathFig = './fig/'
-cond = 'fbk_delay_FF_'
+cond = 'complete_delay_FF_'
 
 #%%  SIMULATION
 
@@ -354,10 +354,10 @@ nest.Connect(cerebellum.N_DCNp, motor_prediction_n, 'all_to_all', syn_spec=syn_e
 nest.Connect(cerebellum.N_DCNn, motor_prediction_n, 'all_to_all', syn_spec=syn_inh)
 
 # connections to motor cortex # TODO ffwrd??
-nest.Connect(motor_prediction_p,mc.out_p[j].pop, "one_to_one", {"weight": 0.1, "delay": res})
+nest.Connect(motor_prediction_p,mc.out_p[cereb_controlled_joint].pop, "one_to_one", {"weight": 0.1, "delay": res})
 #nest.Connect(motor_prediction_p,mc.ffwd_n[j].pop, "all_to_all", {"weight": 0.1, "delay": res })
 #nest.Connect(motor_prediction_n,mc.ffwd_p[j].pop, "all_to_all", {"weight": 0.1, "delay": res })
-nest.Connect(motor_prediction_n,mc.out_n[j].pop, "one_to_one", {"weight": 0.1, "delay": res})
+nest.Connect(motor_prediction_n,mc.out_n[cereb_controlled_joint].pop, "one_to_one", {"weight": 0.1, "delay": res})
 
 # feedback from sensory
 feedback_inv_p = nest.Create("diff_neuron", N)
@@ -869,7 +869,9 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                     freq_neg.extend([0]*( len(cereb.Nest_ids[cell]["negative"])-len(freq_neg)))
                 print('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
                 print('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
-
+                with open(pthDat+"spiking_frequency.txt", "a") as f:
+                    f.write('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)) +'\n')
+                    f.write('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)) + '\n')
             else:
                 freq = []
                 plt.figure(figsize=(10,8))
@@ -913,7 +915,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                     times = [i for i in IDs[cell][key] if i>=start and i<= end]
                     freq.append(len(times)/((end-start)/1000))
                 print('Population frequency {}: {} +- {}'.format(names[name_id],round(np.mean(freq),2),round(np.std(freq),2)))
-
+                with open(pthDat+"spiking_frequency.txt", "a") as f:
+                    f.write('Population frequency {}: {} +- {}'.format(names[name_id],round(np.mean(freq),2),round(np.std(freq),2))+ '\n')
             if ScatterPlot:
                 plt.figure(figsize=(10,8))
                 y_min = np.min(SD[cell]['evs'])
@@ -928,6 +931,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 
         else:
             print('Population '+cell+ ' is NOT spiking')
+            with open(pthDat +"spiking_frequency.txt", "a") as f:
+                f.write('Population '+cell+ ' is NOT spiking'+ '\n')
     '''
     print(weights_pf_bc)
     print(weights_pf_sc)
