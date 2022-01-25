@@ -8,20 +8,22 @@ import matplotlib.pyplot as plt
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
-import trajectories as tj
-import perturbation as pt
+
+
 from pointMass import PointMass
 from sensoryneuron import SensoryNeuron
 from settings import Experiment, Simulation, Brain, MusicCfg
 from util import plotPopulation
+import trajectories as tj
+import perturbation as pt
 
-import ctypes
-ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
-
+#import ctypes
+#ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+from mpi4py import MPI
 
 saveFig = True
 pathFig = './fig/'
-cond = 'fbk_delay_FF_'
+cond = 'complete_delay_'
 
 
 ###################### SIMULATION ######################
@@ -49,7 +51,9 @@ pthDat = exp.pathData
 
 # Perturbation
 angle = exp.frcFld_angle
-k     = exp.frcFld_k
+k     = 0                # Default = No Force field
+ff_application = exp.ff_application
+ff_removal = exp.ff_removal
 
 # Dynamical system
 dynSys = exp.dynSys
@@ -95,7 +99,7 @@ msc = MusicCfg()
 
 # Compute the acceptable latency (AL) of this input port to make sure that
 # Sum(ALs)>=Sum(ITIs). ITI stands for Inter Tick Intervals.
-accLat = 2*res-(0.0001-msc.const/1e3)
+accLat = 2*res-(res-msc.const/1e3)
 # If AL<0, set it to zero (this will satisfy the relationship above)
 if accLat<0:
     accLat=0
@@ -210,20 +214,26 @@ step    = 0 # simulation step
 tickt = runtime.time()
 while tickt < exp_duration:
 
-    #print(tickt)
-    
     # Position and velocity at the beginning of the timestep
     pos_j[step,:] = dynSys.pos                      # Joint space
     vel_j[step,:] = dynSys.vel
     pos[step,:]   = dynSys.forwardKin( dynSys.pos ) # End-effector space
     vel[step,:]   = dynSys.forwardKin( dynSys.vel )
 
-    #TODO devo resettare posizione e velocità all'inizio di ogni trial 
-    # (controllare se ci sono altre cose da resettare)
+    # After a certain number of trials I switch on the force field
+    # The number of trials is defined by "ff_application" variable
+    if tickt >= ff_application*(timeMax+time_pause) and tickt <= ff_application*(timeMax+time_pause)+0.02:
+        print('Added Force Field')
+        k = exp.frcFld_k
+    elif tickt >= ff_removal*(timeMax+time_pause) and tickt <= ff_removal*(timeMax+time_pause)+0.02:
+        print('Removed Force Field')
+        k = 0
+
+
+    # After completing the task and during the pause: initialize position and velocity
     if tickt%(timeMax+time_pause) >= timeMax:
         dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
         dynSys.vel = np.array([0.0,0.0])             # Initial condition (velocity)
-
     else:
         # Send sensory feedback and compute input commands for this timestep
         buf_st = tickt-bufSize # Start of buffer
@@ -253,7 +263,6 @@ runtime.finalize()
 
 
 ########################### SAVING INTO DISK ###########################
-
 def firstElement(elem):
     return elem[0]
 
@@ -302,7 +311,6 @@ for i in range(njt):
         tmp_dat_n = np.array( sn_n[i].spike )
         np.savetxt(tmp_fnm_n, tmp_dat_n)
 
-
 # Motor neuron spike rates (of each population for each joint)
 np.savetxt(pthDat+"motNeur_rate_pos.csv",spkRate_pos, delimiter=',')
 np.savetxt(pthDat+"motNeur_rate_neg.csv",spkRate_neg, delimiter=',')
@@ -328,9 +336,7 @@ np.savetxt( pthDat+"perturbation_j.csv", perturb_j, delimiter=',' )  # Perturbat
 
 
 ########################### PLOTTING ###########################
-
 lgd = ['x','y','des']
-
 plt.figure()
 plt.plot(time_tot,inputCmd)
 plt.plot(time,inputDes,linestyle=':')
@@ -355,16 +361,18 @@ plt.figure()
 trial_delta = int((timeMax+time_pause)/res)
 task_steps = int((timeMax)/res)
 errors = []
+err_x = []
 for trial in range(n_trial):
     start = trial*trial_delta
-    end = start + task_steps
-    if trial >= 10:
-        style = 'k:'
-    else:
+    end = start + task_steps - 1
+    if trial < ff_application: # Only cerebellum
         style = 'k'
+    else:
+        style = 'r:'  # Cerebellum must compensate delay and Force field
     plt.plot(pos[start:end,0],pos[start:end,1],style)
     plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
     errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0])**2 + (pos[end,1] - tgt_pos_ee[1])**2))
+    err_x.append(pos[end,0] -tgt_pos_ee[0])
 plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue')
 plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red')
 plt.axis('equal')
@@ -377,12 +385,37 @@ if saveFig:
 plt.figure()
 plt.plot(errors)
 plt.xlabel('Trial')
-plt.ylabel('Error (m)')
+plt.ylabel('Error [m]')
 if saveFig:
     plt.savefig(pathFig+cond+"error_ee.png")
+
+target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)
+err_perc = [i/target_distance for i in errors]
+plt.figure()
+plt.plot(err_perc)
+plt.xlabel('Trial')
+plt.ylabel('Error [%]')
+if saveFig:
+    plt.savefig(pathFig+cond+"error_ee_perc.png")
+
+plt.figure()
+plt.plot(err_x)
+plt.xlabel('Trial')
+plt.ylabel('Horizontal error [m]')
+if saveFig:
+    plt.savefig(pathFig+cond+"error_ee_x.png")
+
+target_distance_x = abs(tgt_pos_ee[0] - init_pos_ee[0])
+err_x_perc = [i/target_distance_x for i in err_x]
+plt.figure()
+plt.plot(err_x)
+plt.xlabel('Trial')
+plt.ylabel('Horizontal error [%]')
+if saveFig:
+    plt.savefig(pathFig+cond+"error_ee_x_perc.png")
 
 # Show sensory neurons
 # for i in range(njt):
 #     plotPopulation(time, sn_p[i], sn_n[i], title=lgd[i],buffer_size=0.015)
 
-plt.show()
+#plt.show()
