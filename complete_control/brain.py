@@ -26,7 +26,7 @@ import random
 
 
 import ctypes
-ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+# ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 nest.Install("util_neurons_module")
 nest.Install("cerebmodule")
