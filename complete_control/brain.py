@@ -25,8 +25,8 @@ import mpi4py
 import random
 
 
-import ctypes
-ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+# import ctypes
+# ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 nest.Install("util_neurons_module")
 nest.Install("cerebmodule")
@@ -36,7 +36,7 @@ nest.Install("cerebmodule")
 saveFig = True
 ScatterPlot = True
 pathFig = './fig/'
-cond = 'complete_delay_'
+cond = 'complete_delay_only_inv'
 
 #%%  SIMULATION
 
@@ -176,8 +176,8 @@ for j in range(njt):
         nest.SetStatus(fbk_smoothed_p, {"kp": 1.0, "pos": True, "buffer_size": 25.0, "base_rate": 100.0})
         fbk_smoothed_n = nest.Create("diff_neuron", N)
         nest.SetStatus(fbk_smoothed_n, {"kp": 1.0, "pos": False, "buffer_size": 25.0, "base_rate": 100.0})
-        syn_exc = {"weight": 0.02, "delay": res} # 0.02
-        syn_inh = {"weight": -0.02, "delay": res}
+        syn_exc = {"weight": 0.028, "delay": res} # 0.02
+        syn_inh = {"weight": -0.028, "delay": res}
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec=syn_exc)
         nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec=syn_inh)
 
@@ -335,7 +335,7 @@ n = int(N_mossy/2)
 plan_to_inv_p = nest.Create("diff_neuron", n)
 nest.SetStatus(plan_to_inv_p, {"kp": 1.0, "pos": True, "buffer_size": 10.0,  "base_rate": 0.0})
 plan_to_inv_n = nest.Create("diff_neuron", n)
-nest.SetStatus(plan_to_inv_n, {"kp": 1.0, "pos": False, "buffer_size": 25.0, "base_rate": 0.0})
+nest.SetStatus(plan_to_inv_n, {"kp": 1.0, "pos": False, "buffer_size": 10.0, "base_rate": 0.0})
 
 # connection planner to inverse through modulators
 syn_exc = {"weight": 0.001, "delay": res} # 0.003
@@ -614,11 +614,11 @@ for trial in range(n_trial):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
     if trial == cerebellum_application_inv:
-        nest.SetStatus(conns_pos_inv, {"weight": 0.3})
-        nest.SetStatus(conns_neg_inv, {"weight": -0.3})
+        nest.SetStatus(conns_pos_inv, {"weight": -0.1})
+        nest.SetStatus(conns_neg_inv, {"weight": 0.1})
     if trial == cerebellum_application_forw:
-        nest.SetStatus(conns_pos_forw, {"weight": 0.3})
-        nest.SetStatus(conns_neg_forw, {"weight": -0.3})
+        nest.SetStatus(conns_pos_forw, {"weight": 0.5})
+        nest.SetStatus(conns_neg_forw, {"weight": -0.5})
     nest.Simulate(total_len)
 
 #%% SIMULATE ######################
