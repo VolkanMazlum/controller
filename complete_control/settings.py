@@ -50,8 +50,8 @@ class Experiment:
         self._dynSys.vel = np.array([0.0,0.0])                     # Initial condition (velocity)
 
         # At which trial Cerebellum connected to StateEstimator
-        self._cerebellum_application_forw = 10
-        self._cerebellum_application_inv = 0
+        self._cerebellum_application_forw = 1e6
+        self._cerebellum_application_inv = 1e6
 
     def remove_files(self):
         for f in os.listdir(self._pathData):
@@ -118,7 +118,7 @@ class Simulation():
         self._timePause = 200.0
 
         # Number of trials
-        self._n_trials = 2
+        self._n_trials = 10
 
     @property
     def resolution(self):
@@ -180,7 +180,7 @@ class Brain():
     def initMotorCortex(self):
 
         # If true, motor cortex computes precise motor commands using inv. dynamics
-        self._precCtrl = True
+        self._precCtrl = False
 
         self._motCtx_param = {
             "ffwd_base_rate":  0.0, # Feedforward neurons
@@ -285,7 +285,7 @@ class MusicCfg():
     @property
     def input_latency(self):
         return self._input_latency
-    
+
     @property
     def const(self):
         return self._const
