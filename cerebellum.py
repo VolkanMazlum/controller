@@ -9,17 +9,15 @@ __version__ = "1.0.1"
 import numpy as np
 import matplotlib.pyplot as plt
 import nest
-
 import trajectories as tj
 from population_view import PopView
 import mpi4py
 
 from bsb.core import from_hdf5
 from bsb.output import HDF5Formatter
-#from bsb.config import JSONConfig
+from bsb.config import JSONConfig
 from bsb.reporting import set_verbosity
 
-print("1")
 class Cerebellum:
 
     #def __init__(self, filename_h5, filename_config, numNeurons, time_vect, traj_joint, plant, pathData="./data/", precise=False, **kwargs):
@@ -47,10 +45,7 @@ class Cerebellum:
         '''
 
         # Create scaffold_model from HDF5
-        print("pre hdf5")
-        print(filename_h5)
-        self.scaffold_model = from_hdf5(self.filename_h5)
-        print("post hdf5")
+        self.scaffold_model = from_hdf5(filename_h5)
         set_verbosity(3)
 
         # Create adapter
