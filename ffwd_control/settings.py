@@ -51,7 +51,7 @@ class Experiment:
 
         # At which trial Cerebellum connected to StateEstimator
         self._cerebellum_application_forw = 1e6
-        self._cerebellum_application_inv = 1e6
+        self._cerebellum_application_inv = 0
 
     def remove_files(self):
         for f in os.listdir(self._pathData):
