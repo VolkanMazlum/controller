@@ -1,7 +1,7 @@
 # Applications
 [nest]
   binary=./brain.py
-  np=7
+  np=1
 
 [plant]
   binary=./receiver_plant.py

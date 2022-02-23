@@ -2,7 +2,7 @@
 #SBATCH --job-name=massimo
 #SBATCH --account=ich027
 #SBATCH --partition=normal
-#SBATCH --time=5:00:00
+#SBATCH --time=2:00:00
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-core=1
 #SBATCH --ntasks-per-node=36
@@ -24,11 +24,11 @@ export CRAYPE_LINK_TYPE=dynamic
 source /users/bp002003/workspace/nest-simulator-2.18.0-build-mpi/bin/nest_vars.sh
 
 export PATH=/users/bp002003/workspace/MUSIC-build/bin/:$PATH
+export PATH=/users/bp002003/workspace/Codici/control_loops/:$PATH
 export PYTHONPATH=/users/bp002003/workspace/MUSIC-build/lib/python3.8/site-packages:$PYTHONPATH
 
 cd $SLURM_SUBMIT_DIR
 
 echo "Launching job $SLURM_JOB_NAME with $SLURM_JOB_NUM_NODES nodes and a total of $SLURM_CPUS_PER_TASK threads!"
 
-srun -c${SLURM_CPUS_PER_TASK} python3 reconfigure.py
-srun -c${SLURM_CPUS_PER_TASK} music ffwd.music
+srun -c${SLURM_CPUS_PER_TASK} music ./fbk_control/fbk.music

@@ -30,13 +30,32 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 nest.Install("util_neurons_module")
 nest.Install("cerebmodule")
-
-
+ 
+import json
+ 
+# Opening JSON file
+f = open('params.json')
+params = json.load(f)
+print(params["modules"])
+f.close()
 
 saveFig = True
 ScatterPlot = True
 pathFig = './fig/'
 cond = 'complete_delay_'
+
+
+mc_params = params["modules"]["motor_cortex"]
+plan_params = params["modules"]["planner"]
+
+spine_params = params["modules"]["spine"]
+state_params = params["modules"]["state"]
+state_se_params = params["modules"]["state_se"]
+
+pops_params = params["pops"]
+conn_params = params["connections"]
+
+
 
 #%%  SIMULATION
 
@@ -100,36 +119,41 @@ filename_config = brain.filename_config
 cereb_controlled_joint = brain.cerebellum_controlled_joint
 cerebellum_application_forw = exp.cerebellum_application_forw  # Trial at which the cerebellum si connected to StateEstimator
 cerebellum_application_inv = exp.cerebellum_application_inv  # Trial at which the cerebellum si connected to StateEstimator
+'''
 tags = ['forw','inv']
 cerebellum_forw = Cerebellum(filename_h5, filename_config, True, tags[0])
 cerebellum = Cerebellum(filename_h5, filename_config, True, tags[1])
-
+'''
 print(brain.filename_config)
 
 #### Planner
 print("init planner")
-pl_param = brain.plan_param
-kpl      = brain.kpl
-planner = Planner(N, time_vect, tgt_pos_ee, dynSys, kpl, pthDat, time_pause, **pl_param)
+
+planner = Planner(N, time_vect, tgt_pos_ee, dynSys, plan_params["kpl"], pthDat, time_pause, plan_params["base_rate"],plan_params["kp"])
 
 #### Motor cortex
 print("init mc")
 preciseControl = brain.precCtrl # Precise or approximated ffwd commands?
-mc_param       = brain.motCtx_param # Motor cortex parameters
+# mc_param       = brain.motCtx_param # Motor cortex parameters
 
-mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, **mc_param)
+mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, **mc_params)
 
 #### State Estimator
 print("init state")
-kpred    = brain.k_prediction
-ksens    = brain.k_sensory
-se_param = brain.stEst_param
+kpred    = state_se_params["kpred"]
+ksens    = state_se_params["ksens"]
+se_param = {"out_base_rate":  state_se_params["out_base_rate"],   
+            "out_kp":         state_se_params["out_kp"],  
+            "wgt_scale":      state_se_params["wgt_scale"], 
+            "buf_sz":        state_se_params["buf_sz"]}
 se = StateEstimator(N, time_vect, dynSys, kpred, ksens, pthDat, **se_param)
 
+
+stEst = StateEstimator_mass(N, time_vect, dynSys, state_params)
 #%% SPINAL CORD ########################
 
-delay_fbk          = brain.spine_param["fbk_delay"]
-wgt_sensNeur_spine = brain.spine_param["wgt_sensNeur_spine"]
+delay_fbk          = params["modules"]["spine"]["fbk_delay"]
+wgt_sensNeur_spine = params["modules"]["spine"]["wgt_sensNeur_spine"]
 
 #### Sensory feedback (Parrot neurons on Sensory neurons)
 sn_p=[]
@@ -147,66 +171,58 @@ for j in range(njt):
 # Scale the cerebellar prediction up to 1000 Hz
 # in order to have firing rate suitable for the State estimator
 # and all the other structures inside the control system
-''
+'''
+
 prediction_p = nest.Create("diff_neuron", N)
-nest.SetStatus(prediction_p, {"kp": 4.0, "pos": True, "buffer_size": 20.0, "base_rate": 50.0}) #5.5
+nest.SetStatus(prediction_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
 prediction_n = nest.Create("diff_neuron", N)
-nest.SetStatus(prediction_n, {"kp": 4.0, "pos": False, "buffer_size": 20.0, "base_rate": 50.0}) #5.5
+nest.SetStatus(prediction_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
 
-syn_exc = {"weight": 0.3, "delay": res}
-syn_inh = {"weight": -0.3, "delay": res}
-nest.Connect(cerebellum_forw.N_DCNp, prediction_p, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(cerebellum_forw.N_DCNn, prediction_p, 'all_to_all', syn_spec=syn_inh)
-nest.Connect(cerebellum_forw.N_DCNp, prediction_n, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(cerebellum_forw.N_DCNn, prediction_n, 'all_to_all', syn_spec=syn_inh)
-''
-params = {"kp": 1.0,
-          "buffer_size": 20.0,
-          "base_rate": 0.0,
-        }
-stEst = StateEstimator_mass(N, time_vect, dynSys, params)
-
+nest.Connect(cerebellum_forw.N_DCNp, prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum_forw.N_DCNn, prediction_p, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum_forw.N_DCNp, prediction_n, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum_forw.N_DCNn, prediction_n, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+'''
+pops_params["fbk_smoothed"]["kp"]
 # buffer_state = 10 e buffer_fbk_smoothed = 15 sembra decente
-syn_1 = {"weight": 1.0, "receptor_type": 1} # 2.5 TODO 
-syn_2 = {"weight": 1.0, "receptor_type": 2}
+
 for j in range(njt):
-    if j == cereb_controlled_joint:
+    '''if j == cereb_controlled_joint:
         # Modify variability sensory feedback ("smoothed")
         fbk_smoothed_p = nest.Create("diff_neuron", N)
-        nest.SetStatus(fbk_smoothed_p, {"kp": 1.0, "pos": True, "buffer_size": 25.0, "base_rate": 100.0})
+        nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
         fbk_smoothed_n = nest.Create("diff_neuron", N)
-        nest.SetStatus(fbk_smoothed_n, {"kp": 1.0, "pos": False, "buffer_size": 25.0, "base_rate": 100.0})
-        syn_exc = {"weight": 0.028, "delay": res} # 0.02
-        syn_inh = {"weight": -0.028, "delay": res}
-        nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec=syn_exc)
-        nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec=syn_inh)
+        nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": False, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
+        
+        nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
+        nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
         # Positive neurons
-        nest.Connect(prediction_p, stEst.pops_p[j].pop, "all_to_all", syn_spec=syn_1)
-        nest.Connect(fbk_smoothed_p, stEst.pops_p[j].pop, "all_to_all", syn_spec=syn_2)
+        nest.Connect(prediction_p, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["pred_state"])
+        nest.Connect(fbk_smoothed_p, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["fbk_smoothed_state"])
         nest.SetStatus(stEst.pops_p[j].pop, {"num_first": float(N), "num_second": float(N)})
 
         # Negative neurons
-        nest.Connect(prediction_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=syn_1)
-        nest.Connect(fbk_smoothed_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=syn_2)
+        nest.Connect(prediction_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["pred_state"])
+        nest.Connect(fbk_smoothed_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["fbk_smoothed_state"])
         nest.SetStatus(stEst.pops_n[j].pop, {"num_first": float(N), "num_second": float(N)})
-    else:
+    else:'''
         # Positive neurons
-        nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=syn_2)
-        nest.SetStatus(stEst.pops_p[j].pop, {"num_second": float(N)})
-        # Negative neurons
-        nest.Connect(sn_n[j].pop, stEst.pops_n[j].pop, "all_to_all", syn_spec=syn_2)
-        nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
+    nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
+    nest.SetStatus(stEst.pops_p[j].pop, {"num_second": float(N)})
+    # Negative neurons
+    nest.Connect(sn_n[j].pop, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
+    nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
 print("init connections feedback")
 
 #%% CONNECTIONS
 #### Connection Planner - Motor Cortex feedback (excitatory)
-wgt_plnr_mtxFbk   = brain.connections["wgt_plnr_mtxFbk"]
+wgt_plnr_mtxFbk   = conn_params["planner_mc_fbk"]["weight"]
 
 # Delay between planner and motor cortex feedback.
 # It needs to compensate for the delay introduced by the state estimator
 #delay_plnr_mtxFbk = brain.stEst_param["buf_sz"] # USE THIS WITH REAL STATE ESTIMATOR
-delay_plnr_mtxFbk = res                         # USE THIS WITH "FAKE" STATE ESTIMATOR
+delay_plnr_mtxFbk = conn_params["planner_mc_fbk"]["delay"]                         # USE THIS WITH "FAKE" STATE ESTIMATOR
 
 for j in range(njt):
     planner.pops_p[j].connect( mc.fbk_p[j], rule='one_to_one', w= wgt_plnr_mtxFbk, d=delay_plnr_mtxFbk )
@@ -220,7 +236,7 @@ for j in range(njt):
     # planner.pops_n[j].connect( mc.ffwd_n[j], rule='one_to_one', w=-wgt_plnr_mtxFbk, d=delay_plnr_mtxFbk )
 
 #### Connection State Estimator - Motor Cortex feedback (Inhibitory)
-wgt_stEst_mtxFbk = brain.connections["wgt_stEst_mtxFbk"]
+wgt_stEst_mtxFbk = conn_params["state_mc_fbk"]["weight"]
 
 # REAL STATE ESTIMATOR
 # To connect the output of the state estimator to the motor cortex feedback
@@ -242,7 +258,7 @@ for j in range(njt):
 #     se.sens_n[j].connect( mc.fbk_n[j], rule='one_to_one', w=-wgt_stEst_mtxFbk, d=res )
 
 #### Connection Sensory feedback - State estimator (excitatory)
-wgt_spine_stEst = brain.connections["wgt_spine_stEst"]
+# wgt_spine_stEst = brain.connections["wgt_spine_stEst"]
 
 # for j in range(njt):
 #     sn_p[j].connect( se.sens_p[j], rule='one_to_one', w=wgt_spine_stEst, d=res )
@@ -254,68 +270,64 @@ wgt_spine_stEst = brain.connections["wgt_spine_stEst"]
 #     sn_p[j].connect( mc.fbk_n[j], rule='one_to_one', w= wgt_stEst_mtxFbk )
 #     sn_n[j].connect( mc.fbk_p[j], rule='one_to_one', w=-wgt_stEst_mtxFbk )
 #     sn_n[j].connect( mc.fbk_n[j], rule='one_to_one', w=-wgt_stEst_mtxFbk )
-
+'''
 # Cerebellar connections ##############
 N_mossy_forw = len(cerebellum_forw.Nest_Mf)
 
 # Motor cortex neurons controlling a certain joint contact also mossy fibers
 n_forw = int(N_mossy_forw/2)
-
+'''
 # Motor commands relay neurons
-motor_commands_p = nest.Create("diff_neuron", n_forw)
-nest.SetStatus(motor_commands_p, {"kp": 1.0, "pos": True, "buffer_size": 25.0, "base_rate": 0.0})
+'''motor_commands_p = nest.Create("diff_neuron", n_forw)
+nest.SetStatus(motor_commands_p, {"kp": pops_params["motor_commands"]["kp"], "pos": True, "buffer_size": pops_params["motor_commands"]["buffer_size"], "base_rate": pops_params["motor_commands"]["base_rate"]})
 motor_commands_n = nest.Create("diff_neuron", n_forw)
-nest.SetStatus(motor_commands_n, {"kp": 1.0, "pos": False, "buffer_size": 25.0, "base_rate": 0.0})
+nest.SetStatus(motor_commands_n, {"kp": pops_params["motor_commands"]["kp"], "pos": False, "buffer_size": pops_params["motor_commands"]["buffer_size"], "base_rate": pops_params["motor_commands"]["base_rate"]})
 
-syn_exc = {"weight": 0.003, "delay": res}
-syn_inh = {"weight": -0.003, "delay": res}
-nest.Connect(mc.out_p[cereb_controlled_joint].pop, motor_commands_p, "all_to_all", syn_spec=syn_exc)
-nest.Connect(mc.out_n[cereb_controlled_joint].pop, motor_commands_n, "all_to_all", syn_spec=syn_inh)
 
-nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'})
-nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'})
+nest.Connect(mc.out_p[cereb_controlled_joint].pop, motor_commands_p, "all_to_all", syn_spec={"weight": conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
+nest.Connect(mc.out_n[cereb_controlled_joint].pop, motor_commands_n, "all_to_all", syn_spec={"weight": -conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 
+nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'}) 
+nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'})#TODO add weight
+'''
 # Scale the feedback signal to 0-60 Hz in order to be suitable for the cerebellum
 feedback_p = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_p, {"kp": 1.0, "pos": True, "buffer_size": 10.0, "base_rate": 0.0})
+nest.SetStatus(feedback_p, {"kp": pops_params["feedback"]["kp"], "pos": True, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"]})
 feedback_n = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_n, {"kp": 1.0, "pos": False, "buffer_size": 10.0, "base_rate": 0.0})
+nest.SetStatus(feedback_n, {"kp": pops_params["feedback"]["kp"], "pos": False, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"]})
 
-syn_exc = {"weight": 0.001, "delay": res}
-syn_inh = {"weight": -0.001, "delay": res}
-nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_p, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_n, 'all_to_all', syn_spec=syn_inh)
+
+nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_p, 'all_to_all', syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
+nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_n, 'all_to_all', syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
 # Error signal toward IO neurons ############
-gain = 1.0
-buf_size = 30.0
-bas_rate_error = -20.0
-
+'''
 # Positive subpopulation
 error_p = nest.Create("diff_neuron", N)
-nest.SetStatus(error_p, {"kp": gain, "pos": True, "buffer_size":buf_size, "base_rate": bas_rate_error})
+nest.SetStatus(error_p, {"kp": pops_params["error"]["kp"], "pos": True, "buffer_size":pops_params["error"]["buffer_size"], "base_rate": pops_params["error"]["base_rate"]})
 # Negative subpopulation
 error_n = nest.Create("diff_neuron", N)
-nest.SetStatus(error_n, {"kp": gain, "pos": False, "buffer_size":buf_size, "base_rate": bas_rate_error})
+nest.SetStatus(error_n, {"kp": pops_params["error"]["kp"], "pos": False, "buffer_size":pops_params["error"]["buffer_size"], "base_rate": pops_params["error"]["base_rate"]})
 
 syn_exc = {"weight": 0.1}  # Synaptic weight of the excitatory synapse
 syn_inh = {"weight": -0.1} # Synaptic weight of the inhibitory synapse
 
-# Construct the error signal for both positive and negative neurons
-nest.Connect(cerebellum_forw.N_DCNp, error_p, {'rule': 'all_to_all'}, syn_spec=syn_inh)
-nest.Connect(cerebellum_forw.N_DCNn, error_p, {'rule': 'all_to_all'}, syn_spec=syn_exc)
-nest.Connect(feedback_p, error_p, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(feedback_n, error_p, 'all_to_all', syn_spec=syn_inh)
 
-nest.Connect(cerebellum_forw.N_DCNp, error_n, {'rule': 'all_to_all'}, syn_spec=syn_inh)
-nest.Connect(cerebellum_forw.N_DCNn, error_n, {'rule': 'all_to_all'}, syn_spec=syn_exc)
-nest.Connect(feedback_p, error_n, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(feedback_n, error_n, 'all_to_all', syn_spec=syn_inh)
+# Construct the error signal for both positive and negative neurons
+nest.Connect(cerebellum_forw.N_DCNp, error_p, {'rule': 'all_to_all'}, syn_spec={"weight":conn_params["dcn_f_error"]["weight"]})
+nest.Connect(cerebellum_forw.N_DCNn, error_p, {'rule': 'all_to_all'}, syn_spec={"weight":-conn_params["dcn_f_error"]["weight"]})
+nest.Connect(feedback_p, error_p, 'all_to_all', syn_spec={"weight":conn_params["feedback_error"]["weight"]})
+nest.Connect(feedback_n, error_p, 'all_to_all', syn_spec={"weight":-conn_params["feedback_error"]["weight"]})
+
+nest.Connect(cerebellum_forw.N_DCNp, error_n, {'rule': 'all_to_all'}, syn_spec={"weight":-conn_params["dcn_f_error"]["weight"]})
+nest.Connect(cerebellum_forw.N_DCNn, error_n, {'rule': 'all_to_all'}, syn_spec={"weight":conn_params["dcn_f_error"]["weight"]})
+nest.Connect(feedback_p, error_n, 'all_to_all', syn_spec={"weight":-conn_params["feedback_error"]["weight"]})
+nest.Connect(feedback_n, error_n, 'all_to_all', syn_spec={"weight":conn_params["feedback_error"]["weight"]})
 
 # Connect error neurons toward IO neurons
-nest.Connect(error_p, cerebellum_forw.N_IOp,{'rule': 'all_to_all'}, {"weight": 3.0,"receptor_type": 1})
-nest.Connect(error_n, cerebellum_forw.N_IOn,{'rule': 'all_to_all'}, {"weight": 3.0,"receptor_type": 1})
-
+nest.Connect(error_p, cerebellum_forw.N_IOp,{'rule': 'all_to_all'}, conn_params["error_io_f"])
+nest.Connect(error_n, cerebellum_forw.N_IOn,{'rule': 'all_to_all'}, conn_params["error_io_f"])
+'''
 # Connect state estimator (bayesian) to the Motor Cortex
 for j in range(njt):
     nest.Connect(stEst.pops_p[j].pop,mc.fbk_p[j].pop, "one_to_one", {"weight": wgt_stEst_mtxFbk, "delay": res})
@@ -324,7 +336,7 @@ for j in range(njt):
     nest.Connect(stEst.pops_n[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": -wgt_stEst_mtxFbk, "delay": res})
 
 #########
-''
+'''''
 N_mossy = len(cerebellum_forw.Nest_Mf)
 
 # Motor cortex neurons controlling a certain joint contact also mossy fibers
@@ -333,9 +345,9 @@ n = int(N_mossy/2)
 
 # Input to inverse neurons
 plan_to_inv_p = nest.Create("diff_neuron", n)
-nest.SetStatus(plan_to_inv_p, {"kp": 1.0, "pos": True, "buffer_size": 10.0,  "base_rate": 0.0})
+nest.SetStatus(plan_to_inv_p, {"kp": pops_params["plan_to_inv"]["kp"], "pos": True, "buffer_size": pops_params["plan_to_inv"]["buffer_size"],  "base_rate": pops_params["plan_to_inv"]["base_rate"]})
 plan_to_inv_n = nest.Create("diff_neuron", n)
-nest.SetStatus(plan_to_inv_n, {"kp": 1.0, "pos": False, "buffer_size": 10.0, "base_rate": 0.0})
+nest.SetStatus(plan_to_inv_n, {"kp": pops_params["plan_to_inv"]["kp"], "pos": False, "buffer_size": pops_params["plan_to_inv"]["buffer_size"], "base_rate": pops_params["plan_to_inv"]["base_rate"]})
 
 # connection planner to inverse through modulators
 syn_exc = {"weight": 0.001, "delay": res} # 0.003
@@ -343,65 +355,60 @@ syn_inh = {"weight": -0.001, "delay": res}
 nest.Connect(planner.pops_p[cereb_controlled_joint].pop, plan_to_inv_p, "all_to_all", syn_spec=syn_exc)
 nest.Connect(planner.pops_n[cereb_controlled_joint].pop, plan_to_inv_n, "all_to_all", syn_spec=syn_inh)
 
-nest.Connect(plan_to_inv_p, cerebellum.Nest_Mf[-n:], {'rule': 'one_to_one'})
+nest.Connect(plan_to_inv_p, cerebellum.Nest_Mf[-n:], {'rule': 'one_to_one'}) #TODO weight
 nest.Connect(plan_to_inv_n, cerebellum.Nest_Mf[0:n], {'rule': 'one_to_one'})
 
 
 # output from inverse model
 motor_prediction_p = nest.Create("diff_neuron", N)
-nest.SetStatus(motor_prediction_p, {"kp": 5.5, "pos": True, "buffer_size": 20.0, "base_rate": 50.0})
+nest.SetStatus(motor_prediction_p, {"kp": pops_params["motor_pred"]["kp"], "pos": True, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"]})
 motor_prediction_n = nest.Create("diff_neuron", N)
-nest.SetStatus(motor_prediction_n, {"kp": 5.5, "pos": False, "buffer_size": 20.0, "base_rate": 50.0})
+nest.SetStatus(motor_prediction_n, {"kp": pops_params["motor_pred"]["kp"], "pos": False, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"]})
 
 syn_exc = {"weight": 0.3, "delay": res}
 syn_inh = {"weight": -0.3, "delay": res}
-nest.Connect(cerebellum.N_DCNp, motor_prediction_p, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(cerebellum.N_DCNn, motor_prediction_p, 'all_to_all', syn_spec=syn_inh)
-nest.Connect(cerebellum.N_DCNp, motor_prediction_n, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(cerebellum.N_DCNn, motor_prediction_n, 'all_to_all', syn_spec=syn_inh)
+nest.Connect(cerebellum.N_DCNp, motor_prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.N_DCNn, motor_prediction_p, 'all_to_all', syn_spec={"weight": -conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.N_DCNp, motor_prediction_n, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.N_DCNn, motor_prediction_n, 'all_to_all', syn_spec={"weight": -conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
 
 # connections to motor cortex # TODO ffwrd??
-nest.Connect(motor_prediction_p,mc.out_p[cereb_controlled_joint].pop, "one_to_one", {"weight": 0.1, "delay": res})
+nest.Connect(motor_prediction_p,mc.out_p[cereb_controlled_joint].pop, "one_to_one", conn_params["motor_pred_mc_out"])
 #nest.Connect(motor_prediction_p,mc.ffwd_n[j].pop, "all_to_all", {"weight": 0.1, "delay": res })
 #nest.Connect(motor_prediction_n,mc.ffwd_p[j].pop, "all_to_all", {"weight": 0.1, "delay": res })
-nest.Connect(motor_prediction_n,mc.out_n[cereb_controlled_joint].pop, "one_to_one", {"weight": 0.1, "delay": res})
-
+nest.Connect(motor_prediction_n,mc.out_n[cereb_controlled_joint].pop, "one_to_one", conn_params["motor_pred_mc_out"])
+'''
 # feedback from sensory
 feedback_inv_p = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_inv_p, {"kp": 1.0, "pos": True, "buffer_size": 10.0, "base_rate": 0.0})
+nest.SetStatus(feedback_inv_p, {"kp": pops_params["feedback_inv"]["kp"], "pos": True, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
 feedback_inv_n = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_inv_n, {"kp": 1.0, "pos": False, "buffer_size": 10.0, "base_rate": 0.0})
-
+nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": False, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
+'''
 
 # TODO differentiate feedback according to joint
 syn_exc = {"weight": 0.001, "delay": res}
 syn_inh = {"weight": -0.001, "delay": res}
-nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_inv_p, 'all_to_all', syn_spec=syn_exc)
-nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_inv_n, 'all_to_all', syn_spec=syn_inh)
+nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_inv_p, 'all_to_all', syn_spec=conn_params["sn_feedback_inv"])
+nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_inv_n, 'all_to_all', syn_spec=conn_params["sn_feedback_inv"])
 
-
+'''
 # error to IO
-gain = 1.0
-buf_size = 30.0
-bas_rate_error = -20.0
-
+'''
 error_inv_p = nest.Create("diff_neuron", N)
-nest.SetStatus(error_inv_p, {"kp": gain, "pos": True, "buffer_size":buf_size, "base_rate": bas_rate_error})
+nest.SetStatus(error_inv_p, {"kp": pops_params["error_i"]["kp"], "pos": True, "buffer_size":pops_params["error_i"]["buffer_size"], "base_rate": pops_params["error_i"]["base_rate"]})
 # Negative subpopulation
 error_inv_n = nest.Create("diff_neuron", N)
-nest.SetStatus(error_inv_n, {"kp": gain, "pos": False, "buffer_size":buf_size, "base_rate": bas_rate_error})
+nest.SetStatus(error_inv_n, {"kp": pops_params["error_i"]["kp"], "pos": False, "buffer_size":pops_params["error_i"]["buffer_size"], "base_rate": pops_params["error_i"]["base_rate"]})
 
-syn_1 = {"weight": 1.0}#, "receptor_type": 1} # 2.5
-syn_2 = {"weight": 1.0}#, "receptor_type": 1}
 
 j = cereb_controlled_joint
 # Positive neurons
-nest.Connect(feedback_inv_p, error_inv_p, "all_to_all", syn_spec=syn_exc)
-nest.Connect(feedback_inv_p, error_inv_n, "all_to_all", syn_spec=syn_exc)
+nest.Connect(feedback_inv_p, error_inv_p, "all_to_all", syn_spec={"weight": conn_params["feedback_inv_error_inv"]["weight"], "delay": conn_params["feedback_inv_error_inv"]["delay"]})
+nest.Connect(feedback_inv_p, error_inv_n, "all_to_all", syn_spec={"weight": conn_params["feedback_inv_error_inv"]["weight"], "delay": conn_params["feedback_inv_error_inv"]["delay"]})
 
 # Negative neurons
-nest.Connect(feedback_inv_n, error_inv_n, "all_to_all", syn_spec=syn_inh)
-nest.Connect(feedback_inv_n, error_inv_p, "all_to_all", syn_spec=syn_inh)
+nest.Connect(feedback_inv_n, error_inv_n, "all_to_all", syn_spec={"weight": -conn_params["feedback_inv_error_inv"]["weight"], "delay": conn_params["feedback_inv_error_inv"]["delay"]})
+nest.Connect(feedback_inv_n, error_inv_p, "all_to_all", syn_spec={"weight": -conn_params["feedback_inv_error_inv"]["weight"], "delay": conn_params["feedback_inv_error_inv"]["delay"]})
 
      #else:
 syn_exc = {"weight": 0.1, "delay": res}
@@ -413,8 +420,8 @@ syn_inh = {"weight": -0.1, "delay": res}
 
 
 # Construct the error signal for both positive and negative neurons
-nest.Connect(plan_to_inv_p, error_inv_p, {'rule': 'all_to_all'}, syn_spec=syn_exc)
-nest.Connect(plan_to_inv_n, error_inv_p, {'rule': 'all_to_all'}, syn_spec=syn_inh)
+nest.Connect(plan_to_inv_p, error_inv_p, {'rule': 'all_to_all'}, syn_spec={"weight": conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
+nest.Connect(plan_to_inv_n, error_inv_p, {'rule': 'all_to_all'}, syn_spec={"weight": -conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
 # nest.Connect(planner.pops_p[cereb_controlled_joint].pop, error_p, {'rule': 'all_to_all'}, syn_spec=syn_exc)
 # nest.Connect(planner.pops_n[cereb_controlled_joint].pop, error_p, {'rule': 'all_to_all'}, syn_spec=syn_inh)
 
@@ -422,8 +429,8 @@ nest.Connect(plan_to_inv_n, error_inv_p, {'rule': 'all_to_all'}, syn_spec=syn_in
 # nest.Connect(plan_to_inv_n, error_n, {'rule': 'all_to_all'}, syn_spec=syn_exc)
 
 # Connect error neurons toward IO neurons
-nest.Connect(error_inv_p, cerebellum.N_IOp,{'rule': 'all_to_all'}, {"weight": 3.0,"receptor_type": 1})
-nest.Connect(error_inv_n, cerebellum.N_IOn,{'rule': 'all_to_all'}, {"weight": 3.0,"receptor_type": 1})
+nest.Connect(error_inv_p, cerebellum.N_IOp,{'rule': 'all_to_all'}, conn_params["error_inv_io_i"])
+nest.Connect(error_inv_n, cerebellum.N_IOn,{'rule': 'all_to_all'}, conn_params["error_inv_io_i"])
 ''
 # Connect feedbakc directly to the Motor Cortex
 # for j in range(njt):
@@ -432,7 +439,7 @@ nest.Connect(error_inv_n, cerebellum.N_IOn,{'rule': 'all_to_all'}, {"weight": 3.
 #    nest.Connect(sn_n[j].pop,mc.fbk_p[j].pop, "one_to_one", {"weight": -0.1, "delay": res})
 #    nest.Connect(sn_n[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": -0.1, "delay": res})
 
-
+'''
 
 #%% MUSIC CONFIG
 
@@ -507,23 +514,24 @@ nest.Connect(feedback_n, spikedetector_fbk_cereb_neg)
 '''
 nest.Connect(error_inv_p, spikedetector_io_forw_input_pos)
 nest.Connect(error_inv_n, spikedetector_io_forw_input_neg)
-'''
+''''''
 nest.Connect(error_p, spikedetector_io_inv_input_pos)
-nest.Connect(error_n, spikedetector_io_inv_input_neg)
+nest.Connect(error_n, spikedetector_io_inv_input_neg)'''
+
 nest.Connect(se.out_p[cereb_controlled_joint].pop, spikedetector_stEst_pos)
 nest.Connect(se.out_n[cereb_controlled_joint].pop, spikedetector_stEst_neg)
 nest.Connect(planner.pops_p[cereb_controlled_joint].pop, spikedetector_planner_pos)
 nest.Connect(planner.pops_n[cereb_controlled_joint].pop, spikedetector_planner_neg)
-nest.Connect(prediction_p, spikedetector_pred_pos)
-nest.Connect(prediction_n, spikedetector_pred_neg)
+'''nest.Connect(prediction_p, spikedetector_pred_pos)
+nest.Connect(prediction_n, spikedetector_pred_neg)'''
 '''
 nest.Connect(motor_prediction_p, spikedetector_motor_pred_pos)
 nest.Connect(motor_prediction_n, spikedetector_motor_pred_pos)
 '''
 nest.Connect(stEst.pops_p[cereb_controlled_joint].pop, spikedetector_stEst_max_pos)
 nest.Connect(stEst.pops_n[cereb_controlled_joint].pop, spikedetector_stEst_max_neg)
-nest.Connect(fbk_smoothed_p, spikedetector_fbk_smoothed_pos)
-nest.Connect(fbk_smoothed_n, spikedetector_fbk_smoothed_neg)
+'''nest.Connect(fbk_smoothed_p, spikedetector_fbk_smoothed_pos)
+nest.Connect(fbk_smoothed_n, spikedetector_fbk_smoothed_neg)'''
 
 '''
 ##### Weight recorder created manually #####
@@ -592,16 +600,17 @@ conns_neg = nest.GetConnections(source = fbk_smoothed_n, target = stEst.pops_n[c
 nest.SetStatus(conns_pos, {"weight": 0.0})
 nest.SetStatus(conns_neg, {"weight": 0.0})
 '''
+'''
 # Disable Cerebellar prediction in State estimation for the first 5 trials
 conns_pos_forw = nest.GetConnections(source = prediction_p, target = stEst.pops_p[cereb_controlled_joint].pop)
 conns_neg_forw = nest.GetConnections(source = prediction_n, target = stEst.pops_n[cereb_controlled_joint].pop)
-''
+
 conns_pos_inv = nest.GetConnections(source = motor_prediction_p, target = mc.out_p[cereb_controlled_joint].pop)
 conns_neg_inv = nest.GetConnections(source = motor_prediction_n, target = mc.out_n[cereb_controlled_joint].pop)
-''
+'''
 # I can't disconnect cereb-State if the Prediction_error = state - cereb
 # I can disconnect the cerebellum only if the error = Feedback - cereb
-''
+'''''
 if cerebellum_application_inv != 0:
     nest.SetStatus(conns_pos_inv, {"weight": 0.0})
     nest.SetStatus(conns_neg_inv, {"weight": 0.0})
@@ -619,7 +628,7 @@ for trial in range(n_trial):
     if trial == cerebellum_application_forw:
         nest.SetStatus(conns_pos_forw, {"weight": 0.5})
         nest.SetStatus(conns_neg_forw, {"weight": -0.5})
-    nest.Simulate(total_len)
+    nest.Simulate(total_len)'''
 
 #%% SIMULATE ######################
 nest.SetKernelStatus({"data_path": pthDat})
@@ -742,319 +751,319 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 
     #plt.savefig("mctx_out_pos-neg.png")
 
-######## Plotting Cerebellar neurons ########
-## Collapsing data files into one file
-names = []
-network_neurons = ["Input inferior Olive Forw pos","Input inferior Olive Forw neg","Input inferior Olive Inv pos","Input inferior Olive Inv neg","Feedback pos","Feedback neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb motor pred pos","Cereb motor pred neg","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg"]
-cereb_neurons = ["granule_cell","golgi_cell","dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","dcn_cell_GABA","mossy_fibers",'io_cell',"glomerulus","dcn_cell_Gly-I"]
+# ######## Plotting Cerebellar neurons ########
+# ## Collapsing data files into one file
+# names = []
+# network_neurons = ["Input inferior Olive Forw pos","Input inferior Olive Forw neg","Input inferior Olive Inv pos","Input inferior Olive Inv neg","Feedback pos","Feedback neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb motor pred pos","Cereb motor pred neg","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg"]
+# cereb_neurons = ["granule_cell","golgi_cell","dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","dcn_cell_GABA","mossy_fibers",'io_cell',"glomerulus","dcn_cell_Gly-I"]
 
-for t in tags:
-    for n in cereb_neurons:
-        names.append(t + '_' + n)
-    #print(names.append(t + '_' + n))
-names.extend(network_neurons)
+# for t in tags:
+#     for n in cereb_neurons:
+#         names.append(t + '_' + n)
+#     #print(names.append(t + '_' + n))
+# names.extend(network_neurons)
 
-files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
-
-
-if mpi4py.MPI.COMM_WORLD.rank == 0:
-    file_list = []
-    for name in names:
-        if (name + '_spikes' + '.gdf' not in files):
-            for f in files:
-                if (f.startswith(name)):
-                    file_list.append(f)
-            print(file_list)
-            with open(pthDat + name + ".gdf", "w") as wfd:
-                for f in file_list:
-                    with open(pthDat + f, "r") as fd:
-                        wfd.write(fd.read())
-            for f in file_list:
-                os.remove(pthDat+f)
-            file_list = []
-        else:
-            print('Già fatto')
-    print('Collapsing files ended')
+# files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
 
 
-########################### PLOTTING ###########################
-cell_numerosity = {
-    names[0]: len(cerebellum_forw.S_GR),
-    names[1]: len(cerebellum_forw.S_Go),
-    names[2]: len(cerebellum_forw.S_DCN),
-    names[3]: len(cerebellum_forw.S_BC),
-    names[4]: len(cerebellum_forw.S_SC),
-    names[5]: len(cerebellum_forw.S_DCN_GABA),
-    names[6]: len(cerebellum_forw.S_Mf),
-    names[7]: len(cerebellum_forw.S_IO),
-    names[8]: len(cerebellum.S_GR),
-    names[9]: len(cerebellum.S_Go),
-    names[10]: len(cerebellum.S_DCN),
-    names[11]: len(cerebellum.S_PC),
-    names[12]: len(cerebellum.S_BC),
-    names[13]: len(cerebellum.S_SC),
-    names[14]: len(cerebellum.S_DCN_GABA),
-    names[15]: len(cerebellum.S_Mf),
-    names[16]: len(cerebellum.S_IO)}
+# # if mpi4py.MPI.COMM_WORLD.rank == 0:
+# #     file_list = []
+# #     for name in names:
+# #         if (name + '_spikes' + '.gdf' not in files):
+# #             for f in files:
+# #                 if (f.startswith(name)):
+# #                     file_list.append(f)
+# #             print(file_list)
+# #             with open(pthDat + name + ".gdf", "w") as wfd:
+# #                 for f in file_list:
+# #                     with open(pthDat + f, "r") as fd:
+# #                         wfd.write(fd.read())
+# #             for f in file_list:
+# #                 os.remove(pthDat+f)
+# #             file_list = []
+# #         else:
+# #             print('Già fatto')
+# #     print('Collapsing files ended')
 
-for i in range(17,len(names)):
-    cell_numerosity[names[i]] = N
+
+# ########################### PLOTTING ###########################
+# cell_numerosity = {
+#     names[0]: len(cerebellum_forw.S_GR),
+#     names[1]: len(cerebellum_forw.S_Go),
+#     names[2]: len(cerebellum_forw.S_DCN),
+#     names[3]: len(cerebellum_forw.S_BC),
+#     names[4]: len(cerebellum_forw.S_SC),
+#     names[5]: len(cerebellum_forw.S_DCN_GABA),
+#     names[6]: len(cerebellum_forw.S_Mf),
+#     names[7]: len(cerebellum_forw.S_IO),
+#     names[8]: len(cerebellum.S_GR),
+#     names[9]: len(cerebellum.S_Go),
+#     names[10]: len(cerebellum.S_DCN),
+#     names[11]: len(cerebellum.S_PC),
+#     names[12]: len(cerebellum.S_BC),
+#     names[13]: len(cerebellum.S_SC),
+#     names[14]: len(cerebellum.S_DCN_GABA),
+#     names[15]: len(cerebellum.S_Mf),
+#     names[16]: len(cerebellum.S_IO)}
+
+# for i in range(17,len(names)):
+#     cell_numerosity[names[i]] = N
 
 # print(names)
 # print(cell_numerosity)
 # print(len(names))
 # print(len(cell_numerosity))
 
+# ''
 
+# if mpi4py.MPI.COMM_WORLD.rank == 0:
+#     print('Start reading data')
+#     files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
+#     IDs = {}
+#     SD = {}
+#     times = {}
+#     for cell in names:
+#         print('Reading:',cell)
+#         for f in files:
+#             if f.startswith(cell):
+#                 break
+#         cell_f = open(pthDat+f,'r').read()
+#         cell_f = cell_f.split('\n')
+#         IDs[cell] = {}
+#         SD[cell] = {'evs': [], 'ts': []}
+#         for i in range(len(cell_f)-1):
+#             splitted_string = cell_f[i].split('\t')
+#             ID_cell = float(splitted_string[0])
+#             time_cell = float(splitted_string[1])
+#             SD[cell]['evs'].append(ID_cell)
+#             SD[cell]['ts'].append(time_cell)
+#             if str(ID_cell) in IDs[cell].keys():
+#                 IDs[cell][str(ID_cell)].append(time_cell)
+#             else:
+#                 IDs[cell][str(ID_cell)] = [time_cell]
 
-if mpi4py.MPI.COMM_WORLD.rank == 0:
-    print('Start reading data')
-    files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
-    IDs = {}
-    SD = {}
-    times = {}
-    for cell in names:
-        print('Reading:',cell)
-        for f in files:
-            if f.startswith(cell):
-                break
-        cell_f = open(pthDat+f,'r').read()
-        cell_f = cell_f.split('\n')
-        IDs[cell] = {}
-        SD[cell] = {'evs': [], 'ts': []}
-        for i in range(len(cell_f)-1):
-            splitted_string = cell_f[i].split('\t')
-            ID_cell = float(splitted_string[0])
-            time_cell = float(splitted_string[1])
-            SD[cell]['evs'].append(ID_cell)
-            SD[cell]['ts'].append(time_cell)
-            if str(ID_cell) in IDs[cell].keys():
-                IDs[cell][str(ID_cell)].append(time_cell)
-            else:
-                IDs[cell][str(ID_cell)] = [time_cell]
+#     print('Start making plots')
+#     for name_id, cell in enumerate(names):
+#         list1 = []
+#         list1 = [tag + '_' + a for tag in tags for a in ["granule_cell","golgi_cell","glomerulus","dcn_cell_Gly-I"]]
+#         if cell in list1:
+#             continue
+#         if (IDs[cell].keys()):
+#             beginning = 0
+#             bin_duration = 10
+#             list2 = []
+#             list2 = [tag + '_' + a for tag in tags for a in ["dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","io_cell"]]
+#             print(list2)
+#             if cell in list2:
+#                 if cell[0]==tags[0][0]:
+#                     cereb = cerebellum_forw
+#                 else:
+#                     cereb = cerebellum
+#                 freq_pos = []
+#                 freq_neg = []
+#                 plt.figure(figsize=(10,8))
+#                 for start in range(beginning, total_len*n_trial, bin_duration):
+#                     n_spikes_pos = 0
+#                     n_spikes_neg = 0
+#                     end = start + bin_duration
+#                     for key in IDs[cell].keys():
+#                         times = [i for i in IDs[cell][key] if i>=start and i< end]
+#                         if float(key) in cereb.Nest_ids[cell]["positive"]:
+#                             n_spikes_pos += len(times)
+#                         elif float(key) in cereb.Nest_ids[cell]["negative"]:
+#                             n_spikes_neg += len(times)
+#                         else:
+#                             #print(d)
+#                             pass
+#                     freq_bin_pos = n_spikes_pos/(bin_duration/1000*len(cereb.Nest_ids[cell]["positive"]))
+#                     freq_bin_neg = n_spikes_neg/(bin_duration/1000*len(cereb.Nest_ids[cell]["negative"]))
+#                     freq_pos.append(freq_bin_pos)
+#                     freq_neg.append(freq_bin_neg)
+#                 x = range(beginning, total_len*n_trial, bin_duration)
+#                 plt.plot(x,freq_pos,'b', label='positive')
+#                 plt.plot(x,freq_neg,'r', label='negative')
+#                 plt.title('Spike frequency ' + names[name_id], size =25)
+#                 plt.xlabel('Time [ms]', size =25)
+#                 plt.ylabel('Frequency [Hz]', size =25)
+#                 plt.xlim(0,total_len*n_trial)
+#                 plt.xticks(fontsize=25)
+#                 plt.yticks(fontsize=25)
 
-    print('Start making plots')
-    for name_id, cell in enumerate(names):
-        list1 = []
-        list1 = [tag + '_' + a for tag in tags for a in ["granule_cell","golgi_cell","glomerulus","dcn_cell_Gly-I"]]
-        if cell in list1:
-            continue
-        if (IDs[cell].keys()):
-            beginning = 0
-            bin_duration = 10
-            list2 = []
-            list2 = [tag + '_' + a for tag in tags for a in ["dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","io_cell"]]
-            print(list2)
-            if cell in list2:
-                if cell[0]==tags[0][0]:
-                    cereb = cerebellum_forw
-                else:
-                    cereb = cerebellum
-                freq_pos = []
-                freq_neg = []
-                plt.figure(figsize=(10,8))
-                for start in range(beginning, total_len*n_trial, bin_duration):
-                    n_spikes_pos = 0
-                    n_spikes_neg = 0
-                    end = start + bin_duration
-                    for key in IDs[cell].keys():
-                        times = [i for i in IDs[cell][key] if i>=start and i< end]
-                        if float(key) in cereb.Nest_ids[cell]["positive"]:
-                            n_spikes_pos += len(times)
-                        elif float(key) in cereb.Nest_ids[cell]["negative"]:
-                            n_spikes_neg += len(times)
-                        else:
-                            #print(d)
-                            pass
-                    freq_bin_pos = n_spikes_pos/(bin_duration/1000*len(cereb.Nest_ids[cell]["positive"]))
-                    freq_bin_neg = n_spikes_neg/(bin_duration/1000*len(cereb.Nest_ids[cell]["negative"]))
-                    freq_pos.append(freq_bin_pos)
-                    freq_neg.append(freq_bin_neg)
-                x = range(beginning, total_len*n_trial, bin_duration)
-                plt.plot(x,freq_pos,'b', label='positive')
-                plt.plot(x,freq_neg,'r', label='negative')
-                plt.title('Spike frequency ' + names[name_id], size =25)
-                plt.xlabel('Time [ms]', size =25)
-                plt.ylabel('Frequency [Hz]', size =25)
-                plt.xlim(0,total_len*n_trial)
-                plt.xticks(fontsize=25)
-                plt.yticks(fontsize=25)
+#                 start = 0
+#                 end = total_len*n_trial
+#                 n_spikes_pos = 0
+#                 n_spikes_neg = 0
+#                 for key in IDs[cell].keys():
+#                     times = [i for i in IDs[cell][key] if i>=start and i< end]
+#                     if float(key) in cereb.Nest_ids[cell]["positive"]:
+#                         n_spikes_pos += len(times)
+#                     elif float(key) in cereb.Nest_ids[cell]["negative"]:
+#                         n_spikes_neg += len(times)
+#                     else:
+#                         print('STRANO')
+#                         pass
+#                 mean_freq_pos = n_spikes_pos/((end-start)/1000*len(cereb.Nest_ids[cell]["positive"]))
+#                 mean_freq_neg = n_spikes_neg/((end-start)/1000*len(cereb.Nest_ids[cell]["negative"]))
+#                 x = [start,end]
+#                 y = [mean_freq_pos]*len(x)
+#                 plt.plot(x,y,'b',linewidth = 3)
+#                 y = [mean_freq_neg]*len(x)
+#                 plt.plot(x,y,'r',linewidth = 3)
+#                 plt.legend()
+#                 plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
 
-                start = 0
-                end = total_len*n_trial
-                n_spikes_pos = 0
-                n_spikes_neg = 0
-                for key in IDs[cell].keys():
-                    times = [i for i in IDs[cell][key] if i>=start and i< end]
-                    if float(key) in cereb.Nest_ids[cell]["positive"]:
-                        n_spikes_pos += len(times)
-                    elif float(key) in cereb.Nest_ids[cell]["negative"]:
-                        n_spikes_neg += len(times)
-                    else:
-                        print('STRANO')
-                        pass
-                mean_freq_pos = n_spikes_pos/((end-start)/1000*len(cereb.Nest_ids[cell]["positive"]))
-                mean_freq_neg = n_spikes_neg/((end-start)/1000*len(cereb.Nest_ids[cell]["negative"]))
-                x = [start,end]
-                y = [mean_freq_pos]*len(x)
-                plt.plot(x,y,'b',linewidth = 3)
-                y = [mean_freq_neg]*len(x)
-                plt.plot(x,y,'r',linewidth = 3)
-                plt.legend()
-                plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
+#                 # Mean frequency computed considering each neuron (not the entire population)
+#                 freq_pos = []
+#                 freq_neg = []
+#                 start = 0
+#                 end = n_trial*total_len
+#                 for key in IDs[cell].keys():
+#                     times = [i for i in IDs[cell][key] if i>=start and i<= end]
+#                     if float(key) in cereb.Nest_ids[cell]["positive"]:
+#                         freq_pos.append(len(times)/((end-start)/1000))
+#                     elif float(key) in cereb.Nest_ids[cell]["negative"]:
+#                         freq_neg.append(len(times)/((end-start)/1000))
+#                     else:
+#                         print('STRANO')
+#                         pass
+#                 if len(freq_pos) < len(cereb.Nest_ids[cell]["positive"]):
+#                     freq_pos.extend([0]*(len(cereb.Nest_ids[cell]["positive"])-len(freq_pos)))
+#                 if len(freq_neg) <  len(cereb.Nest_ids[cell]["negative"]):
+#                     freq_neg.extend([0]*( len(cereb.Nest_ids[cell]["negative"])-len(freq_neg)))
+#                 print('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
+#                 print('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
+#                 with open(pthDat+"spiking_frequency_log.txt", "a") as f:
+#                     f.write('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)) +'\n')
+#                     f.write('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)) + '\n')
+#                 with open(pthDat+"spiking_frequency_data.csv", "a") as f:
+#                     txt = names[name_id]
+#                     lst = txt.split('_')
+#                     if lst[0] in {'inv','forw'}:
+#                         f1 = lst[0]
+#                         f2 = '_'.join(lst[1:])
+#                     else:
+#                         f1 = ''
+#                         f2 = txt
+#                     f.write('{}; {}; neg; {}; {}\n'.format(f1,f2,round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
+#                     f.write('{}; {}; pos; {}; {}\n'.format(f1,f2,round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
+#             else:
+#                 freq = []
+#                 plt.figure(figsize=(10,8))
+#                 for start in range(beginning, total_len*n_trial, bin_duration):
+#                     n_spikes = 0
+#                     end = start + bin_duration
+#                     for key in IDs[cell].keys():
+#                         times = [i for i in IDs[cell][key] if i>=start and i< end]
+#                         n_spikes += len(times)
+#                     freq_bin = n_spikes/(bin_duration/1000*cell_numerosity[cell])
+#                     freq.append(freq_bin)
+#                 x = range(beginning, total_len*n_trial, bin_duration)
+#                 plt.plot(x,freq)
+#                 plt.title('Spike frequency ' + names[name_id], size =25)
+#                 plt.xlabel('Time [ms]', size =25)
+#                 plt.ylabel('Frequency [Hz]', size =25)
+#                 plt.xlim(0,total_len*n_trial)
+#                 plt.xticks(fontsize=25)
+#                 plt.yticks(fontsize=25)
+#                 start = 0
+#                 end = total_len*n_trial
+#                 n_spikes = 0
+#                 for key in IDs[cell].keys():
+#                     times = [i for i in IDs[cell][key] if i>=start and i< end]
+#                     n_spikes += len(times)
+#                 mean_freq = n_spikes/((end-start)/1000*cell_numerosity[cell])
+#                 x = [start,end]
+#                 y = [mean_freq]*len(x)
+#                 plt.plot(x,y,'r',linewidth = 3)
+#                 plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
 
-                # Mean frequency computed considering each neuron (not the entire population)
-                freq_pos = []
-                freq_neg = []
-                start = 0
-                end = n_trial*total_len
-                for key in IDs[cell].keys():
-                    times = [i for i in IDs[cell][key] if i>=start and i<= end]
-                    if float(key) in cereb.Nest_ids[cell]["positive"]:
-                        freq_pos.append(len(times)/((end-start)/1000))
-                    elif float(key) in cereb.Nest_ids[cell]["negative"]:
-                        freq_neg.append(len(times)/((end-start)/1000))
-                    else:
-                        print('STRANO')
-                        pass
-                if len(freq_pos) < len(cereb.Nest_ids[cell]["positive"]):
-                    freq_pos.extend([0]*(len(cereb.Nest_ids[cell]["positive"])-len(freq_pos)))
-                if len(freq_neg) <  len(cereb.Nest_ids[cell]["negative"]):
-                    freq_neg.extend([0]*( len(cereb.Nest_ids[cell]["negative"])-len(freq_neg)))
-                print('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
-                print('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
-                with open(pthDat+"spiking_frequency_log.txt", "a") as f:
-                    f.write('Population frequency {} NEG: {} +- {}'.format(names[name_id],round(np.mean(freq_neg),2),round(np.std(freq_neg),2)) +'\n')
-                    f.write('Population frequency {} POS: {} +- {}'.format(names[name_id],round(np.mean(freq_pos),2),round(np.std(freq_pos),2)) + '\n')
-                with open(pthDat+"spiking_frequency_data.csv", "a") as f:
-                    txt = names[name_id]
-                    lst = txt.split('_')
-                    if lst[0] in {'inv','forw'}:
-                        f1 = lst[0]
-                        f2 = '_'.join(lst[1:])
-                    else:
-                        f1 = ''
-                        f2 = txt
-                    f.write('{}; {}; neg; {}; {}\n'.format(f1,f2,round(np.mean(freq_neg),2),round(np.std(freq_neg),2)))
-                    f.write('{}; {}; pos; {}; {}\n'.format(f1,f2,round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
-            else:
-                freq = []
-                plt.figure(figsize=(10,8))
-                for start in range(beginning, total_len*n_trial, bin_duration):
-                    n_spikes = 0
-                    end = start + bin_duration
-                    for key in IDs[cell].keys():
-                        times = [i for i in IDs[cell][key] if i>=start and i< end]
-                        n_spikes += len(times)
-                    freq_bin = n_spikes/(bin_duration/1000*cell_numerosity[cell])
-                    freq.append(freq_bin)
-                x = range(beginning, total_len*n_trial, bin_duration)
-                plt.plot(x,freq)
-                plt.title('Spike frequency ' + names[name_id], size =25)
-                plt.xlabel('Time [ms]', size =25)
-                plt.ylabel('Frequency [Hz]', size =25)
-                plt.xlim(0,total_len*n_trial)
-                plt.xticks(fontsize=25)
-                plt.yticks(fontsize=25)
-                start = 0
-                end = total_len*n_trial
-                n_spikes = 0
-                for key in IDs[cell].keys():
-                    times = [i for i in IDs[cell][key] if i>=start and i< end]
-                    n_spikes += len(times)
-                mean_freq = n_spikes/((end-start)/1000*cell_numerosity[cell])
-                x = [start,end]
-                y = [mean_freq]*len(x)
-                plt.plot(x,y,'r',linewidth = 3)
-                plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
+#                 # Mean frequency computed considering each neuron (not the entire population)
+#                 freq = []
+#                 start = 0
+#                 end = total_len*n_trial
+#                 if len(IDs[cell].keys()) < cell_numerosity[cell]:
+#                     freq = [0]*(cell_numerosity[cell]-len(IDs[cell].keys()))
+#                 else:
+#                     freq = []
+#                 for key in IDs[cell].keys():
+#                     times = [i for i in IDs[cell][key] if i>=start and i<= end]
+#                     freq.append(len(times)/((end-start)/1000))
+#                 print('Population frequency {}: {} +- {}'.format(names[name_id],round(np.mean(freq),2),round(np.std(freq),2)))
+#                 with open(pthDat+"spiking_frequency_log.txt", "a") as f:
+#                     f.write('Population frequency {}: {} +- {}'.format(names[name_id],round(np.mean(freq),2),round(np.std(freq),2))+ '\n')
 
-                # Mean frequency computed considering each neuron (not the entire population)
-                freq = []
-                start = 0
-                end = total_len*n_trial
-                if len(IDs[cell].keys()) < cell_numerosity[cell]:
-                    freq = [0]*(cell_numerosity[cell]-len(IDs[cell].keys()))
-                else:
-                    freq = []
-                for key in IDs[cell].keys():
-                    times = [i for i in IDs[cell][key] if i>=start and i<= end]
-                    freq.append(len(times)/((end-start)/1000))
-                print('Population frequency {}: {} +- {}'.format(names[name_id],round(np.mean(freq),2),round(np.std(freq),2)))
-                with open(pthDat+"spiking_frequency_log.txt", "a") as f:
-                    f.write('Population frequency {}: {} +- {}'.format(names[name_id],round(np.mean(freq),2),round(np.std(freq),2))+ '\n')
+#                 with open(pthDat+"spiking_frequency_data.csv", "a") as f:
+#                     txt = names[name_id]
+#                     lst = txt.split(' ')
+#                     if len(lst)==1:
+#                         lst1 = txt.split('_')
+#                         if lst1[0] in {'inv', 'forw'}:
+#                             f1 = lst1[0]
+#                             f2 = '_'.join(lst1[1:])
+#                         else:
+#                             f1 = ''
+#                             f2 = txt
+#                         f3 = ''
+#                     elif lst[-1] in {'pos','neg'}:
+#                         f3 = lst[-1]
+#                         if lst[-2] in {'Inv', 'Forw'}:
+#                             f1 = lst[-2].lower()
+#                             f2 = ' '.join(lst[:-2])
+#                         else:
+#                             f1 = ''
+#                             f2 = ' '.join(lst[:-1])
+#                     else:
+#                         f1= ''
+#                         f3 = ''
+#                         f2 = txt
+#                     f.write('{}; {}; {}; {}; {}\n'.format(f1,f2,f3,round(np.mean(freq),2),round(np.std(freq),2)))
+#                     #f.write('; {}; {}; {}; {} 2\n'.format(f3,f3,round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
 
-                with open(pthDat+"spiking_frequency_data.csv", "a") as f:
-                    txt = names[name_id]
-                    lst = txt.split(' ')
-                    if len(lst)==1:
-                        lst1 = txt.split('_')
-                        if lst1[0] in {'inv', 'forw'}:
-                            f1 = lst1[0]
-                            f2 = '_'.join(lst1[1:])
-                        else:
-                            f1 = ''
-                            f2 = txt
-                        f3 = ''
-                    elif lst[-1] in {'pos','neg'}:
-                        f3 = lst[-1]
-                        if lst[-2] in {'Inv', 'Forw'}:
-                            f1 = lst[-2].lower()
-                            f2 = ' '.join(lst[:-2])
-                        else:
-                            f1 = ''
-                            f2 = ' '.join(lst[:-1])
-                    else:
-                        f1= ''
-                        f3 = ''
-                        f2 = txt
-                    f.write('{}; {}; {}; {}; {}\n'.format(f1,f2,f3,round(np.mean(freq),2),round(np.std(freq),2)))
-                    #f.write('; {}; {}; {}; {} 2\n'.format(f3,f3,round(np.mean(freq_pos),2),round(np.std(freq_pos),2)))
+#             if ScatterPlot:
+#                 plt.figure(figsize=(10,8))
+#                 y_min = np.min(SD[cell]['evs'])
+#                 plt.scatter(SD[cell]['ts'], SD[cell]['evs']-y_min, marker='.', s = 200)
+#                 plt.title('Scatter plot '+ names[name_id]+ ' neurons', size =25)
+#                 plt.xlabel('Time [ms]', size =25)
+#                 plt.ylabel('Neuron ID', size =25)
+#                 plt.xlim(0,total_len*n_trial)
+#                 plt.xticks(fontsize=25)
+#                 plt.yticks(fontsize=25)
+#                 plt.savefig(pathFig+cond+'Scatter plot '+ names[name_id]+ ' neurons.svg')
 
-            if ScatterPlot:
-                plt.figure(figsize=(10,8))
-                y_min = np.min(SD[cell]['evs'])
-                plt.scatter(SD[cell]['ts'], SD[cell]['evs']-y_min, marker='.', s = 200)
-                plt.title('Scatter plot '+ names[name_id]+ ' neurons', size =25)
-                plt.xlabel('Time [ms]', size =25)
-                plt.ylabel('Neuron ID', size =25)
-                plt.xlim(0,total_len*n_trial)
-                plt.xticks(fontsize=25)
-                plt.yticks(fontsize=25)
-                plt.savefig(pathFig+cond+'Scatter plot '+ names[name_id]+ ' neurons.svg')
+#         else:
+#             print('Population '+cell+ ' is NOT spiking')
+#             with open(pthDat +"spiking_frequency_log.txt", "a") as f:
+#                 f.write('Population '+cell+ ' is NOT spiking'+ '\n')
 
-        else:
-            print('Population '+cell+ ' is NOT spiking')
-            with open(pthDat +"spiking_frequency_log.txt", "a") as f:
-                f.write('Population '+cell+ ' is NOT spiking'+ '\n')
-
-            with open(pthDat+"spiking_frequency_data.csv", "a") as f:
-                txt = names[name_id]
-                lst0 = txt.split(' ')
-                if len(lst0)==1:
-                # if '_' in txt:
-                    lst = txt.split('_')
-                    f3 = ''
-                    if lst[0] in {'inv','forw'}:
-                        f1 = lst[0]
-                        f2 = '_'.join(lst[1:])
-                    else:
-                        f1 = ''
-                        f2 = txt
-                else:
-                    lst1 = txt.split(' ')
-                    f1 = ''
-                    if lst1[-1] in {'pos','neg'}:
-                        f3 = lst1[-1]
-                        if lst[-2] in {'Inv', 'Forw'}:
-                            f1 = lst[-2].lower()
-                            f2 = ' '.join(lst[:-2])
-                        else:
-                            f1 = ''
-                            f2 = ' '.join(lst[:-1])
-                    else:
-                        f3 = ''
-                        f2 = txt
-                f.write('{}; {}; {}; ;  \n'.format(f1,f2,f3))
+#             with open(pthDat+"spiking_frequency_data.csv", "a") as f:
+#                 txt = names[name_id]
+#                 lst0 = txt.split(' ')
+#                 if len(lst0)==1:
+#                 # if '_' in txt:
+#                     lst = txt.split('_')
+#                     f3 = ''
+#                     if lst[0] in {'inv','forw'}:
+#                         f1 = lst[0]
+#                         f2 = '_'.join(lst[1:])
+#                     else:
+#                         f1 = ''
+#                         f2 = txt
+#                 else:
+#                     lst1 = txt.split(' ')
+#                     f1 = ''
+#                     if lst1[-1] in {'pos','neg'}:
+#                         f3 = lst1[-1]
+#                         if lst[-2] in {'Inv', 'Forw'}:
+#                             f1 = lst[-2].lower()
+#                             f2 = ' '.join(lst[:-2])
+#                         else:
+#                             f1 = ''
+#                             f2 = ' '.join(lst[:-1])
+#                     else:
+#                         f3 = ''
+#                         f2 = txt
+#                 f.write('{}; {}; {}; ;  \n'.format(f1,f2,f3))''
 
     '''
     print(weights_pf_bc)

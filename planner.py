@@ -16,7 +16,7 @@ from util import AddPause
 class Planner:
 
     #### Constructor (plant value is just for testing)
-    def __init__(self, n, time_vect, target, plant, kPlan=1.0, pathData="./data/", pause_len=0.0, **kwargs):
+    def __init__(self, n, time_vect, target, plant, kPlan=0.5, pathData="./data/", pause_len=0.0, base_rate = 0.0, kp = 1200.0):
 
         # Path where to save the data file
         self.pathData = pathData
@@ -50,10 +50,10 @@ class Planner:
 
         # General parameters of neurons
         params = {
-            "base_rate": 0.0,
-            "kp": 1.0,
+            "base_rate": base_rate,
+            "kp": kp
             }
-        params.update(kwargs)
+        # params.update(base_rate, kp)
 
         # Initialize population arrays
         self.pops_p = []

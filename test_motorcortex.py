@@ -20,16 +20,16 @@ msd = int( time.time() * 1000.0 )
 N_vp = nest.GetKernelStatus(['total_num_virtual_procs'])[0]
 nest.SetKernelStatus({'rng_seeds' : range(msd+N_vp+1, msd+2*N_vp+1)})
 
-flagSaveFig = True
+flagSaveFig = False
 figPath = './fig/motorcortex/'
 pthDat = "./data/"
 
 # Positions in end-effector space (meters)
 init_pos = np.array([0.0,0.0]) # Initial position
-tgt_pos  = np.array([0.2,0.5]) # Desired target
-tgt_real = np.array([0.5,0.5]) # Final position reached
+tgt_pos  = np.array([0.5,0.5]) # Desired target
+tgt_real = np.array([0.5,0.2]) # Final position reached
 
-preciseControl = True
+preciseControl = False
 
 # Dynamical system
 m          = 2.0
@@ -64,7 +64,7 @@ savePattern(trj_err, pthDat+"error")
 ####### Error population (goes into motor cortex feedback)
 err_param = {
     "base_rate": 0.0,
-    "kp": 100.0
+    "kp": 10.0
     }
 
 err_pop_p = []
@@ -183,10 +183,10 @@ for i in range(njt):
 # Feedforward and output populations (same scale)
 fig, ax = plt.subplots(2,1)
 for i in range(njt):
-    mc.ffwd_p[i].plot_rate(time_vect,ax=ax[i],bar=False,color='r',label='ffwd p')
-    mc.ffwd_n[i].plot_rate(time_vect,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b', label='ffwd n')
-    mc.out_p[i].plot_rate(time_vect,ax=ax[i],bar=False,color='r',linestyle=':',label='out p')
-    mc.out_n[i].plot_rate(time_vect,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label = "out n")
+    mc.ffwd_p[i].plot_rate(time_vect,ax=ax[i],bar=False,color='r',label='ffwd')
+    mc.ffwd_n[i].plot_rate(time_vect,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b')
+    mc.out_p[i].plot_rate(time_vect,ax=ax[i],bar=False,color='r',linestyle=':',label='out')
+    mc.out_n[i].plot_rate(time_vect,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':')
     ax[i].set(ylim=(0, max_y))
 
 ax[0].set_title('spike rate')

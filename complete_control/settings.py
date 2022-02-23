@@ -118,7 +118,7 @@ class Simulation():
         self._timePause = 200.0
 
         # Number of trials
-        self._n_trials = 5
+        self._n_trials = 1
 
     @property
     def resolution(self):
