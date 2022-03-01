@@ -21,7 +21,7 @@
             "wgt_sensNeur_spine" : 1.0,
             "sensNeur_base_rate":  0.0,
             "sensNeur_kp":      1200.0,
-            "fbk_delay":          80.0
+            "fbk_delay":          0.1
         },
         "state":{
             "kp":1.0,

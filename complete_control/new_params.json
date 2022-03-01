@@ -1,15 +1,15 @@
 {
       "modules": {
             "planner": {
-                  "kp": 1200.0,
-                  "kpl": 0.5,
+                  "kp": 1258.6698001835662,
+                  "kpl": 1.2742963240983942,
                   "base_rate": 0.0
             },
             "motor_cortex": {
                   "ffwd_base_rate": 0.0,
-                  "ffwd_kp": 8.682621154668949,
+                  "ffwd_kp": 9.091030228648949,
                   "fbk_base_rate": 0.0,
-                  "fbk_kp": 0.3340167655308517,
+                  "fbk_kp": 0.41708879576253133,
                   "out_base_rate": 0.0,
                   "out_kp": 1.0,
                   "wgt_ffwd_out": 1.0,
@@ -17,11 +17,11 @@
                   "buf_sz": 20.0
             },
             "spine": {
-                  "wgt_motCtx_motNeur": 1.7912044489969343,
-                  "wgt_sensNeur_spine": 0.5769778952793022,
+                  "wgt_motCtx_motNeur": 1.009394402415847,
+                  "wgt_sensNeur_spine": 1.3659365689788179,
                   "sensNeur_base_rate": 0.0,
                   "sensNeur_kp": 1200.0,
-                  "fbk_delay": 80.0
+                  "fbk_delay": 0.1
             },
             "state": {
                   "kp": 1.0,
@@ -90,7 +90,7 @@
                   "delay": 0.1
             },
             "sn_fbk_smoothed": {
-                  "weight": 0.047751857699559745,
+                  "weight": 0.007627125053883081,
                   "delay": 0.1
             },
             "pred_state": {
@@ -114,7 +114,7 @@
                   "delay": 0.1
             },
             "mc_out_motor_commands": {
-                  "weight": 0.029978795585448147,
+                  "weight": 0.005920233767894265,
                   "delay": 0.1
             },
             "motor_commands_mossy_forw": {
@@ -122,7 +122,7 @@
                   "delay": 0.1
             },
             "sn_feedback": {
-                  "weight": 0.04227038048430722,
+                  "weight": 0.02833362956244096,
                   "delay": 0.1
             },
             "dcn_f_error": {
@@ -171,5 +171,6 @@
                   "delay": 0.1,
                   "receptor_type": 1
             }
-      }
+      },
+      "path": "./fig/"
 }
