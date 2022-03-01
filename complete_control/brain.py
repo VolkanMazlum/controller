@@ -34,7 +34,7 @@ nest.Install("cerebmodule")
 import json
  
 # Opening JSON file
-f = open('params.json')
+f = open('new_params.json')
 params = json.load(f)
 print(params["modules"])
 f.close()
@@ -655,101 +655,101 @@ for trial in range(n_trial):
     '''
 
 
-#%% PLOTTING
-if mpi4py.MPI.COMM_WORLD.rank == 0:
-    lgd = ['x','y']
-    time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
+# #%% PLOTTING
+# if mpi4py.MPI.COMM_WORLD.rank == 0:
+#     lgd = ['x','y']
+#     time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
 
-    # Positive
-    fig, ax = plt.subplots(2,1)
-    for i in range(njt):
-        planner.pops_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='planner')
-        sn_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
-        se.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
-    plt.legend()
-    ax[i].set_xlabel("time (ms)")
-    plt.suptitle("Positive")
-    if saveFig:
-        plt.savefig(pathFig+cond+"plan_fbk_pos.png")
+#     # Positive
+#     fig, ax = plt.subplots(2,1)
+#     for i in range(njt):
+#         planner.pops_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='planner')
+#         sn_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
+#         se.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
+#     plt.legend()
+#     ax[i].set_xlabel("time (ms)")
+#     plt.suptitle("Positive")
+#     if saveFig:
+#         plt.savefig(pathFig+cond+"plan_fbk_pos.png")
 
-    # Negative
-    fig, ax = plt.subplots(2,1)
-    for i in range(njt):
-        planner.pops_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='planner')
-        sn_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
-        se.out_n[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state neg')
-        plt.legend()
-    ax[i].set_xlabel("time (ms)")
-    plt.suptitle("Negative")
-    if saveFig:
-        plt.savefig(pathFig+cond+"plan_fbk_neg.png")
+#     # Negative
+#     fig, ax = plt.subplots(2,1)
+#     for i in range(njt):
+#         planner.pops_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='planner')
+#         sn_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
+#         se.out_n[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state neg')
+#         plt.legend()
+#     ax[i].set_xlabel("time (ms)")
+#     plt.suptitle("Negative")
+#     if saveFig:
+#         plt.savefig(pathFig+cond+"plan_fbk_neg.png")
 
-    # # MC fbk
-    for i in range(njt):
-        plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], title=lgd[i],buffer_size=10)
-        plt.suptitle("MC fbk")
-        plt.xlabel("time (ms)")
-        if saveFig:
-            plt.savefig(pathFig+cond+"mtctx_fbk_"+lgd[i]+".png")
+#     # # MC fbk
+#     for i in range(njt):
+#         plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], title=lgd[i],buffer_size=10)
+#         plt.suptitle("MC fbk")
+#         plt.xlabel("time (ms)")
+#         if saveFig:
+#             plt.savefig(pathFig+cond+"mtctx_fbk_"+lgd[i]+".png")
 
-    # # MC ffwd
-    for i in range(njt):
-        plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], title=lgd[i],buffer_size=10)
-        plt.suptitle("MC ffwd")
-        plt.xlabel("time (ms)")
-        if saveFig:
-            plt.savefig(pathFig+cond+"mtctx_ffwd_"+lgd[i]+".png")
-
-
-    # lgd = ['x','y']
-    #
-    # for i in range(njt):
-    #     plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], title=lgd[i],buffer_size=15)
-    #     plt.suptitle("Planner")
-    #
-    # # Sensory feedback
-    # for i in range(njt):
-    #     plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
-    #     plt.suptitle("Sensory feedback")
+#     # # MC ffwd
+#     for i in range(njt):
+#         plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], title=lgd[i],buffer_size=10)
+#         plt.suptitle("MC ffwd")
+#         plt.xlabel("time (ms)")
+#         if saveFig:
+#             plt.savefig(pathFig+cond+"mtctx_ffwd_"+lgd[i]+".png")
 
 
-    # lgd = ['x','y']
-    #
-    # # State estimator
-    # for i in range(njt):
-    #     plotPopulation(time_vect_paused, se.out_p[i],se.out_n[i], title=lgd[i],buffer_size=15)
-    #     plt.suptitle("State estimator")
-    #
-    # # Sensory feedback
-    # for i in range(njt):
-    #     plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
-    #     plt.suptitle("Sensory feedback")
-    #
+#     # lgd = ['x','y']
+#     #
+#     # for i in range(njt):
+#     #     plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], title=lgd[i],buffer_size=15)
+#     #     plt.suptitle("Planner")
+#     #
+#     # # Sensory feedback
+#     # for i in range(njt):
+#     #     plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
+#     #     plt.suptitle("Sensory feedback")
 
 
-    # motCmd = mc.getMotorCommands()
-    # fig, ax = plt.subplots(2,1)
-    # ax[0].plot(time_vect_paused,trj)
-    # ax[1].plot(time_vect_paused,motCmd)
-    #
-    #
-    lgd = ['x','y']
+#     # lgd = ['x','y']
+#     #
+#     # # State estimator
+#     # for i in range(njt):
+#     #     plotPopulation(time_vect_paused, se.out_p[i],se.out_n[i], title=lgd[i],buffer_size=15)
+#     #     plt.suptitle("State estimator")
+#     #
+#     # # Sensory feedback
+#     # for i in range(njt):
+#     #     plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
+#     #     plt.suptitle("Sensory feedback")
+#     #
 
-    fig, ax = plt.subplots(2,1)
-    for i in range(njt):
-        mc.out_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='out')
-        mc.out_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b')
 
-        b,c,pos_r = mc.out_p[i].computePSTH(time_vect_paused,buffer_sz=25)
-        b,c,neg_r = mc.out_n[i].computePSTH(time_vect_paused,buffer_sz=25)
-        if i==0:
-            plt.figure()
-        plt.plot(b[:-1],pos_r-neg_r)
-        plt.xlabel("time (ms)")
-        plt.ylabel("spike rate positive - negative")
-        plt.legend(lgd)
+#     # motCmd = mc.getMotorCommands()
+#     # fig, ax = plt.subplots(2,1)
+#     # ax[0].plot(time_vect_paused,trj)
+#     # ax[1].plot(time_vect_paused,motCmd)
+#     #
+#     #
+#     lgd = ['x','y']
 
-    #plt.savefig("mctx_out_pos-neg.png")
+#     fig, ax = plt.subplots(2,1)
+#     for i in range(njt):
+#         mc.out_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='out')
+#         mc.out_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b')
+
+#         b,c,pos_r = mc.out_p[i].computePSTH(time_vect_paused,buffer_sz=25)
+#         b,c,neg_r = mc.out_n[i].computePSTH(time_vect_paused,buffer_sz=25)
+#         if i==0:
+#             plt.figure()
+#         plt.plot(b[:-1],pos_r-neg_r)
+#         plt.xlabel("time (ms)")
+#         plt.ylabel("spike rate positive - negative")
+#         plt.legend(lgd)
+
+#     #plt.savefig("mctx_out_pos-neg.png")
 
 # ######## Plotting Cerebellar neurons ########
 # ## Collapsing data files into one file
