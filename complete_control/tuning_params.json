@@ -1,5 +1,6 @@
 {
     "modules":{
+        "planner": ["kp", "kpl"],
         "motor_cortex": ["ffwd_kp","fbk_kp"],
         "spine":["wgt_motCtx_motNeur","wgt_sensNeur_spine"]
 	},
