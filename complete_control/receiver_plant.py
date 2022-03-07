@@ -22,9 +22,32 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
 saveFig = True
-pathFig = './fig/'
 cond = 'complete_delay_'
 
+import json
+ 
+# Opening JSON file
+f = open('new_params.json')
+params = json.load(f)
+print(params["modules"])
+f.close()
+
+mc_params = params["modules"]["motor_cortex"]
+plan_params = params["modules"]["planner"]
+
+spine_params = params["modules"]["spine"]
+state_params = params["modules"]["state"]
+state_se_params = params["modules"]["state_se"]
+
+pops_params = params["pops"]
+conn_params = params["connections"]
+
+pathFig = params["path"]
+
+f = open(pathFig+"params.json","w")
+json.dump(params, f, indent =6)
+f.close()
+#%%  SIMULATION
 
 ###################### SIMULATION ######################
 
@@ -82,15 +105,15 @@ brain = Brain()
 N = brain.nNeurPop
 
 # Weight (motor cortex - motor neurons)
-w = brain.spine_param["wgt_motCtx_motNeur"]
+w = spine_params["wgt_motCtx_motNeur"]
 
 # Sensory feedback delay (seconds)
-delay_fbk = brain.spine_param["fbk_delay"]/1e3
+delay_fbk = spine_params["fbk_delay"]/1e3
 
 # First ID sensory neurons
 sensNeur_idSt     = brain.firstIdSensNeurons
-sensNeur_baseRate = brain.spine_param["sensNeur_base_rate"]
-sensNeur_gain     = brain.spine_param["sensNeur_kp"]
+sensNeur_baseRate = spine_params["sensNeur_base_rate"]
+sensNeur_gain     = spine_params["sensNeur_kp"]
 
 
 ############################## MUSIC CONFIG ##############################
@@ -373,6 +396,10 @@ for trial in range(n_trial):
     plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
     errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0])**2 + (pos[end,1] - tgt_pos_ee[1])**2))
     err_x.append(pos[end,0] -tgt_pos_ee[0])
+
+error_x = pos[end,0] -tgt_pos_ee[0]
+error_y = pos[end,1] -tgt_pos_ee[1]
+errors_xy = [error_x, error_y, np.array(errors[-1])]
 plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue')
 plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red')
 plt.axis('equal')
@@ -388,6 +415,9 @@ plt.xlabel('Trial')
 plt.ylabel('Error [m]')
 if saveFig:
     plt.savefig(pathFig+cond+"error_ee.png")
+
+np.savetxt("error.txt",np.array(errors)*100)
+np.savetxt("error_xy.txt",np.array(errors_xy)*100)
 
 target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)
 err_perc = [i/target_distance for i in errors]
