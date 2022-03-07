@@ -1,0 +1,173 @@
+{
+      "modules": {
+            "planner": {
+                  "kp": 0.6902864867631032,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "motor_cortex": {
+                  "ffwd_base_rate": 0.8873372574325002,
+                  "ffwd_kp": 10.0,
+                  "fbk_base_rate": 0.0,
+                  "fbk_kp": 0.3,
+                  "out_base_rate": 0.0,
+                  "out_kp": 1.0,
+                  "wgt_ffwd_out": 1.0,
+                  "wgt_fbk_out": 1.0,
+                  "buf_sz": 20.0
+            },
+            "spine": {
+                  "wgt_motCtx_motNeur": 1.0,
+                  "wgt_sensNeur_spine": 1.0,
+                  "sensNeur_base_rate": 0.0,
+                  "sensNeur_kp": 1200.0,
+                  "fbk_delay": 0.1
+            },
+            "state": {
+                  "kp": 1.0,
+                  "base_rate": 20.0,
+                  "buf_sz": 0.0
+            }
+      },
+      "pops": {
+            "prediction": {
+                  "kp": 0.932843835678835,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "motor_commands": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "feedback": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "fbk_smoothed": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "error": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "plan_to_inv": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "motor_pred": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "feedback_inv": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            },
+            "error_i": {
+                  "kp": 1.0,
+                  "buffer_size": 10.0,
+                  "base_rate": 0.0
+            }
+      },
+      "connections": {
+            "dcn_forw_prediction": {
+                  "weight": 0.7998860161261354,
+                  "delay": 0.1
+            },
+            "sn_fbk_smoothed": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "pred_state": {
+                  "weight": 1.0,
+                  "delay": 0.1,
+                  "receptor_type": 1
+            },
+            "fbk_smoothed_state": {
+                  "weight": 1.0,
+                  "delay": 0.1,
+                  "receptor_type": 1
+            },
+            "sn_state": {
+                  "weight": 1.0,
+                  "delay": 0.1,
+                  "receptor_type": 1
+            },
+            "planner_mc_fbk": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "state_mc_fbk": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "spine_state": {
+                  "weight": 1.0,
+                  "delay": 0.1,
+                  "receptor_type": 1
+            },
+            "mc_out_motor_commands": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "motor_commands_mossy_forw": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "sn_feedback": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "dcn_f_error": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "feedback_error": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "error_io_f": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "planner_plan_to_inv": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "plan_to_inv_mossy_i": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "dcn_i_motor_pred": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "motor_pred_mc_out": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "sn_feedback_inv": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "feedback_inv_error_inv": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "plan_to_inv_error_inv": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            },
+            "error_inv_io_i": {
+                  "weight": 1.0,
+                  "delay": 0.1
+            }
+      }
+}
