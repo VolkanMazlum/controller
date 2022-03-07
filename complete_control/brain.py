@@ -35,7 +35,7 @@ nest.Install("cerebmodule")
 import json
  
 # Opening JSON file
-f = open('params.json')
+f = open('new_params.json')
 params = json.load(f)
 print(params["modules"])
 f.close()
