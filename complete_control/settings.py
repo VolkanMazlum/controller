@@ -50,7 +50,7 @@ class Experiment:
         self._dynSys.vel = np.array([0.0,0.0])                     # Initial condition (velocity)
 
         # At which trial Cerebellum connected to StateEstimator
-        self._cerebellum_application_forw = 1e6
+        self._cerebellum_application_forw = 5
         self._cerebellum_application_inv = 1e6
 
     def remove_files(self):
@@ -118,7 +118,7 @@ class Simulation():
         self._timePause = 200.0
 
         # Number of trials
-        self._n_trials = 5
+        self._n_trials = 15
 
     @property
     def resolution(self):
@@ -285,7 +285,7 @@ class MusicCfg():
     @property
     def input_latency(self):
         return self._input_latency
-    
+
     @property
     def const(self):
         return self._const
