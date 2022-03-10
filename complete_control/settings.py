@@ -118,7 +118,7 @@ class Simulation():
         self._timePause = 200.0
 
         # Number of trials
-        self._n_trials = 1
+        self._n_trials = 5
 
     @property
     def resolution(self):
@@ -285,7 +285,7 @@ class MusicCfg():
     @property
     def input_latency(self):
         return self._input_latency
-    
+
     @property
     def const(self):
         return self._const

@@ -30,9 +30,9 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 nest.Install("util_neurons_module")
 nest.Install("cerebmodule")
- 
+
 import json
- 
+
 # Opening JSON file
 f = open('new_params.json')
 params = json.load(f)
@@ -42,7 +42,7 @@ f.close()
 saveFig = True
 ScatterPlot = True
 pathFig = './fig/'
-cond = 'complete_delay_'
+cond = 'tuning_'
 
 
 mc_params = params["modules"]["motor_cortex"]
@@ -142,9 +142,9 @@ mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, 
 print("init state")
 kpred    = state_se_params["kpred"]
 ksens    = state_se_params["ksens"]
-se_param = {"out_base_rate":  state_se_params["out_base_rate"],   
-            "out_kp":         state_se_params["out_kp"],  
-            "wgt_scale":      state_se_params["wgt_scale"], 
+se_param = {"out_base_rate":  state_se_params["out_base_rate"],
+            "out_kp":         state_se_params["out_kp"],
+            "wgt_scale":      state_se_params["wgt_scale"],
             "buf_sz":        state_se_params["buf_sz"]}
 se = StateEstimator(N, time_vect, dynSys, kpred, ksens, pthDat, **se_param)
 
@@ -193,7 +193,7 @@ for j in range(njt):
         nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
         fbk_smoothed_n = nest.Create("diff_neuron", N)
         nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": False, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
-        
+
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
         nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
@@ -287,7 +287,7 @@ nest.SetStatus(motor_commands_n, {"kp": pops_params["motor_commands"]["kp"], "po
 nest.Connect(mc.out_p[cereb_controlled_joint].pop, motor_commands_p, "all_to_all", syn_spec={"weight": conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 nest.Connect(mc.out_n[cereb_controlled_joint].pop, motor_commands_n, "all_to_all", syn_spec={"weight": -conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 
-nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'}) 
+nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'})
 nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'})#TODO add weight
 '''
 # Scale the feedback signal to 0-60 Hz in order to be suitable for the cerebellum

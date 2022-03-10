@@ -1,5 +1,4 @@
 !#/bin/sh
-cd  /home/benedetta/controller_versions/controller_tuning/complete_control/
-mpirun -n 8 music /home/benedetta/controller_versions/controller_tuning/complete_control/complete.music
-
-cd /home/benedetta/genetic_algorithm
+cd  /home/gambosi/.pyenv/versions/controller/controller/complete_control
+mpirun -n 10 music complete.music
+cd /home/gambosi/.pyenv/versions/controller/genetic_algorithm
