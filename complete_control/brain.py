@@ -31,9 +31,9 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 nest.Install("util_neurons_module")
 nest.Install("cerebmodule")
- 
+
 import json
- 
+
 # Opening JSON file
 f = open('new_params.json')
 params = json.load(f)
@@ -43,7 +43,7 @@ f.close()
 saveFig = True
 ScatterPlot = True
 pathFig = './fig/'
-cond = 'complete_delay_'
+cond = 'fbk_at_10_delay_'
 
 
 mc_params = params["modules"]["motor_cortex"]
@@ -143,9 +143,9 @@ mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, 
 print("init state")
 kpred    = state_se_params["kpred"]
 ksens    = state_se_params["ksens"]
-se_param = {"out_base_rate":  state_se_params["out_base_rate"],   
-            "out_kp":         state_se_params["out_kp"],  
-            "wgt_scale":      state_se_params["wgt_scale"], 
+se_param = {"out_base_rate":  state_se_params["out_base_rate"],
+            "out_kp":         state_se_params["out_kp"],
+            "wgt_scale":      state_se_params["wgt_scale"],
             "buf_sz":        state_se_params["buf_sz"]}
 se = StateEstimator(N, time_vect, dynSys, kpred, ksens, pthDat, **se_param)
 
