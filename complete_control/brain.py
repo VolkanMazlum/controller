@@ -171,13 +171,13 @@ for j in range(njt):
 # Scale the cerebellar prediction up to 1000 Hz
 # in order to have firing rate suitable for the State estimator
 # and all the other structures inside the control system
-'''
+''
 
 prediction_p = nest.Create("diff_neuron", N)
 nest.SetStatus(prediction_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
 prediction_n = nest.Create("diff_neuron", N)
 nest.SetStatus(prediction_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
-
+'''
 nest.Connect(cerebellum_forw.N_DCNp, prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
 nest.Connect(cerebellum_forw.N_DCNn, prediction_p, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
 nest.Connect(cerebellum_forw.N_DCNp, prediction_n, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
@@ -187,7 +187,7 @@ pops_params["fbk_smoothed"]["kp"]
 # buffer_state = 10 e buffer_fbk_smoothed = 15 sembra decente
 
 for j in range(njt):
-    '''if j == cereb_controlled_joint:
+    if j == cereb_controlled_joint:
         # Modify variability sensory feedback ("smoothed")
         fbk_smoothed_p = nest.Create("diff_neuron", N)
         nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
@@ -206,13 +206,13 @@ for j in range(njt):
         nest.Connect(prediction_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["pred_state"])
         nest.Connect(fbk_smoothed_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["fbk_smoothed_state"])
         nest.SetStatus(stEst.pops_n[j].pop, {"num_first": float(N), "num_second": float(N)})
-    else:'''
-        # Positive neurons
-    nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
-    nest.SetStatus(stEst.pops_p[j].pop, {"num_second": float(N)})
-    # Negative neurons
-    nest.Connect(sn_n[j].pop, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
-    nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
+    else:
+            # Positive neurons
+        nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
+        nest.SetStatus(stEst.pops_p[j].pop, {"num_second": float(N)})
+        # Negative neurons
+        nest.Connect(sn_n[j].pop, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
+        nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
 print("init connections feedback")
 
 #%% CONNECTIONS
@@ -600,25 +600,25 @@ conns_neg = nest.GetConnections(source = fbk_smoothed_n, target = stEst.pops_n[c
 nest.SetStatus(conns_pos, {"weight": 0.0})
 nest.SetStatus(conns_neg, {"weight": 0.0})
 '''
-'''
+''
 # Disable Cerebellar prediction in State estimation for the first 5 trials
 conns_pos_forw = nest.GetConnections(source = prediction_p, target = stEst.pops_p[cereb_controlled_joint].pop)
 conns_neg_forw = nest.GetConnections(source = prediction_n, target = stEst.pops_n[cereb_controlled_joint].pop)
-
+'''
 conns_pos_inv = nest.GetConnections(source = motor_prediction_p, target = mc.out_p[cereb_controlled_joint].pop)
 conns_neg_inv = nest.GetConnections(source = motor_prediction_n, target = mc.out_n[cereb_controlled_joint].pop)
 '''
 # I can't disconnect cereb-State if the Prediction_error = state - cereb
 # I can disconnect the cerebellum only if the error = Feedback - cereb
-'''''
+'''
 if cerebellum_application_inv != 0:
     nest.SetStatus(conns_pos_inv, {"weight": 0.0})
     nest.SetStatus(conns_neg_inv, {"weight": 0.0})
-''
+'''
 if cerebellum_application_forw != 0:
     nest.SetStatus(conns_pos_forw, {"weight": 0.0})
     nest.SetStatus(conns_neg_forw, {"weight": 0.0})
-
+'''
 for trial in range(n_trial):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))

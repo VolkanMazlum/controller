@@ -5,8 +5,8 @@
         "spine":["wgt_motCtx_motNeur","wgt_sensNeur_spine"]
 	},
     "connections": {
-        "sn_fbk_smoothed":"weight",
-        "mc_out_motor_commands":"weight",
-        "sn_feedback":"weight"
+        "sn_fbk_smoothed": "weight",
+        "fbk_smoothed_state": "weight",
+        "sn_state":"weight"
     	}
 }
