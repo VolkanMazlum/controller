@@ -520,7 +520,7 @@ spikedetector_plan_to_inv_pos = nest.Create("spike_detector", params={"withgid":
 spikedetector_plan_to_inv_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Plan to inv neg"})
 
 nest.Connect(motor_commands_p, spikedetector_motor_comm_pos)
-nest.Connect(motor_commands_p, spikedetector_motor_comm_neg)
+nest.Connect(motor_commands_n, spikedetector_motor_comm_neg)
 
 nest.Connect(plan_to_inv_p, spikedetector_plan_to_inv_pos)
 nest.Connect(plan_to_inv_n, spikedetector_plan_to_inv_neg)
