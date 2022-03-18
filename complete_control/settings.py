@@ -40,7 +40,7 @@ class Experiment:
         right = -alpha
         self._frcFld_angle = right  # Angle of the perturbation force wrt movement velocity
         self._frcFld_k     = 2       # Gain of the perturbation force wrt movement velocity
-        self._ff_application = 1e6    # Trial at which the Force Field is applied (1e6 = no force field)
+        self._ff_application = 0    # Trial at which the Force Field is applied (1e6 = no force field)
         self._ff_removal = 1e6    # Trial at which the Force Field is removed for extinction
 
         # Dynamical system to be controlled (mass and dyn sys object)
@@ -51,7 +51,11 @@ class Experiment:
 
         # At which trial Cerebellum connected to StateEstimator
         self._cerebellum_application_forw = 0
+<<<<<<< HEAD
         self._cerebellum_application_inv = 0
+=======
+        self._cerebellum_application_inv = 1e6
+>>>>>>> 670b2663ddbb37c3b67c56c3b94b60a3d224474f
 
     def remove_files(self):
         for f in os.listdir(self._pathData):
@@ -118,7 +122,7 @@ class Simulation():
         self._timePause = 200.0
 
         # Number of trials
-        self._n_trials = 1
+        self._n_trials = 15
 
     @property
     def resolution(self):

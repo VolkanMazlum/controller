@@ -43,7 +43,7 @@ f.close()
 saveFig = True
 ScatterPlot = True
 pathFig = './fig/'
-cond = 'test_delay_both_old_parmas_'
+cond = 'only_f_10_delay_old_params_ff_'
 
 
 mc_params = params["modules"]["motor_cortex"]
@@ -195,7 +195,7 @@ nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": 
 for j in range(njt):
     ''
     if j == cereb_controlled_joint:
-        
+
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
         print(conn_params["sn_fbk_smoothed"]["weight"])
         nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
@@ -292,8 +292,8 @@ nest.SetStatus(motor_commands_n, {"kp": pops_params["motor_commands"]["kp"], "po
 nest.Connect(mc.out_p[cereb_controlled_joint].pop, motor_commands_p, "all_to_all", syn_spec={"weight": conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 nest.Connect(mc.out_n[cereb_controlled_joint].pop, motor_commands_n, "all_to_all", syn_spec={"weight": -conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 ''
-nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'}) 
-nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'})#TODO add weight
+nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'},syn_spec={'weight':1.0})
+nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'},syn_spec={'weight':1.0})#TODO add weight
 ''
 # Scale the feedback signal to 0-60 Hz in order to be suitable for the cerebellum
 feedback_p = nest.Create("diff_neuron", N)
@@ -370,7 +370,7 @@ motor_prediction_p = nest.Create("diff_neuron", N)
 nest.SetStatus(motor_prediction_p, {"kp": pops_params["motor_pred"]["kp"], "pos": True, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"]})
 motor_prediction_n = nest.Create("diff_neuron", N)
 nest.SetStatus(motor_prediction_n, {"kp": pops_params["motor_pred"]["kp"], "pos": False, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"]})
-''
+'''
 syn_exc = {"weight": 0.3, "delay": res}
 syn_inh = {"weight": -0.3, "delay": res}
 nest.Connect(cerebellum.N_DCNp, motor_prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
@@ -383,7 +383,7 @@ nest.Connect(motor_prediction_p,mc.out_p[cereb_controlled_joint].pop, "one_to_on
 #nest.Connect(motor_prediction_p,mc.ffwd_n[j].pop, "all_to_all", {"weight": 0.1, "delay": res })
 #nest.Connect(motor_prediction_n,mc.ffwd_p[j].pop, "all_to_all", {"weight": 0.1, "delay": res })
 nest.Connect(motor_prediction_n,mc.out_n[cereb_controlled_joint].pop, "one_to_one", conn_params["motor_pred_mc_out"])
-''
+'''
 # feedback from sensory
 feedback_inv_p = nest.Create("diff_neuron", N)
 nest.SetStatus(feedback_inv_p, {"kp": pops_params["feedback_inv"]["kp"], "pos": True, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
@@ -392,10 +392,10 @@ nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": 
 
 ''
 # TODO differentiate feedback according to joint
-syn_exc = {"weight": 0.001, "delay": res}
-syn_inh = {"weight": -0.001, "delay": res}
-nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_inv_p, 'all_to_all', syn_spec=conn_params["sn_feedback_inv"])
-nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_inv_n, 'all_to_all', syn_spec=conn_params["sn_feedback_inv"])
+# syn_exc = {"weight": 0.001, "delay": res}
+# syn_inh = {"weight": -0.001, "delay": res}
+nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_inv_p, 'all_to_all', syn_spec={"weight": conn_params["sn_feedback_inv"]["weight"], "delay": conn_params["sn_feedback_inv"]["delay"]})
+nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_inv_n, 'all_to_all', syn_spec={"weight": -conn_params["sn_feedback_inv"]["weight"], "delay": conn_params["sn_feedback_inv"]["delay"]})
 ''
 
 # error to IO
@@ -517,6 +517,18 @@ spikedetector_stEst_max_neg = nest.Create("spike_detector", params={"withgid": T
 spikedetector_fbk_smoothed_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed pos"})
 spikedetector_fbk_smoothed_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed neg"})
 
+spikedetector_motor_comm_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Motor Command pos"})
+spikedetector_motor_comm_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Motor Command neg"})
+
+spikedetector_plan_to_inv_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Plan to inv pos"})
+spikedetector_plan_to_inv_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Plan to inv neg"})
+
+nest.Connect(motor_commands_p, spikedetector_motor_comm_pos)
+nest.Connect(motor_commands_n, spikedetector_motor_comm_neg)
+
+nest.Connect(plan_to_inv_p, spikedetector_plan_to_inv_pos)
+nest.Connect(plan_to_inv_n, spikedetector_plan_to_inv_neg)
+
 nest.Connect(sn_p[cereb_controlled_joint].pop, spikedetector_fbk_pos)
 nest.Connect(sn_n[cereb_controlled_joint].pop, spikedetector_fbk_neg)
 nest.Connect(feedback_p, spikedetector_fbk_cereb_pos)
@@ -525,11 +537,11 @@ nest.Connect(feedback_n, spikedetector_fbk_cereb_neg)
 nest.Connect(feedback_inv_p, spikedetector_fbk_inv_pos)
 nest.Connect(feedback_inv_n, spikedetector_fbk_inv_pos)
 ''
-nest.Connect(error_inv_p, spikedetector_io_forw_input_pos)
-nest.Connect(error_inv_n, spikedetector_io_forw_input_neg)
+nest.Connect(error_p, spikedetector_io_forw_input_pos)
+nest.Connect(error_n, spikedetector_io_forw_input_neg)
 
-nest.Connect(error_p, spikedetector_io_inv_input_pos)
-nest.Connect(error_n, spikedetector_io_inv_input_neg)
+nest.Connect(error_inv_p, spikedetector_io_inv_input_pos)
+nest.Connect(error_inv_n, spikedetector_io_inv_input_neg)
 ''
 nest.Connect(se.out_p[cereb_controlled_joint].pop, spikedetector_stEst_pos)
 nest.Connect(se.out_n[cereb_controlled_joint].pop, spikedetector_stEst_neg)
@@ -540,7 +552,7 @@ nest.Connect(prediction_p, spikedetector_pred_pos)
 nest.Connect(prediction_n, spikedetector_pred_neg)
 
 nest.Connect(motor_prediction_p, spikedetector_motor_pred_pos)
-nest.Connect(motor_prediction_n, spikedetector_motor_pred_pos)
+nest.Connect(motor_prediction_n, spikedetector_motor_pred_neg)
 ''
 nest.Connect(stEst.pops_p[cereb_controlled_joint].pop, spikedetector_stEst_max_pos)
 nest.Connect(stEst.pops_n[cereb_controlled_joint].pop, spikedetector_stEst_max_neg)
@@ -625,11 +637,11 @@ conns_neg_inv = nest.GetConnections(source = motor_prediction_n, target = mc.out
 ''
 # I can't disconnect cereb-State if the Prediction_error = state - cereb
 # I can disconnect the cerebellum only if the error = Feedback - cereb
-''
+'''
 if cerebellum_application_inv != 0:
     nest.SetStatus(conns_pos_inv, {"weight": 0.0})
     nest.SetStatus(conns_neg_inv, {"weight": 0.0})
-''
+'''
 if cerebellum_application_forw != 0:
     nest.SetStatus(conns_pos_forw, {"weight": 0.0})
     nest.SetStatus(conns_neg_forw, {"weight": 0.0})
@@ -639,14 +651,15 @@ total_len = int(time_span + time_pause)
 for trial in range(n_trial):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
+
     if trial == cerebellum_application_inv:
-        nest.SetStatus(conns_pos_inv, {"weight": -0.1})
-        nest.SetStatus(conns_neg_inv, {"weight": 0.1})
+        nest.SetStatus(conns_pos_inv, {"weight": -conn_params["motor_pred_mc_out"]["weight"]})
+        nest.SetStatus(conns_neg_inv, {"weight": conn_params["motor_pred_mc_out"]["weight"]})
     if trial == cerebellum_application_forw:
-        nest.SetStatus(conns_pos_forw, {"weight": 0.5})
-        nest.SetStatus(conns_neg_forw, {"weight": -0.5})
+        nest.SetStatus(conns_pos_forw, {"weight": conn_params["pred_state"]["weight"]})
+        nest.SetStatus(conns_neg_forw, {"weight": -conn_params["pred_state"]["weight"]})
     nest.Simulate(total_len)
-''
+'''
 #%% SIMULATE ######################
 nest.SetKernelStatus({"data_path": pthDat})
 total_len = int(time_span + time_pause)
@@ -654,7 +667,7 @@ for trial in range(n_trial):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
     nest.Simulate(total_len)
-
+'''
 '''
     # Add weights to weigth_recorder
     # Pf-BC
@@ -771,7 +784,11 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 ######## Plotting Cerebellar neurons ########
 ## Collapsing data files into one file
 names = []
+<<<<<<< HEAD
 network_neurons = ["Input inferior Olive Forw pos","Input inferior Olive Forw neg","Input inferior Olive Inv pos","Input inferior Olive Inv neg","Feedback pos","Feedback neg","Feedback inv pos","Feedback inv neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb motor pred pos","Cereb motor pred neg","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg"]
+=======
+network_neurons = ["Input inferior Olive Forw pos","Input inferior Olive Forw neg","Input inferior Olive Inv pos","Input inferior Olive Inv neg","Feedback pos","Feedback neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb motor pred pos","Cereb motor pred neg","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg","Motor Command pos","Motor Command neg","Plan to inv pos","Plan to inv neg"]
+>>>>>>> 670b2663ddbb37c3b67c56c3b94b60a3d224474f
 cereb_neurons = ["granule_cell","golgi_cell","dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","dcn_cell_GABA","mossy_fibers",'io_cell',"glomerulus","dcn_cell_Gly-I"]
 
 for t in tags:

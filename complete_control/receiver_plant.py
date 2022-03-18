@@ -22,7 +22,11 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
 saveFig = True
+<<<<<<< HEAD
 cond = 'test_delay_both_old_parmas_'
+=======
+cond = 'only_f_10_delay_old_params_ff_'
+>>>>>>> 670b2663ddbb37c3b67c56c3b94b60a3d224474f
 
 import json
 
