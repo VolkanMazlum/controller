@@ -21,13 +21,22 @@ import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
-saveFig = True
-cond = 'only_f_10_delay_old_params_ff_'
 
 import json
 
+
+exp = Experiment()
+
+param_file = exp.param_file
+saveFig = True
+ScatterPlot = True
+pathFig = exp.pathFig
+pthDat   = exp.pathData
+pthFig = exp.pathFig
+cond = exp.cond
+
 # Opening JSON file
-f = open('params.json')
+f = open(param_file)
 params = json.load(f)
 print(params["modules"])
 f.close()

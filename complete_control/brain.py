@@ -34,16 +34,23 @@ nest.Install("cerebmodule")
 
 import json
 
+exp = Experiment()
+
+param_file = exp.param_file
+saveFig = True
+ScatterPlot = True
+pathFig = exp.pathFig
+pthDat   = exp.pathData
+pthFig = exp.pathFig
+cond = exp.cond
+
 # Opening JSON file
-f = open('params.json')
+f = open(param_file)
 params = json.load(f)
 print(params["modules"])
 f.close()
 
-saveFig = True
-ScatterPlot = True
-pathFig = './fig/'
-cond = 'only_f_10_delay_old_params_ff_'
+
 
 
 mc_params = params["modules"]["motor_cortex"]
@@ -81,7 +88,6 @@ nest.SetKernelStatus({'rng_seeds' : range(msd+N_vp+1, msd+2*N_vp+1)})
 #%%  EXPERIMENT
 print("init exp")
 
-exp = Experiment()
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     # Remove existing .dat and/or .gdf files generated in previous simulations
     exp.remove_files()
@@ -98,9 +104,6 @@ trj_ee, pol = tj.minimumJerk(init_pos_ee, tgt_pos_ee, time_vect)
 init_pos = dynSys.inverseKin( init_pos_ee )
 tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
 trj      = dynSys.inverseKin( trj_ee )
-
-pthDat   = exp.pathData
-pthFig = exp.pathFig
 
 #%% BRAIN ########################
 print("init brain")

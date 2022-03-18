@@ -24,10 +24,15 @@ class Experiment:
 
     def __init__(self):
 
+        # name for the saved data
+        self._cond = "test_for_local"
+
+        # parameters json file
+        self._param_file = "params.json"
+
         # Where to save data
         self._pathData = "./data/"
         self._pathFig = "./fig/"
-
         # Initial and target position (end-effector space)
         self._init_pos = np.array([0.0,0.0])
         self._tgt_pos  = np.array([1.0,0.5])
@@ -51,11 +56,8 @@ class Experiment:
 
         # At which trial Cerebellum connected to StateEstimator
         self._cerebellum_application_forw = 0
-<<<<<<< HEAD
-        self._cerebellum_application_inv = 0
-=======
+
         self._cerebellum_application_inv = 1e6
->>>>>>> 670b2663ddbb37c3b67c56c3b94b60a3d224474f
 
     def remove_files(self):
         for f in os.listdir(self._pathData):
@@ -65,6 +67,12 @@ class Experiment:
     @property
     def pathData(self):
         return self._pathData
+    @property
+    def param_file(self):
+        return self._param_file
+    @property
+    def cond(self):
+        return self._cond
 
     @property
     def pathFig(self):
