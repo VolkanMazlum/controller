@@ -640,11 +640,11 @@ conns_neg_inv = nest.GetConnections(source = motor_prediction_n, target = mc.out
 ''
 # I can't disconnect cereb-State if the Prediction_error = state - cereb
 # I can disconnect the cerebellum only if the error = Feedback - cereb
-'''
+''
 if cerebellum_application_inv != 0:
     nest.SetStatus(conns_pos_inv, {"weight": 0.0})
     nest.SetStatus(conns_neg_inv, {"weight": 0.0})
-'''
+''
 if cerebellum_application_forw != 0:
     nest.SetStatus(conns_pos_forw, {"weight": 0.0})
     nest.SetStatus(conns_neg_forw, {"weight": 0.0})
