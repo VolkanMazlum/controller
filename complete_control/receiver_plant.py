@@ -22,12 +22,12 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
 saveFig = True
-cond = 'fbk_at_10_delay_'
+cond = 'only_f_10_delay_old_params_ff_'
 
 import json
 
 # Opening JSON file
-f = open('new_params.json')
+f = open('params.json')
 params = json.load(f)
 print(params["modules"])
 f.close()
