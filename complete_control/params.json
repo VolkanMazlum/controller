@@ -153,11 +153,7 @@
             "delay": 0.1
         },
         "motor_pred_mc_out":{
-<<<<<<< HEAD
-            "weight": 0.0,
-=======
             "weight": 0.1,
->>>>>>> 670b2663ddbb37c3b67c56c3b94b60a3d224474f
             "delay": 0.1
         },
         "sn_feedback_inv":{
