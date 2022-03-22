@@ -1,15 +1,15 @@
 {
       "modules": {
             "planner": {
-                  "kp": 1048.268544255273,
-                  "kpl": 1.5080289926633321,
+                  "kp": 1255.0503631208485,
+                  "kpl": 0.32504265346581107,
                   "base_rate": 0.0
             },
             "motor_cortex": {
                   "ffwd_base_rate": 0.0,
-                  "ffwd_kp": 10.630103810184576,
+                  "ffwd_kp": 8.896740997816629,
                   "fbk_base_rate": 0.0,
-                  "fbk_kp": 0.06799829206540017,
+                  "fbk_kp": 0.22817879115406156,
                   "out_base_rate": 0.0,
                   "out_kp": 1.0,
                   "wgt_ffwd_out": 1.0,
@@ -17,8 +17,8 @@
                   "buf_sz": 20.0
             },
             "spine": {
-                  "wgt_motCtx_motNeur": 1.041943543656776,
-                  "wgt_sensNeur_spine": 2.0760165222651548,
+                  "wgt_motCtx_motNeur": 1.0625540740843757,
+                  "wgt_sensNeur_spine": 1.6427161409427353,
                   "sensNeur_base_rate": 0.0,
                   "sensNeur_kp": 1200.0,
                   "fbk_delay": 0.1
@@ -34,7 +34,7 @@
                   "out_base_rate": 0.0,
                   "out_kp": 1.0,
                   "wgt_scale": 1.0,
-                  "buf_sz": 10.0
+                  "buf_sz": 20.0
             }
       },
       "pops": {
@@ -69,7 +69,7 @@
                   "base_rate": 0.0
             },
             "motor_pred": {
-                  "kp": 5.5,
+                  "kp": 2.5,
                   "buffer_size": 20.0,
                   "base_rate": 50.0
             },
@@ -102,7 +102,7 @@
                   "receptor_type": 2
             },
             "sn_state": {
-                  "weight": 1.733875624328092,
+                  "weight": 0.6317663917438847,
                   "receptor_type": 2
             },
             "planner_mc_fbk": {
@@ -151,7 +151,7 @@
                   "delay": 0.1
             },
             "motor_pred_mc_out": {
-                  "weight": 1.0,
+                  "weight": 0.1,
                   "delay": 0.1
             },
             "sn_feedback_inv": {
