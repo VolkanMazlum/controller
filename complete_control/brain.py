@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from pickle import POP_MARK
+
 import nest
 import numpy as np
 import time
@@ -24,7 +25,7 @@ from pointMass import PointMass
 from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
 import random
-
+from plotting import plot_activity, plot_activity_pos_neg
 
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
@@ -994,6 +995,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                     freq_pos.append(freq_bin_pos)
                     freq_neg.append(freq_bin_neg)
                 x = range(beginning, total_len*n_trial, bin_duration)
+                t = np.arange(beginning, total_len*n_trial, bin_duration)
                 plt.plot(x,freq_pos,'b', label='positive')
                 plt.plot(x,freq_neg,'r', label='negative')
                 plt.title('Spike frequency ' + names[name_id], size =25)
@@ -1025,7 +1027,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                 plt.plot(x,y,'r',linewidth = 3)
                 plt.legend()
                 plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
-
+                plot_activity_pos_neg(freq_pos, freq_neg, [mean_freq_pos]*len(t), [mean_freq_neg]*len(t), t,'Spike frequency ' + names[name_id], show=False, to_html = True, to_png = True, path = pathFig+cond)
                 # Mean frequency computed considering each neuron (not the entire population)
                 freq_pos = []
                 freq_neg = []
@@ -1072,6 +1074,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                     freq_bin = n_spikes/(bin_duration/1000*cell_numerosity[cell])
                     freq.append(freq_bin)
                 x = range(beginning, total_len*n_trial, bin_duration)
+                t = np.arange(beginning, total_len*n_trial, bin_duration)
                 plt.plot(x,freq)
                 plt.title('Spike frequency ' + names[name_id], size =25)
                 plt.xlabel('Time [ms]', size =25)
@@ -1090,7 +1093,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                 y = [mean_freq]*len(x)
                 plt.plot(x,y,'r',linewidth = 3)
                 plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
-
+                plot_activity(freq, [mean_freq]*len(t), t, 'Spike frequency ' + names[name_id], show=False, to_html = True, to_png = True, path =pathFig+cond)
                 # Mean frequency computed considering each neuron (not the entire population)
                 freq = []
                 start = 0
