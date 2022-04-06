@@ -22,7 +22,7 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
 saveFig = True
-cond = 'complete_delay_'
+cond = 'test_ff_'
 
 import json
  
@@ -396,16 +396,17 @@ for trial in range(n_trial):
     plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
     errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0])**2 + (pos[end,1] - tgt_pos_ee[1])**2))
     err_x.append(pos[end,0] -tgt_pos_ee[0])
-
+plt.plot(pos[start:end,0],pos[start:end,1],style, label="trajectory")
+plt.plot(pos[end,0],pos[end,1],marker='x',color='k', label="reached pos")
 error_x = pos[end,0] -tgt_pos_ee[0]
 error_y = pos[end,1] -tgt_pos_ee[1]
 errors_xy = [error_x, error_y, np.array(errors[-1])]
-plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue')
-plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red')
+plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue',label="start pos")
+plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red',label="target pos")
 plt.axis('equal')
 plt.xlabel('position x (m)')
 plt.ylabel('position y (m)')
-plt.legend(['trajectory', 'init','target','final'])
+plt.legend()
 if saveFig:
     plt.savefig(pathFig+cond+"position_ee.png")
 

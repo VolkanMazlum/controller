@@ -1,15 +1,15 @@
 {
       "modules": {
             "planner": {
-                  "kp": 1258.6698001835662,
-                  "kpl": 1.2742963240983942,
+                  "kp": 1255.0503631208485,
+                  "kpl": 0.32504265346581107,
                   "base_rate": 0.0
             },
             "motor_cortex": {
                   "ffwd_base_rate": 0.0,
-                  "ffwd_kp": 9.091030228648949,
+                  "ffwd_kp": 8.896740997816629,
                   "fbk_base_rate": 0.0,
-                  "fbk_kp": 0.41708879576253133,
+                  "fbk_kp": 0.22817879115406156,
                   "out_base_rate": 0.0,
                   "out_kp": 1.0,
                   "wgt_ffwd_out": 1.0,
@@ -17,8 +17,8 @@
                   "buf_sz": 20.0
             },
             "spine": {
-                  "wgt_motCtx_motNeur": 1.009394402415847,
-                  "wgt_sensNeur_spine": 1.3659365689788179,
+                  "wgt_motCtx_motNeur": 1.0625540740843757,
+                  "wgt_sensNeur_spine": 1.6427161409427353,
                   "sensNeur_base_rate": 0.0,
                   "sensNeur_kp": 1200.0,
                   "fbk_delay": 0.1
@@ -34,7 +34,7 @@
                   "out_base_rate": 0.0,
                   "out_kp": 1.0,
                   "wgt_scale": 1.0,
-                  "buf_sz": 10.0
+                  "buf_sz": 20.0
             }
       },
       "pops": {
@@ -44,8 +44,13 @@
                   "base_rate": 50.0
             },
             "motor_commands": {
-                  "kp": 1.0,
+                  "kp": 0.1,
                   "buffer_size": 25.0,
+                  "base_rate": 0.0
+            },
+            "brain_stem": {
+                  "kp": 0.2,
+                  "buffer_size": 10.0,
                   "base_rate": 0.0
             },
             "feedback": {
@@ -69,9 +74,9 @@
                   "base_rate": 0.0
             },
             "motor_pred": {
-                  "kp": 5.5,
+                  "kp": 0.05,
                   "buffer_size": 20.0,
-                  "base_rate": 50.0
+                  "base_rate": 40.0
             },
             "feedback_inv": {
                   "kp": 1.0,
@@ -90,7 +95,7 @@
                   "delay": 0.1
             },
             "sn_fbk_smoothed": {
-                  "weight": 0.007627125053883081,
+                  "weight": 0.028,
                   "delay": 0.1
             },
             "pred_state": {
@@ -102,7 +107,7 @@
                   "receptor_type": 2
             },
             "sn_state": {
-                  "weight": 1.0,
+                  "weight": 0.6317663917438847,
                   "receptor_type": 2
             },
             "planner_mc_fbk": {
@@ -114,7 +119,7 @@
                   "delay": 0.1
             },
             "mc_out_motor_commands": {
-                  "weight": 0.005920233767894265,
+                  "weight": 0.003,
                   "delay": 0.1
             },
             "motor_commands_mossy_forw": {
@@ -122,7 +127,7 @@
                   "delay": 0.1
             },
             "sn_feedback": {
-                  "weight": 0.02833362956244096,
+                  "weight": 0.001,
                   "delay": 0.1
             },
             "dcn_f_error": {
@@ -147,11 +152,19 @@
                   "delay": 0.1
             },
             "dcn_i_motor_pred": {
-                  "weight": 0.3,
+                  "weight": 0.5,
                   "delay": 0.1
             },
             "motor_pred_mc_out": {
-                  "weight": 1.0,
+                  "weight": 0.1,
+                  "delay": 0.1
+            },
+            "motor_pre_brain_stem": {
+                  "weight": 0.005,
+                  "delay": 0.1
+            },
+            "mc_out_brain_stem": {
+                  "weight": 0.1,
                   "delay": 0.1
             },
             "sn_feedback_inv": {
