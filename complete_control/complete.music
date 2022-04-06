@@ -8,5 +8,5 @@
   np=1
 
 # How ports are connected
-nest.mot_cmd_out -> plant.mot_cmd_in [200]
-plant.fbk_out -> nest.fbk_in [200]
+nest.mot_cmd_out -> plant.mot_cmd_in [100]
+plant.fbk_out -> nest.fbk_in [100]

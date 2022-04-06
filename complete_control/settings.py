@@ -29,13 +29,15 @@ class Experiment:
         self._pathFig = "./fig/"
 
         # Initial and target position (end-effector space)
-        self._init_pos = np.array([2.0,0.0])
-        self._tgt_pos  = np.array([0.0,2.0])
+        self._init_pos = np.ndarray([1,2])
+        self._tgt_pos  = np.ndarray([1,2])
+        self._init_pos[:] = [2.0,0.0]
+        self._tgt_pos[:]  =[0.0,2.0]
         #self._tgt_pos  = np.array([0.25,0.43])
         #self._tgt_pos  = np.array([-0.25,0.43])
 
         # Perturbation
-        alpha = np.arctan(self._tgt_pos[1]/self._tgt_pos[0])/np.pi*180
+        alpha = 0#np.arctan(self._tgt_pos[:,1]/self._tgt_pos[:,0])/np.pi*180
         left = (180 - alpha)
         right = -alpha
         self._frcFld_angle = right  # Angle of the perturbation force wrt movement velocity
@@ -113,10 +115,10 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 500.0
+        self._timeMax = 50.0
 
         # Pause after movement (milliseconds)
-        self._timePause = 200.0
+        self._timePause = 20.0
 
         # Number of trials
         self._n_trials = 1

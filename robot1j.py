@@ -42,10 +42,10 @@ class Robot1J(Body):
 
     # Integrate the body over dt
     def integrateTimeStep(self, u, dt):
-        if u.shape!=self._angles.shape or u.shape!=self._ang_vel.shape:
-            raise Exception("Wrong format")
-        self._ang_vel = self._ang_vel + u/self._mass * dt
-        self._angles = self._angles + self._ang_vel * dt
+        # if u.shape!=self._angles.shape or u.shape!=self._ang_vel.shape:
+        #     raise Exception("Wrong format")
+        self._vel = self._vel + u/self.robot["links"]**2 * dt
+        self._pos = self._pos + self._vel * dt
 
     # Definition of the inverse kinematic given end-effector position
     def inverseKin(self,pos_external):
@@ -70,8 +70,8 @@ class Robot1J(Body):
         
         x = self.robot["links"]*np.cos(angles)
         y = self.robot["links"]*np.sin(angles)
-        pos_external = [x,y]
-        return pos_external
+        pos_external = np.array([x,y])
+        return pos_external.reshape([2,pos_external.shape[1]])
 
     # Definition of the inverse dynamics (from kin to torques)
     def inverseDyn(self,pos,vel,acc):

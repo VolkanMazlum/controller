@@ -108,7 +108,7 @@ class Planner:
         return self.traj_plan_j
 
     def generateJointTraj(self,init,target):
-        trj_j, pol = tj.minimumJerk(init, target, self.time_vect)
+        trj_j, pol = tj.minimumJerk(init[0], target, self.time_vect)
 
         nj = trj_j.shape[1]
         if nj!=self.numJoints:

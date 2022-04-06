@@ -95,7 +95,7 @@ tgt_pos_ee  = exp.tgt_pos
 # Joint space
 init_pos = dynSys.inverseKin( init_pos_ee )
 tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
-trj, pol = tj.minimumJerk(init_pos, tgt_pos, time_vect)
+trj, pol = tj.minimumJerk(init_pos[0], tgt_pos[0], time_vect)
 trj_ee      = dynSys.forwardKin( trj )
 
 pthDat   = exp.pathData
@@ -129,7 +129,7 @@ print(brain.filename_config)
 #### Planner
 print("init planner")
 
-planner = Planner(N, time_vect, tgt_pos, dynSys, plan_params["kpl"], pthDat, time_pause, plan_params["base_rate"],plan_params["kp"])
+planner = Planner(N, time_vect, tgt_pos[0], dynSys, plan_params["kpl"], pthDat, time_pause, plan_params["base_rate"],plan_params["kp"])
 
 #### Motor cortex
 print("init mc")
