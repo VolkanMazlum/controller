@@ -28,6 +28,7 @@ class Planner:
         self.plant = plant
         self.numJoints = plant.numVariables()
         self.init_endEff = plant.forwardKin( plant.pos )
+        self.init_j = plant.pos
 
         # Time vector
         self.time_vect = time_vect
@@ -42,11 +43,11 @@ class Planner:
         self.error_plan = 0.0
 
         # Desired and planned trajectory in end-effector space
-        self.traj_des  = self.generateEndEffTraj(self.init_endEff, self.target_des)
-        self.traj_plan = self.generateEndEffTraj(self.init_endEff, self.target_plan)
+        self.traj_des_j  = self.generateJointTraj(self.init_j, self.target_des)
+        self.traj_plan_j = self.generateJointTraj(self.init_j, self.target_plan)
 
         # Planned trajectory in joint space
-        self.traj_plan_j = self.generateJointTraj(self.traj_plan)
+        self.traj_plan = self.generateEndEffTraj(self.traj_plan_j)
 
         # General parameters of neurons
         params = {
@@ -78,52 +79,36 @@ class Planner:
     #### Target (end-effector space)
 
     def getTargetDes(self):
-        return self.target_des
+        return self.target_des[0]
 
     def setTargetDes(self, tgt):
         self.target_des = tgt
 
     def getTargetPlan(self):
-        return self.target_plan
+        return self.target_plan[0]
 
     def setTargetPlan(self, tgt):
         self.target_plan = tgt
-        self.traj_plan   = self.generateEndEffTraj(self.init_endEff, self.target_plan)   # Update planned trajectory (end-effector space)
-        self.traj_plan_j = self.generateJointTraj(self.traj_plan)
+        self.traj_plan_j   = self.generateJointTraj(self.init_j, self.target_plan)   # Update planned trajectory (end-effector space)
+        self.traj_plan = self.generateEndEffTraj(self.traj_plan_j)
 
     def updateTarget(self, error):
         self.error_plan  = error                                                         # Record error
         self.target_plan = self.getTargetPlan()-self.kPlan*error                         # Update planned traget
-        self.traj_plan   = self.generateEndEffTraj(self.init_endEff, self.target_plan)   # Update planned trajectory (end-effector space)
-        self.traj_plan_j = self.generateJointTraj(self.traj_plan)                        # Update planned trajectory (joint space)
+        self.traj_plan_j   = self.generateJointTraj(self.init_j, self.target_plan)   # Update planned trajectory (end-effector space)
+        self.traj_plan = self.generateEndEffTraj(self.traj_plan)                        # Update planned trajectory (joint space)
 
 
     #### Trajectory (end-effector space)
 
-    def getTrajDes(self):
-        return self.traj_des
-
-    def getTrajPlan(self):
-        return self.traj_plan
-
-    def generateEndEffTraj(self,init,target):
-        trj, pol = tj.minimumJerk(init, target, self.time_vect)
-        return trj
-
-    def setTrajDes(self):
-        self.generateEndEffTraj(self.init_endEff,self.target_des)
-
-    def setTrajPlan(self):
-        self.generateEndEffTraj(self.init_endEff,self.target_plan)
-
-
-    #### Trajectory (joint space)
+    def getTrajDes_j(self):
+        return self.traj_des_j
 
     def getTrajPlan_j(self):
-            return self.traj_plan_j
+        return self.traj_plan_j
 
-    def generateJointTraj(self, trj_endEff):
-        trj_j = self.plant.inverseKin( trj_endEff )
+    def generateJointTraj(self,init,target):
+        trj_j, pol = tj.minimumJerk(init, target, self.time_vect)
 
         nj = trj_j.shape[1]
         if nj!=self.numJoints:
@@ -145,3 +130,39 @@ class Planner:
             a_file.close()
 
         return trj_j_pause
+
+    def setTrajDes(self):
+        self.generateJointTraj(self.init_j,self.target_des)
+
+    def setTrajPlan(self):
+        self.generateJointTraj(self.init_j,self.target_plan)
+
+
+    #### Trajectory (joint space)
+
+    def getTrajPlan_j(self):
+            return self.traj_plan_j
+
+    def generateEndEffTraj(self, trj_j):
+        trj_ee = self.plant.forwardKin( trj_j )
+
+        # nj = trj_j.shape[1]
+        # if nj!=self.numJoints:
+        #     raise Exception("Number of joint is different from number of columns")
+
+        # # Include pause into the trajectory
+        # res = nest.GetKernelStatus({"resolution"})[0]
+        # time_bins = trj_j.shape[0] + int(self.pause_len/res)
+        # trj_j_pause = np.zeros((time_bins, trj_j.shape[1])) 
+        # for i in range(nj):
+        #     trj_j_pause[:,i] = AddPause(trj_j[:,i], self.pause_len, res)
+
+        # # save joint trajectories into files
+        # # NOTE: THIS OVERWRITES EXISTING TRAJECTORIES
+        # for i in range(nj):
+        #     traj_file = self.pathData + "joint" + str(i) + ".dat"
+        #     a_file = open(traj_file, "w")
+        #     np.savetxt( a_file, trj_j_pause[:,i] )
+        #     a_file.close()
+
+        return trj_ee

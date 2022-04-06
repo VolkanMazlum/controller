@@ -14,7 +14,7 @@ import numpy as np
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-from pointMass import PointMass
+from robot1j import Robot1J
 import perturbation as pt
 import os
 
@@ -29,8 +29,8 @@ class Experiment:
         self._pathFig = "./fig/"
 
         # Initial and target position (end-effector space)
-        self._init_pos = np.array([0.0,0.0])
-        self._tgt_pos  = np.array([1.0,0.5])
+        self._init_pos = np.array([2.0,0.0])
+        self._tgt_pos  = np.array([0.0,2.0])
         #self._tgt_pos  = np.array([0.25,0.43])
         #self._tgt_pos  = np.array([-0.25,0.43])
 
@@ -43,12 +43,13 @@ class Experiment:
         self._ff_application = 1e6    # Trial at which the Force Field is applied (1e6 = no force field)
         self._ff_removal = 1e6    # Trial at which the Force Field is removed for extinction
 
-        # Dynamical system to be controlled (mass and dyn sys object)
-        self._m          = 2.0                                     # Mass (kg)
-        self._dynSys     = PointMass(mass=self._m)                 # Point mass
-        self._dynSys.pos = self._dynSys.inverseKin(self._init_pos) # Initial condition (position)
-        self._dynSys.vel = np.array([0.0,0.0])                     # Initial condition (velocity)
-
+        # Dynamical system
+        self._robot_spec = {"mass": np.array([1.0]),
+                    "links":np.array([2.0])}
+        self._dynSys     = Robot1J(robot=self._robot_spec)
+        self._dynSys.pos = self._dynSys.inverseKin(pos_external = self._init_pos) # Place dyn sys in desired initial position
+        self._dynSys.vel = np.array([0.0])      # with zero initial velocity
+        
         # At which trial Cerebellum connected to StateEstimator
         self._cerebellum_application_forw = 1e6
         self._cerebellum_application_inv = 1e6

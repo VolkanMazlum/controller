@@ -86,12 +86,14 @@ njt    = exp.dynSys.numVariables()
 # End-effector space
 init_pos_ee = exp.init_pos
 tgt_pos_ee  = exp.tgt_pos
-trj_ee, pol = tj.minimumJerk(init_pos_ee, tgt_pos_ee, time)
 
-# Joint space
+
 init_pos = dynSys.inverseKin( init_pos_ee )
 tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
-trj      = dynSys.inverseKin( trj_ee )
+trj, pol = tj.minimumJerk(init_pos, tgt_pos, time)
+
+# Joint space
+trj_ee      = dynSys.forwardKin( trj )
 trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
 inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)
@@ -401,7 +403,7 @@ plt.plot(pos[end,0],pos[end,1],marker='x',color='k', label="reached pos")
 error_x = pos[end,0] -tgt_pos_ee[0]
 error_y = pos[end,1] -tgt_pos_ee[1]
 errors_xy = [error_x, error_y, np.array(errors[-1])]
-plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue',label="start pos")
+plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue',label="starting pos")
 plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red',label="target pos")
 plt.axis('equal')
 plt.xlabel('position x (m)')

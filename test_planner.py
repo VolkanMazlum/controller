@@ -7,6 +7,7 @@ import trajectories as tj
 
 from planner import Planner
 from pointMass import PointMass
+from robot1j import Robot1J 
 from population_view import plotPopulation
 
 nest.Install("util_neurons_module")
@@ -16,20 +17,26 @@ flagSaveFig = False
 figPath = './fig/planner/'
 pthDat = "./data/"
 
+
 # End effector space
-pos_i  = np.array([0.0,0.0]) # Initial position
-tgt    = np.array([0.25,0.43]) # Desired target
-final  = np.array([0.25,0.43]) # Exemplary reached target (this will be the output of a simulation)
-kpl    = 1.0                 # Coefficient across-trial plan adjustement
+pos_i    = np.ndarray([1,2]) # Initial position
+pos_i[:] = [2.0,0.0]
+pos_tgt = np.ndarray([1,2])
+pos_tgt[:] = [0.0, 2.0] # Desired target
+#final  = np.array([0.25,0.43]) # Exemplary reached target (this will be the output of a simulation)
+#kpl    = 1.0                 # Coefficient across-trial plan adjustement
+
 
 # Dynamical system
-m          = 2.0
-ptMass     = PointMass(mass=m)
-ptMass.pos = ptMass.inverseKin(pos_i) # Place dyn sys in desired initial position
-ptMass.vel = np.array([0.0,0.0])      # with zero initial velocity
-njt        = ptMass.numVariables()
-
+robot_spec = {"mass": np.array([1.0]),
+            "links":np.array([2.0])}
+rob     = Robot1J(robot=robot_spec)
+angles_i = rob.inverseKin(pos_external = pos_i) # Place dyn sys in desired initial position
+rob.ang_vel = np.array([0.0])      # with zero initial velocity
+njt        = rob.numVariables()
 N = 50   # Number neurons
+target = rob.inverseKin(pos_tgt)
+final = 1.50
 
 time_span = 1000.0
 time_vect = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
@@ -39,7 +46,7 @@ pl_param = {
     "kp": 50.0
     }
 
-plan_pop = Planner(N, time_vect, plant=ptMass, target=tgt, kPlan=kpl, pathData=pthDat, **pl_param)
+plan_pop = Planner(N, time_vect, plant=rob, target=target, kPlan=1.0, pathData=pthDat, **pl_param)
 
 
 ######################## Check trajectories ########################
@@ -47,7 +54,7 @@ plan_pop = Planner(N, time_vect, plant=ptMass, target=tgt, kPlan=kpl, pathData=p
 #plan_pop.setTargetPlan(np.array([10.0,0.5]))
 
 # End-effector space
-final_trj, pol = tj.minimumJerk(pos_i, final, time_vect)
+final_trj, pol = tj.minimumJerk(angles_i[0], final, time_vect)
 err = final-plan_pop.getTargetDes()     # Error
 plan_pop.updateTarget(err)              # Compute new plan, given error
 
@@ -77,17 +84,17 @@ nest.Simulate(time_span)
 
 ########################### PLOTTING ###########################
 
-lgd = ['x tgt des','y tgt des','x predicted','y predicted','x plan','y plan']
+lgd = ['theta tgt des','theta predicted','theta plan']
 
 plt.figure()
-plt.plot( time_span, np.reshape(tgt,(1,2)), marker='o' )   # Desired target
+plt.plot( time_span, target, marker='o' )   # Desired target
 plt.plot( time_vect, final_trj, linestyle=':' )            # Predicted trajectory
-plt.plot( time_vect, plan_pop.getTrajPlan() )              # Planned trajectory
+plt.plot( time_vect, plan_pop.getTrajPlan_j() )              # Planned trajectory
 plt.ylabel("Trajectory (m)")
 plt.xlabel("time (ms)")
 plt.legend(lgd)
 plt.grid()
-
+plt.show()
 if flagSaveFig:
     plt.savefig(figPath+"planner_trj_i_"+str(pos_i)+"_tgt_"+str(tgt)+"_err_"+str(err)+"_2.png",format="png")
     #plt.savefig(figPath+"planner_trj_i_"+str(pos_i)+"_tgt_"+str(tgt)+"_err_"+str(err)+".svg",format="svg")
@@ -99,7 +106,7 @@ pos = plan_pop.pops_p
 neg = plan_pop.pops_n
 
 # Populations
-lgd = ['x','y']
+lgd = ['theta']
 max_y = np.empty(shape=(njt,2))
 axv = []
 fgv = []
