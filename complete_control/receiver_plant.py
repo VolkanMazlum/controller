@@ -5,12 +5,11 @@ import sys
 import queue
 import numpy as np
 import matplotlib.pyplot as plt
+import json
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-
-from pointMass import PointMass
 from sensoryneuron import SensoryNeuron
 from settings import Experiment, Simulation, Brain, MusicCfg
 from util import plotPopulation
@@ -22,10 +21,7 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
 saveFig = True
-cond = 'test_ff_'
 
-import json
- 
 # Opening JSON file
 f = open('new_params.json')
 params = json.load(f)
@@ -42,11 +38,10 @@ state_se_params = params["modules"]["state_se"]
 pops_params = params["pops"]
 conn_params = params["connections"]
 
-pathFig = params["path"]
 
-f = open(pathFig+"params.json","w")
-json.dump(params, f, indent =6)
-f.close()
+# f = open(pathFig+"params.json","w")
+# json.dump(params, f, indent =6)
+# f.close()
 #%%  SIMULATION
 
 ###################### SIMULATION ######################
@@ -70,7 +65,11 @@ bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 exp = Experiment()
 
+
+pathFig =exp.pathFig
+# pathFig = params["path"]
 pthDat = exp.pathData
+cond = exp.cond
 
 # Perturbation
 angle = exp.frcFld_angle
@@ -360,95 +359,95 @@ np.savetxt( pthDat+"perturbation_ee.csv", perturb, delimiter=',' )   # Perturbat
 np.savetxt( pthDat+"perturbation_j.csv", perturb_j, delimiter=',' )  # Perturbation torque
 
 
-# ########################### PLOTTING ###########################
-# lgd = ['theta','des']
-# plt.figure()
-# plt.plot(time_tot,inputCmd)
-# plt.plot(time,inputDes,linestyle=':')
-# plt.xlabel("time (s)")
-# plt.ylabel("motor commands (N)")
-# plt.legend(lgd)
-# if saveFig:
-#     plt.savefig(pathFig+cond+"motCmd.png")
+########################### PLOTTING ###########################
+lgd = ['theta','des']
+plt.figure()
+plt.plot(time_tot,inputCmd)
+plt.plot(time,inputDes,linestyle=':')
+plt.xlabel("time (s)")
+plt.ylabel("motor commands (N)")
+plt.legend(lgd)
+if saveFig:
+    plt.savefig(pathFig+cond+"motCmd.png")
 
-# # Joint space
-# plt.figure()
-# plt.plot(time_tot,pos_j)
-# plt.plot(time,trj,linestyle=':')
-# plt.xlabel('time (s)')
-# plt.ylabel('position (m)')
-# plt.legend(['x','y','x_des','y_des'])
-# if saveFig:
-#     plt.savefig(pathFig+cond+"position_joint.png")
+# Joint space
+plt.figure()
+plt.plot(time_tot,pos_j)
+plt.plot(time,trj,linestyle=':')
+plt.xlabel('time (s)')
+plt.ylabel('position (m)')
+plt.legend(['theta','des'])
+if saveFig:
+    plt.savefig(pathFig+cond+"position_joint.png")
 
-# # End-effector space
-# plt.figure()
-# trial_delta = int((timeMax+time_pause)/res)
-# task_steps = int((timeMax)/res)
-# errors = []
-# err_x = []
-# for trial in range(n_trial):
-#     start = trial*trial_delta
-#     end = start + task_steps - 1
-#     if trial < ff_application: # Only cerebellum
-#         style = 'k'
-#     else:
-#         style = 'r:'  # Cerebellum must compensate delay and Force field
-#     plt.plot(pos[start:end,0],pos[start:end,1],style)
-#     plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
-#     errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0])**2 + (pos[end,1] - tgt_pos_ee[1])**2))
-#     err_x.append(pos[end,0] -tgt_pos_ee[0])
-# plt.plot(pos[start:end,0],pos[start:end,1],style, label="trajectory")
-# plt.plot(pos[end,0],pos[end,1],marker='x',color='k', label="reached pos")
+# End-effector space
+plt.figure()
+trial_delta = int((timeMax+time_pause)/res)
+task_steps = int((timeMax)/res)
+errors = []
+err_x = []
+for trial in range(n_trial):
+    start = trial*trial_delta
+    end = start + task_steps - 1
+    if trial < ff_application: # Only cerebellum
+        style = 'k'
+    else:
+        style = 'r:'  # Cerebellum must compensate delay and Force field
+    plt.plot(pos[start:end,0],pos[start:end,1],style)
+    plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
+    # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
+    # err_x.append(pos[end,0] -tgt_pos_ee[0])
+plt.plot(pos[start:end,0],pos[start:end,1],style, label="trajectory")
+plt.plot(pos[end,0],pos[end,1],marker='x',color='k', label="reached pos")
 # error_x = pos[end,0] -tgt_pos_ee[0]
 # error_y = pos[end,1] -tgt_pos_ee[1]
 # errors_xy = [error_x, error_y, np.array(errors[-1])]
-# plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue',label="starting pos")
-# plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red',label="target pos")
-# plt.axis('equal')
-# plt.xlabel('position x (m)')
-# plt.ylabel('position y (m)')
-# plt.legend()
-# if saveFig:
-#     plt.savefig(pathFig+cond+"position_ee.png")
+plt.plot(init_pos_ee[0,0],init_pos_ee[0,1],marker='o',color='blue',label="starting pos")
+plt.plot(tgt_pos_ee[0,0],tgt_pos_ee[0,1],marker='o',color='red',label="target pos")
+plt.axis('equal')
+plt.xlabel('position x (m)')
+plt.ylabel('position y (m)')
+plt.legend()
+if saveFig:
+    plt.savefig(pathFig+cond+"position_ee.png")
 
-# plt.figure()
-# plt.plot(errors)
-# plt.xlabel('Trial')
-# plt.ylabel('Error [m]')
-# if saveFig:
-#     plt.savefig(pathFig+cond+"error_ee.png")
+plt.figure()
+plt.plot(errors)
+plt.xlabel('Trial')
+plt.ylabel('Error [m]')
+if saveFig:
+    plt.savefig(pathFig+cond+"error_ee.png")
 
-# np.savetxt("error.txt",np.array(errors)*100)
+np.savetxt("error.txt",np.array(errors)*100)
 # np.savetxt("error_xy.txt",np.array(errors_xy)*100)
 
-# # target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)
-# # err_perc = [i/target_distance for i in errors]
-# # plt.figure()
-# # plt.plot(err_perc)
-# # plt.xlabel('Trial')
-# # plt.ylabel('Error [%]')
-# # if saveFig:
-# #     plt.savefig(pathFig+cond+"error_ee_perc.png")
+# target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)
+# err_perc = [i/target_distance for i in errors]
+# plt.figure()
+# plt.plot(err_perc)
+# plt.xlabel('Trial')
+# plt.ylabel('Error [%]')
+# if saveFig:
+#     plt.savefig(pathFig+cond+"error_ee_perc.png")
 
-# # plt.figure()
-# # plt.plot(err_x)
-# # plt.xlabel('Trial')
-# # plt.ylabel('Horizontal error [m]')
-# # if saveFig:
-# #     plt.savefig(pathFig+cond+"error_ee_x.png")
+# plt.figure()
+# plt.plot(err_x)
+# plt.xlabel('Trial')
+# plt.ylabel('Horizontal error [m]')
+# if saveFig:
+#     plt.savefig(pathFig+cond+"error_ee_x.png")
 
-# # target_distance_x = abs(tgt_pos_ee[0] - init_pos_ee[0])
-# # err_x_perc = [i/target_distance_x for i in err_x]
-# # plt.figure()
-# # plt.plot(err_x)
-# # plt.xlabel('Trial')
-# # plt.ylabel('Horizontal error [%]')
-# # if saveFig:
-# #     plt.savefig(pathFig+cond+"error_ee_x_perc.png")
+# target_distance_x = abs(tgt_pos_ee[0] - init_pos_ee[0])
+# err_x_perc = [i/target_distance_x for i in err_x]
+# plt.figure()
+# plt.plot(err_x)
+# plt.xlabel('Trial')
+# plt.ylabel('Horizontal error [%]')
+# if saveFig:
+#     plt.savefig(pathFig+cond+"error_ee_x_perc.png")
 
-# # Show sensory neurons
-# # for i in range(njt):
-# #     plotPopulation(time, sn_p[i], sn_n[i], title=lgd[i],buffer_size=0.015)
+# Show sensory neurons
+# for i in range(njt):
+#     plotPopulation(time, sn_p[i], sn_n[i], title=lgd[i],buffer_size=0.015)
 
-# #plt.show()
+#plt.show()

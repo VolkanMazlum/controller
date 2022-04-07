@@ -63,7 +63,7 @@ class Robot1J(Body):
             else:
                 theta.append(np.arctan(pos_external[i,1]/pos_external[i,0]))
         self.angles=theta
-        return theta
+        return np.array([theta])
 
     # Definition of the forward kinematic given joint angles
     def forwardKin(self,angles):

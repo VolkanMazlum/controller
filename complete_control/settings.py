@@ -24,6 +24,9 @@ class Experiment:
 
     def __init__(self):
 
+
+        self._cond = "test_plot_"
+        
         # Where to save data
         self._pathData = "./data/"
         self._pathFig = "./fig/"
@@ -68,6 +71,10 @@ class Experiment:
     @property
     def pathFig(self):
         return self._pathFig
+
+    @property
+    def cond(self):
+        return self._cond
 
     @property
     def dynSys(self):
@@ -115,10 +122,10 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 50.0
+        self._timeMax = 500.0
 
         # Pause after movement (milliseconds)
-        self._timePause = 20.0
+        self._timePause = 200.0
 
         # Number of trials
         self._n_trials = 1
