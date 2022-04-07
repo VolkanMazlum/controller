@@ -8,7 +8,7 @@ __version__ = "1.0.1"
 
 import numpy as np
 from body import Body
-
+g = 9.81
 class Robot1J(Body):
 
     def __init__(self, IC_pos=np.array([0.0]),
@@ -22,7 +22,7 @@ class Robot1J(Body):
         self.robot = robot
         self.pos  = IC_pos
         self.vel  = IC_vel
-
+        self.I = self.robot["mass"] * self.robot["links"]**2
     @property
     def mass(self):
         return self.robot["mass"]
@@ -44,7 +44,10 @@ class Robot1J(Body):
     def integrateTimeStep(self, u, dt):
         # if u.shape!=self._angles.shape or u.shape!=self._ang_vel.shape:
         #     raise Exception("Wrong format")
-        self._vel = self._vel + u/self.robot["links"]**2 * dt
+        
+        self._acc = (u - g * self.robot["mass"] * self.robot["links"]/2 *np.sin(self._pos))/self.I
+        self._vel = self._vel + self._acc * dt
+        # self._vel = self._vel + u/self.robot["links"]**2 * dt
         self._pos = self._pos + self._vel * dt
 
     # Definition of the inverse kinematic given end-effector position
@@ -82,7 +85,8 @@ class Robot1J(Body):
         #         raise Exception("Wrong value format")
         # elif acc.shape!=self._angles.shape:
         #     raise Exception("Wrong value format")
-        torques = acc * self.robot["links"]**2
+        # torques = acc * self.robot["links"]**2
+        torques = self.I * acc + g * self.robot["mass"] * self.robot["links"]/2 *np.sin(pos)
         return torques
     
     # Definition of the forward dynamics (from torques to kin)
