@@ -84,7 +84,7 @@
                   "base_rate": 0.0
             },
             "error_i": {
-                  "kp": 0.1,
+                  "kp": 0.01,
                   "buffer_size": 30.0,
                   "base_rate": -20.0
             }
@@ -184,7 +184,7 @@
                   "delay": 0.1
             },
             "error_inv_io_i": {
-                  "weight": 3.0,
+                  "weight": 1.0,
                   "delay": 0.1,
                   "receptor_type": 1
             }
