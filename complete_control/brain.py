@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from pickle import POP_MARK
-
 import nest
 import numpy as np
 import time
@@ -19,13 +17,14 @@ from planner import Planner
 from stateestimator import StateEstimator, StateEstimator_mass
 from cerebellum import Cerebellum
 from population_view import plotPopulation
-from util import savePattern
+
+from util import plot_activity, plot_activity_pos_neg, plot_scatter, add_rect_pause, add_slider, collapse_gdf_data, read_gdf_data, neptune_manager
 from population_view import PopView
 from pointMass import PointMass
 from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
 import random
-from plotting import plot_activity, plot_activity_pos_neg
+#from plotting import plot_activity, plot_activity_pos_neg
 
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
@@ -40,6 +39,7 @@ exp = Experiment()
 param_file = exp.param_file
 saveFig = True
 ScatterPlot = False
+SHOW = False
 pathFig = exp.pathFig
 pthDat   = exp.pathData
 pthFig = exp.pathFig
@@ -882,22 +882,23 @@ files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))
 
 
 if mpi4py.MPI.COMM_WORLD.rank == 0:
-    file_list = []
-    for name in names:
-        if (name + '_spikes' + '.gdf' not in files):
-            for f in files:
-                if (f.startswith(name)):
-                    file_list.append(f)
-            print(file_list)
-            with open(pthDat + name + ".gdf", "w") as wfd:
-                for f in file_list:
-                    with open(pthDat + f, "r") as fd:
-                        wfd.write(fd.read())
-            for f in file_list:
-                os.remove(pthDat+f)
-            file_list = []
-        else:
-            print('Già fatto')
+    collapse_gdf_data(names, pthDat)
+    # file_list = []
+    # for name in names:
+    #     if (name + '_spikes' + '.gdf' not in files):
+    #         for f in files:
+    #             if (f.startswith(name)):
+    #                 file_list.append(f)
+    #         print(file_list)
+    #         with open(pthDat + name + ".gdf", "w") as wfd:
+    #             for f in file_list:
+    #                 with open(pthDat + f, "r") as fd:
+    #                     wfd.write(fd.read())
+    #         for f in file_list:
+    #             os.remove(pthDat+f)
+    #         file_list = []
+    #     else:
+    #         print('Già fatto')
     print('Collapsing files ended')
 
 
@@ -932,31 +933,34 @@ for i in range(17,len(names)):
 
 
 if mpi4py.MPI.COMM_WORLD.rank == 0:
+    SD, IDs =   read_gdf_data(names,pthDat)
     print('Start reading data')
-    files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
-    IDs = {}
-    SD = {}
-    times = {}
-    for cell in names:
-        print('Reading:',cell)
-        for f in files:
-            if f.startswith(cell):
-                break
-        cell_f = open(pthDat+f,'r').read()
-        cell_f = cell_f.split('\n')
-        IDs[cell] = {}
-        SD[cell] = {'evs': [], 'ts': []}
-        for i in range(len(cell_f)-1):
-            splitted_string = cell_f[i].split('\t')
-            ID_cell = float(splitted_string[0])
-            time_cell = float(splitted_string[1])
-            SD[cell]['evs'].append(ID_cell)
-            SD[cell]['ts'].append(time_cell)
-            if str(ID_cell) in IDs[cell].keys():
-                IDs[cell][str(ID_cell)].append(time_cell)
-            else:
-                IDs[cell][str(ID_cell)] = [time_cell]
-
+    # files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
+    # IDs = {}
+    # SD = {}
+    # times = {}
+    # for cell in names:
+    #     print('Reading:',cell)
+    #     for f in files:
+    #         if f.startswith(cell):
+    #             break
+    #     cell_f = open(pthDat+f,'r').read()
+    #     cell_f = cell_f.split('\n')
+    #     IDs[cell] = {}
+    #     SD[cell] = {'evs': [], 'ts': []}
+    #     for i in range(len(cell_f)-1):
+    #         splitted_string = cell_f[i].split('\t')
+    #         ID_cell = float(splitted_string[0])
+    #         time_cell = float(splitted_string[1])
+    #         SD[cell]['evs'].append(ID_cell)
+    #         SD[cell]['ts'].append(time_cell)
+    #         if str(ID_cell) in IDs[cell].keys():
+    #             IDs[cell][str(ID_cell)].append(time_cell)
+    #         else:
+    #             IDs[cell][str(ID_cell)] = [time_cell]
+    nep = neptune_manager()
+    nep.set_params(params)
+    
     print('Start making plots')
     for name_id, cell in enumerate(names):
         list1 = []
@@ -968,7 +972,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             bin_duration = 10
             list2 = []
             list2 = [tag + '_' + a for tag in tags for a in ["dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","io_cell"]]
-            print(list2)
+            # print(list2)
             if cell in list2:
                 if cell[0]==tags[0][0]:
                     cereb = cerebellum_forw
@@ -1027,7 +1031,14 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                 plt.plot(x,y,'r',linewidth = 3)
                 plt.legend()
                 plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
-                plot_activity_pos_neg(freq_pos, freq_neg, [mean_freq_pos]*len(t), [mean_freq_neg]*len(t), t,'Spike frequency ' + names[name_id], show=False, to_html = True, to_png = True, path = pathFig+cond)
+                fig = plot_activity_pos_neg(freq_pos, freq_neg, [mean_freq_pos]*len(t), [mean_freq_neg]*len(t), t,'Spike frequency ' + names[name_id], to_html = True, to_png = True, path = pathFig+cond)
+                add_rect_pause(fig, time_span, time_pause, n_trial)
+                add_slider(fig)
+                nep.save_fig(fig, 'Spike frequency ' + names[name_id])
+                #fig_to_neptune(neptune_flag, fig, run, cell)
+                # run["visuals/plotly-fig"+cell] = File.as_html(fig)
+                if SHOW:
+                    fig.show()
                 # Mean frequency computed considering each neuron (not the entire population)
                 freq_pos = []
                 freq_neg = []
@@ -1093,7 +1104,10 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                 y = [mean_freq]*len(x)
                 plt.plot(x,y,'r',linewidth = 3)
                 plt.savefig(pathFig+cond+'Spike frequency ' + names[name_id]+'.svg')
-                plot_activity(freq, [mean_freq]*len(t), t, 'Spike frequency ' + names[name_id], show=False, to_html = True, to_png = True, path =pathFig+cond)
+                fig = plot_activity(freq, [mean_freq]*len(t), t, 'Spike frequency ' + names[name_id], to_html = True, to_png = True, path =pathFig+cond)
+                add_rect_pause(fig, time_span, time_pause, n_trial)
+                add_slider(fig)
+                nep.save_fig(fig, 'Spike frequency ' + names[name_id])
                 # Mean frequency computed considering each neuron (not the entire population)
                 freq = []
                 start = 0
