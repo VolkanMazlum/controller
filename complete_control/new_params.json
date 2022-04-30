@@ -21,7 +21,7 @@
                   "wgt_sensNeur_spine": 1.6427161409427353,
                   "sensNeur_base_rate": 0.0,
                   "sensNeur_kp": 1200.0,
-                  "fbk_delay": 0.1
+                  "fbk_delay": 80.0
             },
             "state": {
                   "kp": 1.0,
@@ -39,13 +39,13 @@
       },
       "pops": {
             "prediction": {
-                  "kp": 4.0,
+                  "kp": 2.0,
                   "buffer_size": 20.0,
                   "base_rate": 50.0
             },
             "motor_commands": {
-                  "kp": 0.1,
-                  "buffer_size": 25.0,
+                  "kp": 0.5,
+                  "buffer_size": 30.0,
                   "base_rate": 0.0
             },
             "brain_stem": {
@@ -56,7 +56,7 @@
             "feedback": {
                   "kp": 1.0,
                   "buffer_size": 10.0,
-                  "base_rate": 0.0
+                  "base_rate": 50.0
             },
             "fbk_smoothed": {
                   "kp": 1.0,
@@ -64,14 +64,14 @@
                   "base_rate": 100.0
             },
             "error": {
-                  "kp": 1.0,
+                  "kp": 0.09,
                   "buffer_size": 30.0,
                   "base_rate": -20.0
             },
             "plan_to_inv": {
                   "kp": 1.0,
                   "buffer_size": 10.0,
-                  "base_rate": 0.0
+                  "base_rate": 0.1
             },
             "motor_pred": {
                   "kp": 0.5,
@@ -131,20 +131,20 @@
                   "delay": 0.1
             },
             "dcn_f_error": {
-                  "weight": 0.1,
+                  "weight": 1.1,
                   "delay": 0.1
             },
             "feedback_error": {
-                  "weight": 0.1,
+                  "weight": 1.1,
                   "delay": 0.1
             },
             "error_io_f": {
-                  "weight": 1.0,
+                  "weight": 3.0,
                   "delay": 0.1,
                   "receptor_type": 1
             },
             "planner_plan_to_inv": {
-                  "weight": 0.001,
+                  "weight": 0.003,
                   "delay": 0.1
             },
             "plan_to_inv_mossy_i": {
@@ -176,11 +176,11 @@
                   "delay": 0.1
             },
             "state_error_inv": {
-                  "weight": 0.001,
+                  "weight": 0.5,
                   "delay": 0.1
             },
             "plan_to_inv_error_inv": {
-                  "weight": 5.0,
+                  "weight": 0.4,
                   "delay": 0.1
             },
             "error_inv_io_i": {

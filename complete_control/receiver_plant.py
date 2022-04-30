@@ -5,10 +5,10 @@ import sys
 import queue
 import numpy as np
 import matplotlib.pyplot as plt
-
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
+from util import plot_errors, neptune_manager, plot_error_trend
 
 from pointMass import PointMass
 from sensoryneuron import SensoryNeuron
@@ -406,6 +406,11 @@ for trial in range(n_trial):
     errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0])**2 + (pos[end,1] - tgt_pos_ee[1])**2))
     err_x.append(pos[end,0] -tgt_pos_ee[0])
 
+nep= neptune_manager()
+fig = plot_errors(pos, n_trial, np.int((timeMax+time_pause)/res), np.int(timeMax/res), to_html=False,to_png=True,  path=pathFig)
+nep.save_fig(fig,"traj")
+fig =  plot_error_trend(errors, n_trial, to_html=False,to_png=True,  path=pathFig)
+nep.save_fig(fig,"errors")
 error_x = pos[end,0] -tgt_pos_ee[0]
 error_y = pos[end,1] -tgt_pos_ee[1]
 errors_xy = [error_x, error_y, np.array(errors[-1])]
@@ -453,6 +458,7 @@ plt.ylabel('Horizontal error [%]')
 if saveFig:
     plt.savefig(pathFig+cond+"error_ee_x_perc.png")
 
+nep.save_file_fig(pathFig)
 # Show sensory neurons
 # for i in range(njt):
 #     plotPopulation(time, sn_p[i], sn_n[i], title=lgd[i],buffer_size=0.015)
