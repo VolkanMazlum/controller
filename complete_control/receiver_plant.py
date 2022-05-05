@@ -13,7 +13,7 @@ import json
 sys.path.insert(1, '../')
 
 from sensoryneuron import SensoryNeuron
-from settings import Experiment, Simulation, Brain, MusicCfg
+from .settings import Experiment, Simulation, Brain, MusicCfg
 from util import plotPopulation
 import trajectories as tj
 import perturbation as pt
