@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+from bullet_muscle_sim.arm_1dof.bullet_arm_1dof import BulletArm1Dof
+from bullet_muscle_sim.arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
 import sys
 import queue
@@ -217,6 +219,15 @@ perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
 inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
 
+######################## INIT BULLET ##########################
+
+# Initialize bullet and load robot
+bullet = BulletArm1Dof()
+bullet.InitPybullet()
+
+bullet_robot = bullet.LoadRobot()
+
+
 ######################## RUNTIME ##########################
 
 # Function to copute spike rates within within a buffer
@@ -239,10 +250,10 @@ tickt = runtime.time()
 while tickt < exp_duration:
 
     # Position and velocity at the beginning of the timestep
-    pos_j[step,:] = dynSys.pos                      # Joint space
-    vel_j[step,:] = dynSys.vel
-    pos[step,:]   = dynSys.forwardKin( dynSys.pos ).reshape([2,]) # End-effector space
-    vel[step,:]   = dynSys.forwardKin( dynSys.vel ).reshape([2,])
+    pos_j[step,:] = bullet_robot.JointPos(RobotArm1Dof.ELBOW_JOINT_ID)  # Joint space
+    vel_j[step,:] = bullet_robot.JointVel(RobotArm1Dof.ELBOW_JOINT_ID)
+    pos[step,:]   = bullet_robot.EEPose()[0][0:3:2]         # End effector space. Convert to 2D
+    pos[step,:]   = bullet_robot.EEVel()[0][0:3:2]
 
     # After a certain number of trials I switch on the force field
     # The number of trials is defined by "ff_application" variable
@@ -256,8 +267,9 @@ while tickt < exp_duration:
 
     # After completing the task and during the pause: initialize position and velocity
     if tickt%(timeMax+time_pause) >= timeMax:
-        dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
-        dynSys.vel = np.array([0.0])             # Initial condition (velocity)
+        #dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
+        #dynSys.vel = np.array([0.0])             # Initial condition (velocity)
+        pass
     else:
         # Send sensory feedback and compute input commands for this timestep
         buf_st = tickt-bufSize # Start of buffer
@@ -276,8 +288,11 @@ while tickt < exp_duration:
         #perturb_j[step,:]    = np.matmul( dynSys.jacobian(pos_j[step,:]) , perturb[step,:] )  # Torques
         inputCmd_tot[step,:] = inputCmd[step,:] #+ perturb_j[step,:]                           # Total torques
 
+        # Set joint torque
+        bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:])
+
         # Integrate dynamical system
-        dynSys.integrateTimeStep(inputCmd_tot[step,:], res)
+        bullet.Simulate(t=res)
 
     step = step+1
     runtime.tick()
