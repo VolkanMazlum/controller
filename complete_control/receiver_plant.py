@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
-from bullet_muscle_sim.arm_1dof.bullet_arm_1dof import BulletArm1Dof
-from bullet_muscle_sim.arm_1dof.robot_arm_1dof import RobotArm1Dof
+from arm_1dof.bullet_arm_1dof import BulletArm1Dof
+from arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
 import sys
 import queue
@@ -13,7 +13,7 @@ import json
 sys.path.insert(1, '../')
 
 from sensoryneuron import SensoryNeuron
-from .settings import Experiment, Simulation, Brain, MusicCfg
+from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
 from util import plotPopulation
 import trajectories as tj
 import perturbation as pt
