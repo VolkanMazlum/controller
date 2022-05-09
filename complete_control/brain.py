@@ -458,12 +458,12 @@ j = cereb_controlled_joint
 # nest.Connect(feedback_inv_n, error_inv_p, "all_to_all", syn_spec={"weight": -conn_params["feedback_inv_error_inv"]["weight"], "delay": conn_params["feedback_inv_error_inv"]["delay"]})
 
 # Positive neurons #TODO ragionare se feedback o state
-nest.Connect(stEst.pops_p[j].pop, error_inv_p, "all_to_all", syn_spec={"weight": conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
-nest.Connect(stEst.pops_p[j].pop, error_inv_n, "all_to_all", syn_spec={"weight": conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
+nest.Connect(stEst.pops_p[j].pop, error_inv_p, "all_to_all", syn_spec={"weight": -conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
+nest.Connect(stEst.pops_p[j].pop, error_inv_n, "all_to_all", syn_spec={"weight": -conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
 
 # Negative neurons
-nest.Connect(stEst.pops_n[j].pop, error_inv_n, "all_to_all", syn_spec={"weight": -conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
-nest.Connect(stEst.pops_n[j].pop, error_inv_p, "all_to_all", syn_spec={"weight": -conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
+nest.Connect(stEst.pops_n[j].pop, error_inv_n, "all_to_all", syn_spec={"weight": conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
+nest.Connect(stEst.pops_n[j].pop, error_inv_p, "all_to_all", syn_spec={"weight": conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
 
 
 
