@@ -31,6 +31,12 @@ class Experiment:
         self._pathData = "./data/"
         self._pathFig = "./fig/"
 
+        if not os.path.exists(self._pathData):
+            os.mkdir(self._pathData)
+        
+        if not os.path.exists(self._pathFig):
+            os.mkdir(self._pathFig)
+
         # Initial and target position (end-effector space)
         self._init_pos = np.ndarray([1,2])
         self._tgt_pos  = np.ndarray([1,2])
@@ -60,9 +66,6 @@ class Experiment:
         self._cerebellum_application_inv = 1e6
 
     def remove_files(self):
-        if not os.path.exists(self._pathData):
-            os.mkdir(self._pathData)
-
         for f in os.listdir(self._pathData):
             if '.gdf' in f or '.dat' in f or '.txt' in f or '.csv' in f:
                 os.remove(self._pathData+f)
