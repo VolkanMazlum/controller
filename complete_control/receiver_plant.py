@@ -249,6 +249,9 @@ step    = 0 # simulation step
 tickt = runtime.time()
 while tickt < exp_duration:
 
+    # Get bullet joint states
+    bullet_robot.UpdateStats()
+
     # Position and velocity at the beginning of the timestep
     pos_j[step,:] = bullet_robot.JointPos(RobotArm1Dof.ELBOW_JOINT_ID)  # Joint space
     vel_j[step,:] = bullet_robot.JointVel(RobotArm1Dof.ELBOW_JOINT_ID)
@@ -292,7 +295,7 @@ while tickt < exp_duration:
         bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:])
 
         # Integrate dynamical system
-        bullet.Simulate(t=res)
+        bullet.Simulate(sim_time=res)
 
     step = step+1
     runtime.tick()
