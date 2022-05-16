@@ -1,1 +1,7 @@
 __pycache__
+
+/complete_control/data
+/complete_control/fig
+/complete_control/error.txt
+/complete_control/variability_neg.txt
+/complete_control/variability_pos.txt
