@@ -7,13 +7,13 @@
           },
           "motor_cortex": {
                 "ffwd_base_rate": 0.0,
-                "ffwd_kp": 5108.896740997816629,
+                "ffwd_kp": 0.000896740997816629,
                 "fbk_base_rate": 0.0,
-                "fbk_kp": 1.022817879115406156,
+                "fbk_kp": 0.052817879115406156,
                 "out_base_rate": 0.0,
                 "out_kp": 1.0,
                 "wgt_ffwd_out": 1.0,
-                "wgt_fbk_out": 1.0,
+                "wgt_fbk_out": 0.1,
                 "buf_sz": 20.0
           },
           "spine": {

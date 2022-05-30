@@ -59,7 +59,8 @@ exp_duration = (timeMax+time_pause)*n_trial
 time_tot     = np.arange(0,exp_duration,res)
 n_time       = len(time_tot)
 
-scale   = 100.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale   = 190000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale_des = scale/170
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 
@@ -97,7 +98,7 @@ trj, pol = tj.minimumJerk(init_pos[0], tgt_pos[0], time)
 trj_ee      = dynSys.forwardKin( trj )
 trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
-inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)
+inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
 
 ############################ BRAIN ############################
@@ -295,15 +296,14 @@ while tickt < exp_duration:
         inputCmd_tot[step,:] = inputCmd[step,:] #+ perturb_j[step,:]                           # Total torques
 
         # Set joint torque
-        bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:] / 80000)
+        bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:] )
 
         # Integrate dynamical system
-        bullet.Simulate(sim_time=tickt)
+        bullet.Simulate(sim_time=res)
 
     step = step+1
     runtime.tick()
     tickt = runtime.time()
-
 runtime.finalize()
 
 

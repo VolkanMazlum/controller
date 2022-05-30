@@ -131,10 +131,10 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 500.0
+        self._timeMax = 200.0
 
         # Pause after movement (milliseconds)
-        self._timePause = 200.0
+        self._timePause = 50.0
 
         # Number of trials
         self._n_trials = 1
