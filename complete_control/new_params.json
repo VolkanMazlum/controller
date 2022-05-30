@@ -7,9 +7,9 @@
           },
           "motor_cortex": {
                 "ffwd_base_rate": 0.0,
-                "ffwd_kp": 0.000896740997816629,
+                "ffwd_kp": 2000.0296740997816629,
                 "fbk_base_rate": 0.0,
-                "fbk_kp": 0.052817879115406156,
+                "fbk_kp": 0.52817879115406156,
                 "out_base_rate": 0.0,
                 "out_kp": 1.0,
                 "wgt_ffwd_out": 1.0,

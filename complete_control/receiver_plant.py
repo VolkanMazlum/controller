@@ -59,8 +59,8 @@ exp_duration = (timeMax+time_pause)*n_trial
 time_tot     = np.arange(0,exp_duration,res)
 n_time       = len(time_tot)
 
-scale   = 190000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
-scale_des = scale/170
+scale   = 350000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale_des = scale/scale
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 

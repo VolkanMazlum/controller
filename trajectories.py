@@ -40,7 +40,7 @@ def minimumJerk_ddt(x_init, x_des, timespan):
     pol = np.array([a,b,c,d])
     pp  = a*np.power(tmspn,3) + b*np.power(tmspn,2) + c*np.power(tmspn,1) + d
 
-    return pp, pol
+    return pp*1000*1000, pol
 
 
 # Get the extremes of the second derivative of a min-jerk trajectory
