@@ -59,7 +59,7 @@ exp_duration = (timeMax+time_pause)*n_trial
 time_tot     = np.arange(0,exp_duration,res)
 n_time       = len(time_tot)
 
-scale   = 10.0   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale   = 100.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 
@@ -207,7 +207,7 @@ spkRate_neg  = np.zeros([n_time,njt])
 spkRate_net  = np.zeros([n_time,njt])
 
 # Sequence of position and velocities
-pos   = np.zeros([n_time,2])   # End-effector space
+pos   = np.zeros([n_time,3])   # End-effector space
 vel   = np.zeros([n_time,2])
 pos_j = np.zeros([n_time,njt]) # Joint space
 vel_j = np.zeros([n_time,njt])
@@ -223,8 +223,10 @@ inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
 # Initialize bullet and load robot
 bullet = BulletArm1Dof()
-bullet.InitPybullet()
+# bullet.InitPybullet()
 
+import pybullet
+bullet.InitPybullet(bullet_connect=pybullet.GUI)#, g=[0.0, 0.0 , -9.81])
 bullet_robot = bullet.LoadRobot()
 
 
@@ -255,8 +257,9 @@ while tickt < exp_duration:
     # Position and velocity at the beginning of the timestep
     pos_j[step,:] = bullet_robot.JointPos(RobotArm1Dof.ELBOW_JOINT_ID)  # Joint space
     vel_j[step,:] = bullet_robot.JointVel(RobotArm1Dof.ELBOW_JOINT_ID)
-    pos[step,:]   = bullet_robot.EEPose()[0][0:3:2]         # End effector space. Convert to 2D
-    pos[step,:]   = bullet_robot.EEVel()[0][0:3:2]
+    pos[step,:]   = bullet_robot.EEPose()[0][0:3]         # End effector space. Convert to 2D
+    #print(pos[step,:] )
+    vel[step,:]   = bullet_robot.EEVel()[0][0:3:2]
 
     # After a certain number of trials I switch on the force field
     # The number of trials is defined by "ff_application" variable
@@ -292,10 +295,10 @@ while tickt < exp_duration:
         inputCmd_tot[step,:] = inputCmd[step,:] #+ perturb_j[step,:]                           # Total torques
 
         # Set joint torque
-        bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:])
+        bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:] / 80000)
 
         # Integrate dynamical system
-        bullet.Simulate(sim_time=res)
+        bullet.Simulate(sim_time=tickt)
 
     step = step+1
     runtime.tick()
@@ -393,7 +396,7 @@ plt.figure()
 plt.plot(time_tot,pos_j)
 plt.plot(time,trj,linestyle=':')
 plt.xlabel('time (s)')
-plt.ylabel('position (m)')
+plt.ylabel('angle (rad)')
 plt.legend(['theta','des'])
 if saveFig:
     plt.savefig(pathFig+cond+"position_joint.png")
@@ -411,12 +414,12 @@ for trial in range(n_trial):
         style = 'k'
     else:
         style = 'r:'  # Cerebellum must compensate delay and Force field
-    plt.plot(pos[start:end,0],pos[start:end,1],style)
-    plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
+    plt.plot(pos[start:end,0],pos[start:end,2],style)
+    plt.plot(pos[end,0],pos[end,2],marker='x',color='k')
     # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
     # err_x.append(pos[end,0] -tgt_pos_ee[0])
-plt.plot(pos[start:end,0],pos[start:end,1],style, label="trajectory")
-plt.plot(pos[end,0],pos[end,1],marker='x',color='k', label="reached pos")
+plt.plot(pos[start:end,0],pos[start:end,2],style, label="trajectory")
+plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
 # error_x = pos[end,0] -tgt_pos_ee[0]
 # error_y = pos[end,1] -tgt_pos_ee[1]
 # errors_xy = [error_x, error_y, np.array(errors[-1])]

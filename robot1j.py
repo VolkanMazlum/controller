@@ -8,13 +8,16 @@ __version__ = "1.0.1"
 
 import numpy as np
 from body import Body
-g = 9.81
+
+g = 0#-9.81
+
 class Robot1J(Body):
 
     def __init__(self, IC_pos=np.array([0.0]),
                        IC_vel=np.array([0.0]),
                        robot = dict(mass = np.array([1.0]),
-                                    links = np.array([1.0]))):
+                                    links = np.array([1.0]),
+                                    I = np.array([1.0]))):
 
         if IC_pos.shape!=IC_vel.shape:
             raise Exception("Position and velocity need to have the same format")
@@ -22,7 +25,7 @@ class Robot1J(Body):
         self.robot = robot
         self.pos  = IC_pos
         self.vel  = IC_vel
-        self.I = self.robot["mass"] * self.robot["links"]**2
+        self.I = self.robot["I"] # mass *link**2
     @property
     def mass(self):
         return self.robot["mass"]
@@ -30,6 +33,10 @@ class Robot1J(Body):
     @property
     def links(self):
         return self.robot["links"]
+
+    @property
+    def I(self):
+        return self.robot["I"]
     
     # State variable setter
     @mass.setter
@@ -39,6 +46,10 @@ class Robot1J(Body):
     @links.setter
     def links(self, value):
         self.robot["links"] = value
+
+    @I.setter
+    def I(self, value):
+        self.robot["I"] = value
 
     # Integrate the body over dt
     def integrateTimeStep(self, u, dt):
@@ -104,31 +115,34 @@ class Robot1J(Body):
 # TEST
 if __name__ == '__main__':
 
-    m   = 5.0
+    robot_spec = dict(mass = np.array([1.89]),
+                                    links = np.array([0.42]),
+                                    I = np.array([0.00189]))
     #ICp = np.array([2.0, 2.0, 3.0])
     #ICv = np.array([3.0, 3.0, 4.0])
     ICp = np.array([0.0])
     ICv = np.array([0.0])
 
-    rob = Robot1J(mass=m,IC_pos=ICp,IC_vel=ICv)
+    rob = Robot1J(robot=robot_spec,IC_pos=ICp,IC_vel=ICv)
 
     print("Mass: "+str(rob.mass))
-    print("Position: "+str(rob.angles))
-    print("Velocity: "+str(rob.ang_vel))
+    print("Position: "+str(rob.pos))
+    print("Velocity: "+str(rob.vel))
 
-    #ext_pos = np.array([7.0,10.0])         # Correct
+    ext_pos = np.ndarray([1,2])
+    ext_pos[0,:] = [7.0,10.0]       # Correct
     #ext_pos = np.array([7.0,10.0,3.0])     # Wrong
     #ext_pos = 7.0                          # Wrong
     #ext_pos = np.ones((10,2))              # Correct
     #ext_pos = np.ones((10,3))              # Wrong
-    #print( pm.inverseKin(ext_pos) )
+    print( rob.inverseKin(ext_pos) )
 
-    #acc = np.array([3.0,4.0])               # Correct
+    acc = np.array([3.0,4.0])               # Correct
     #acc = np.array([3.0,4.0,7.0])           # Wrong
     #acc = 7.0                               # Wrong
     #acc = np.ones((10,2))                   # Correct
     #acc = np.ones((10,3))                   # Wrong
-    #print( pm.inverseDyn(acc) )
+    print( rob.inverseDyn(rob.inverseKin(ext_pos),0,acc) )
 
     print("Number of variables: "+str(rob.numVariables()))
 
@@ -137,5 +151,5 @@ if __name__ == '__main__':
     #u  = np.array([5.0,3.0])
     u  = np.array([0.0,0.0])
     rob.integrateTimeStep(u,dt)
-    print("New position: "+str(rob.angles))
-    print("New velocity: "+str(rob.ang_vel))
+    print("New position: "+str(rob.pos))
+    print("New velocity: "+str(rob.vel))

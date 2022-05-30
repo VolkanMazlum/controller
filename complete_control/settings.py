@@ -40,8 +40,10 @@ class Experiment:
         # Initial and target position (end-effector space)
         self._init_pos = np.ndarray([1,2])
         self._tgt_pos  = np.ndarray([1,2])
-        self._init_pos[:] = [2.0,0.0]
-        self._tgt_pos[:]  =[0.0,2.0]
+        self._init_pos[:] = [0.31,0.0]
+        self._tgt_pos[:]  =[0.0,0.31]
+        # self._init_pos[:] = [-0.00155569,1.16870009]
+        # self._tgt_pos[:]  =[-0.00155569+0.31,1.16870009+0.31]
         #self._tgt_pos  = np.array([0.25,0.43])
         #self._tgt_pos  = np.array([-0.25,0.43])
 
@@ -55,8 +57,9 @@ class Experiment:
         self._ff_removal = 1e6    # Trial at which the Force Field is removed for extinction
 
         # Dynamical system
-        self._robot_spec = {"mass": np.array([1.0]),
-                    "links":np.array([2.0])}
+        self._robot_spec = {"mass": np.array([1.89]),
+                    "links":np.array([0.31]),
+                    "I": np.array([0.00189])} #0.00189
         self._dynSys     = Robot1J(robot=self._robot_spec)
         self._dynSys.pos = self._dynSys.inverseKin(pos_external = self._init_pos) # Place dyn sys in desired initial position
         self._dynSys.vel = np.array([0.0])      # with zero initial velocity
