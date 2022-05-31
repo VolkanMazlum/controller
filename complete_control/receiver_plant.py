@@ -64,6 +64,29 @@ scale_des = scale/scale
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 
+######################## INIT BULLET ##########################
+
+# Initialize bullet and load robot
+bullet = BulletArm1Dof()
+# bullet.InitPybullet()
+
+import pybullet as p
+bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+bullet_robot = bullet.LoadRobot()
+
+
+upperarm = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.UPPER_ARM_LINK_ID,
+    computeLinkVelocity=True)[0]
+forearm = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.FOREARM_LINK_ID,
+            computeLinkVelocity=True)[0]
+hand = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.HAND_LINK_ID,
+            computeLinkVelocity=True)[0]
+# hand = bullet_robot.EEPose()[0]
+_init_pos = [hand[0], hand[2]]
+rho = np.linalg.norm(np.array(upperarm)-np.array(hand))
+z = upperarm[2] -rho*np.cos(1.57)
+y = upperarm[0] +rho*np.sin(1.57)
+_tgt_pos  = [y,z]
 ##################### EXPERIMENT #####################
 
 exp = Experiment()
@@ -219,16 +242,6 @@ perturb      = np.zeros([n_time,2])   # Perturbation (end-effector)
 perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
 inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
-
-######################## INIT BULLET ##########################
-
-# Initialize bullet and load robot
-bullet = BulletArm1Dof()
-# bullet.InitPybullet()
-
-import pybullet
-bullet.InitPybullet(bullet_connect=pybullet.GUI)#, g=[0.0, 0.0 , -9.81])
-bullet_robot = bullet.LoadRobot()
 
 
 ######################## RUNTIME ##########################
@@ -423,8 +436,8 @@ plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
 # error_x = pos[end,0] -tgt_pos_ee[0]
 # error_y = pos[end,1] -tgt_pos_ee[1]
 # errors_xy = [error_x, error_y, np.array(errors[-1])]
-plt.plot(init_pos_ee[0,0],init_pos_ee[0,1],marker='o',color='blue',label="starting pos")
-plt.plot(tgt_pos_ee[0,0],tgt_pos_ee[0,1],marker='o',color='red',label="target pos")
+plt.plot(_init_pos[0],_init_pos[1],marker='o',color='blue',label="starting pos")
+plt.plot(_tgt_pos[0],_tgt_pos[1],marker='o',color='red',label="target pos")
 plt.axis('equal')
 plt.xlabel('position x (m)')
 plt.ylabel('position y (m)')
