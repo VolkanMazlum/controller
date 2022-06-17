@@ -8,13 +8,13 @@ import queue
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+from util import plot_errors, neptune_manager, plot_error_trend
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
 from sensoryneuron import SensoryNeuron
 from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
-from util import plotPopulation
 import trajectories as tj
 import perturbation as pt
 
@@ -60,7 +60,7 @@ time_tot     = np.arange(0,exp_duration,res)
 n_time       = len(time_tot)
 
 scale   = 350000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
-scale_des = scale/scale
+scale_des = 350
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 
@@ -289,6 +289,7 @@ while tickt < exp_duration:
     if tickt%(timeMax+time_pause) >= timeMax:
         #dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
         #dynSys.vel = np.array([0.0])             # Initial condition (velocity)
+        p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID,0.0)
         pass
     else:
         # Send sensory feedback and compute input commands for this timestep
@@ -429,7 +430,7 @@ for trial in range(n_trial):
         style = 'r:'  # Cerebellum must compensate delay and Force field
     plt.plot(pos[start:end,0],pos[start:end,2],style)
     plt.plot(pos[end,0],pos[end,2],marker='x',color='k')
-    # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
+    errors.append(np.sqrt((pos[end,0] -_tgt_pos[0])**2 + (pos[end,1] - _tgt_pos[1])**2))
     # err_x.append(pos[end,0] -tgt_pos_ee[0])
 plt.plot(pos[start:end,0],pos[start:end,2],style, label="trajectory")
 plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
@@ -437,7 +438,7 @@ plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
 # error_y = pos[end,1] -tgt_pos_ee[1]
 # errors_xy = [error_x, error_y, np.array(errors[-1])]
 plt.plot(_init_pos[0],_init_pos[1],marker='o',color='blue',label="starting pos")
-plt.plot(_tgt_pos[0],_tgt_pos[1],marker='o',color='red',label="target pos")
+plt.plot(_tgt_pos[0]-0.008,_tgt_pos[1],marker='o',color='red',label="target pos")
 plt.axis('equal')
 plt.xlabel('position x (m)')
 plt.ylabel('position y (m)')
@@ -446,6 +447,13 @@ if saveFig:
     plt.savefig(pathFig+cond+"position_ee.png")
 
 plt.figure()
+
+# nep= neptune_manager()
+fig = plot_errors(pos,_init_pos,_tgt_pos, n_trial, np.int((timeMax+time_pause)/res), np.int(timeMax/res), to_html=False,to_png=True,  path=pathFig)
+# nep.save_fig(fig,"traj")
+fig =  plot_error_trend(errors, n_trial, to_html=False,to_png=True,  path=pathFig)
+# nep.save_fig(fig,"errors")
+
 plt.plot(errors)
 plt.xlabel('Trial')
 plt.ylabel('Error [m]')
