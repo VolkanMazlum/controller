@@ -8,7 +8,13 @@ import queue
 import numpy as np
 import matplotlib.pyplot as plt
 import json
-from util import plot_errors, neptune_manager, plot_error_trend
+from util import plot_errors, plot_error_trend
+
+
+nep_flag = False
+
+if nep_flag:
+    from util import neptune_manager
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
@@ -448,11 +454,17 @@ if saveFig:
 
 plt.figure()
 
-# nep= neptune_manager()
+
+if nep_flag:
+    nep= neptune_manager()
 fig = plot_errors(pos,_init_pos,_tgt_pos, n_trial, np.int((timeMax+time_pause)/res), np.int(timeMax/res), to_html=False,to_png=True,  path=pathFig)
-# nep.save_fig(fig,"traj")
+if nep_flag:
+    nep.save_fig(fig,"traj")
+    
 fig =  plot_error_trend(errors, n_trial, to_html=False,to_png=True,  path=pathFig)
-# nep.save_fig(fig,"errors")
+
+if nep_flag:
+    nep.save_fig(fig,"errors")
 
 plt.plot(errors)
 plt.xlabel('Trial')

@@ -17,7 +17,7 @@ from planner import Planner
 from stateestimator import StateEstimator, StateEstimator_mass
 from cerebellum import Cerebellum
 from population_view import plotPopulation
-from util import plot_activity, plot_activity_pos_neg, plot_scatter, add_rect_pause, add_slider, collapse_gdf_data, read_gdf_data, neptune_manager
+from util import plot_activity, plot_activity_pos_neg, plot_scatter, add_rect_pause, add_slider, collapse_gdf_data, read_gdf_data
 from population_view import PopView
 from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
@@ -35,7 +35,9 @@ import json
 saveFig = True
 ScatterPlot = False
 SHOW=False
-
+nep_flag = False
+if nep_flag:
+    from util import neptune_manager
 # Opening JSON file
 f = open('new_params.json')
 params = json.load(f)
@@ -799,8 +801,10 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     #             IDs[cell][str(ID_cell)].append(time_cell)
     #         else:
     #             IDs[cell][str(ID_cell)] = [time_cell]
-    nep = neptune_manager()
-    nep.set_params(params)
+
+    if nep_flag:
+        nep = neptune_manager()
+        nep.set_params(params)
     
     print('Start making plots')
     for name_id, cell in enumerate(names):
@@ -875,7 +879,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                 fig = plot_activity_pos_neg(freq_pos, freq_neg, [mean_freq_pos]*len(t), [mean_freq_neg]*len(t), t,'Spike frequency ' + names[name_id], to_html = True, to_png = True, path = pathFig+cond)
                 add_rect_pause(fig, time_span, time_pause, n_trial)
                 add_slider(fig)
-                nep.save_fig(fig, 'Spike frequency ' + names[name_id])
+                if nep_flag:
+                    nep.save_fig(fig, 'Spike frequency ' + names[name_id])
                 #fig_to_neptune(neptune_flag, fig, run, cell)
                 # run["visuals/plotly-fig"+cell] = File.as_html(fig)
                 if SHOW:
@@ -948,7 +953,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
                 fig = plot_activity(freq, [mean_freq]*len(t), t, 'Spike frequency ' + names[name_id], to_html = True, to_png = True, path =pathFig+cond)
                 add_rect_pause(fig, time_span, time_pause, n_trial)
                 add_slider(fig)
-                nep.save_fig(fig, 'Spike frequency ' + names[name_id])
+                if nep_flag:
+                    nep.save_fig(fig, 'Spike frequency ' + names[name_id])
                 # Mean frequency computed considering each neuron (not the entire population)
                 freq = []
                 start = 0
