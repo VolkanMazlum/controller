@@ -14,7 +14,7 @@ import numpy as np
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-from pointMass import PointMass
+from robot1j import Robot1J
 import perturbation as pt
 import os
 
@@ -24,23 +24,32 @@ class Experiment:
 
     def __init__(self):
 
-        # name for the saved data
-        self._cond = "test_"
 
-        # parameters json file
-        self._param_file = "new_params.json"
-
+        self._cond = "test_plot_"
+        
         # Where to save data
         self._pathData = "./data/"
         self._pathFig = "./fig/"
+
+        if not os.path.exists(self._pathData):
+            os.mkdir(self._pathData)
+        
+        if not os.path.exists(self._pathFig):
+            os.mkdir(self._pathFig)
+
+
         # Initial and target position (end-effector space)
-        self._init_pos = np.array([0.0,0.0])
-        self._tgt_pos  = np.array([1.0,0.5])
+        self._init_pos = np.ndarray([1,2])
+        self._tgt_pos  = np.ndarray([1,2])
+        self._init_pos[:] = [0.31,0.0]
+        self._tgt_pos[:]  =[0.0,0.31]
+        # self._init_pos[:] = [-0.00155569,1.16870009]
+        # self._tgt_pos[:]  =[-0.00155569+0.31,1.16870009+0.31]
         #self._tgt_pos  = np.array([0.25,0.43])
         #self._tgt_pos  = np.array([-0.25,0.43])
 
         # Perturbation
-        alpha = np.arctan(self._tgt_pos[1]/self._tgt_pos[0])/np.pi*180
+        alpha = 0#np.arctan(self._tgt_pos[:,1]/self._tgt_pos[:,0])/np.pi*180
         left = (180 - alpha)
         right = -alpha
         self._frcFld_angle = right  # Angle of the perturbation force wrt movement velocity
@@ -48,12 +57,14 @@ class Experiment:
         self._ff_application = 1e6    # Trial at which the Force Field is applied (1e6 = no force field)
         self._ff_removal = 1e6    # Trial at which the Force Field is removed for extinction
 
-        # Dynamical system to be controlled (mass and dyn sys object)
-        self._m          = 2.0                                     # Mass (kg)
-        self._dynSys     = PointMass(mass=self._m)                 # Point mass
-        self._dynSys.pos = self._dynSys.inverseKin(self._init_pos) # Initial condition (position)
-        self._dynSys.vel = np.array([0.0,0.0])                     # Initial condition (velocity)
-
+        # Dynamical system
+        self._robot_spec = {"mass": np.array([1.89]),
+                    "links":np.array([0.31]),
+                    "I": np.array([0.00189])} #0.00189
+        self._dynSys     = Robot1J(robot=self._robot_spec)
+        self._dynSys.pos = self._dynSys.inverseKin(pos_external = self._init_pos) # Place dyn sys in desired initial position
+        self._dynSys.vel = np.array([0.0])      # with zero initial velocity
+        
         # At which trial Cerebellum connected to StateEstimator
         self._cerebellum_application_forw = 1e6
 
@@ -77,6 +88,10 @@ class Experiment:
     @property
     def pathFig(self):
         return self._pathFig
+
+    @property
+    def cond(self):
+        return self._cond
 
     @property
     def dynSys(self):
@@ -127,10 +142,11 @@ class Simulation():
         self._timeMax = 500.0
 
         # Pause after movement (milliseconds)
-        self._timePause = 200.0
+        self._timePause = 50.0
 
         # Number of trials
-        self._n_trials = 20
+        self._n_trials = 1
+
 
     @property
     def resolution(self):

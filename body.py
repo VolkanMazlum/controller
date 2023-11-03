@@ -34,7 +34,7 @@ class Body:
 
     # Return the number of position variables
     def numVariables(self):
-        return self._pos.shape[0]
+        return len(self._pos)
 
     # Returns the values of the state variable corresponding to the values of
     # the given external variables
