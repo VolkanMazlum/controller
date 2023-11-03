@@ -27,6 +27,7 @@ def savePattern(pattern, file_bas):
 #     y_p =   evs_p - pop_pos.pop[0] + 1
 #     y_n = -(evs_n - pop_neg.pop[0] + 1)
 
+
 #     fig, ax = plt.subplots(2,1,sharex=True)
 #     ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
 #     ax[0].scatter(ts_n, y_n, marker='.', s=1)
@@ -39,6 +40,7 @@ def savePattern(pattern, file_bas):
 #     return fig, ax
 
 def AddPause(signal, pause_len, res):    
+
     # Add a pause at the end of the signal pattern
     signal_list = list(signal)
     signal_list.extend([0]*int(pause_len/res))
@@ -46,13 +48,14 @@ def AddPause(signal, pause_len, res):
     return np.array(signal_list)
 
 # from population_view import PopView
+
 import plotly.graph_objects as go
 import plotly.express as ex
 import numpy as np
 import os
 
 def set_nest_vars_mac():
-    
+
     nest_install_dir = "/Users/Benedetta/opt/anaconda3/envs/nest"
     os.environ["NEST_DATA_DIR"]=nest_install_dir+"/share/nest"
     os.environ["NEST_DOC_DIR"]=nest_install_dir+"/share/doc/nest"
@@ -76,6 +79,7 @@ def set_nest_vars_mac():
 #         # Path where to save the data file
 #         self.pathData = pathData
 
+
 #         # General parameters of neurons
 #         params = {
 #             "base_rate": 0.0,
@@ -90,6 +94,7 @@ def set_nest_vars_mac():
 
 #         # Create populations
 #         file_pattern = self.pathData+filename
+
 
 #         # Positive population (joint i)
 #         tmp_pop_p = nest.Create("tracking_neuron", n=n, params=params)
@@ -135,6 +140,7 @@ def plot_activity_pos_neg(freq_pos, freq_neg, mean_pos, mean_neg, time_vect,labe
                 )
     fig.update_yaxes(title = "Frequency [Hz]",
                     linecolor="black", 
+
                     mirror=True,
                     ticks='outside',
                     showline=True,
@@ -142,7 +148,7 @@ def plot_activity_pos_neg(freq_pos, freq_neg, mean_pos, mean_neg, time_vect,labe
                     )
     if to_png:
         fig.write_image(path+label+".png")
-    
+
     if to_html:
         fig.write_html(path+label+".html", include_plotlyjs='cdn')
 
@@ -181,6 +187,7 @@ def plot_activity(freq, mean, time_vect, label, to_html = False, to_png = True, 
                 )
     fig.update_yaxes(title = "Frequency [Hz]",
                     linecolor="black", 
+
                     mirror=True,
                     ticks='outside',
                     showline=True,
@@ -191,7 +198,7 @@ def plot_activity(freq, mean, time_vect, label, to_html = False, to_png = True, 
 
     if to_html:
         fig.write_html(path+label+".html", include_plotlyjs='cdn')
-    
+
     return fig
 
 def plot_simple(y, x, label, to_html = False, to_png = True, path=''):
@@ -226,6 +233,7 @@ def plot_simple(y, x, label, to_html = False, to_png = True, path=''):
                 )
     fig.update_yaxes(title = "Frequency [Hz]",
                     linecolor="black", 
+
                     mirror=True,
                     ticks='outside',
                     showline=True,
@@ -236,7 +244,7 @@ def plot_simple(y, x, label, to_html = False, to_png = True, path=''):
 
     if to_html:
         fig.write_html(path+label+".html", include_plotlyjs='cdn')
-    
+
     return fig
 
 def plot_activity_old(freq, mean, time_vect, label, show=False, to_html = False, to_png = True, path=''):
@@ -272,6 +280,7 @@ def plot_activity_old(freq, mean, time_vect, label, show=False, to_html = False,
                     )
         fig.update_yaxes(title = "Frequency [Hz]",
                         linecolor="black", 
+
                         mirror=True,
                         ticks='outside',
                         showline=True,
@@ -292,12 +301,13 @@ def plot_activity_old(freq, mean, time_vect, label, show=False, to_html = False,
                         rangeslider_visible=True)
         fig.update_yaxes(title = "Frequency [Hz]",
                         linecolor="black", 
+
                         mirror=True,
                         ticks='outside',
                         showline=True,
                         gridcolor="#bfbfbf"
                         )
-    
+
     if to_html:
         fig.write_html(path+label+".html", include_plotlyjs='cdn')
     if show:
@@ -314,6 +324,7 @@ def plot_scatter(evs, ts, type, label, to_html = False, to_png = True, path=''):
         fig.add_trace(go.Scatter(x=ts, y=evs-y_min, mode="markers", 
                     marker=dict(color="blue")))
    
+
     fig.update_layout(width=1200,
                     height=800,
                 title={
@@ -341,6 +352,7 @@ def plot_scatter(evs, ts, type, label, to_html = False, to_png = True, path=''):
                 )
     fig.update_yaxes(title = "Neuron id",
                     linecolor="black", 
+
                     mirror=True,
                     ticks='outside',
                     showline=True,
@@ -348,7 +360,7 @@ def plot_scatter(evs, ts, type, label, to_html = False, to_png = True, path=''):
                     )
     if to_png:
         fig.write_image(path+label+".png")
-    
+
     if to_html:
         fig.write_html(path+label+".html", include_plotlyjs='cdn')
     return fig
@@ -379,6 +391,7 @@ def read_gdf_data(cell_names,data_folder):
             else:
                 IDs[cell][str(ID_cell)] = [time_cell]
     return SD, IDs 
+
 
 def collapse_gdf_data(names, pthDat):
 
@@ -412,6 +425,7 @@ def add_rect_pause(fig, len_trial, len_pause, n_trials):
     for i in range(1,1+n_trials):
         fig.add_vrect(x0=i*len_trial, x1=i*len_trial+len_pause, line_width=0, fillcolor="grey", opacity=0.2)
 
+
 def add_slider(fig):
     fig.update_xaxes(rangeslider_visible=True)
 
@@ -436,6 +450,7 @@ class neptune_manager():
 
         self.run["spiking results"].upload_files(data_folder+"*")
         
+
 def fig_to_neptune(flag, fig, run, label):
 
     from neptune.new.types import File
@@ -471,6 +486,7 @@ def fig_to_neptune(flag, fig, run, label):
 #     return fig
     
 def plot_errors(real_ee, init, tgt, n_trials, len_trial, len_mov, to_html=False,to_png=True,  path=""):
+
     lst = []
     ends = np.zeros([n_trials,2])
 
@@ -484,6 +500,7 @@ def plot_errors(real_ee, init, tgt, n_trials, len_trial, len_mov, to_html=False,
 
         ends[i,0] = real_ee[k_e,0]
         ends[i,1] = real_ee[k_e,2]
+
         lst.append(i)
 
         fig.add_trace(go.Scatter(x=pos[i,:,0], y=pos[i,:,1],mode="lines", line=dict(color="black"),showlegend=False))
@@ -491,6 +508,7 @@ def plot_errors(real_ee, init, tgt, n_trials, len_trial, len_mov, to_html=False,
                                                         size=10,
                                                         cmax=n_trials,
                                                         cmin=0,
+
                                                         color=lst,
                                                         colorbar=dict(
                                                             title="# trial"
@@ -502,6 +520,7 @@ def plot_errors(real_ee, init, tgt, n_trials, len_trial, len_mov, to_html=False,
 
     fig.add_trace(go.Scatter(x=[init[0]], y=[init[1]], name = "start",mode="markers", marker=dict(color="black", size = 10)))
     fig.add_trace(go.Scatter(x=[tgt[0]-0.008], y=[tgt[1]], name = "target",mode="markers", marker=dict(color="red", size = 10)))
+
 
     fig.update_traces(textposition='top center')
 
@@ -561,6 +580,7 @@ def plot_error_trend(error, n_trials, to_html=False,to_png=True,  path=""):
     fig.add_trace(go.Scatter(x=np.arange(0,n_trials), y=error, mode="markers+lines", marker=dict(color="red",size=10), line=dict(color="black")))
 
     
+
     fig.update_layout(width=800,
                     height=600,
                 title={
@@ -592,6 +612,7 @@ def plot_error_trend(error, n_trials, to_html=False,to_png=True,  path=""):
                 )
     fig.update_yaxes(title = "error [m]",
                     linecolor="black", 
+
                     mirror=True,
                     ticks='outside',
                     showline=True,
@@ -628,3 +649,4 @@ def compute_variation(IDs, cell, Nest_ids, n_trial, len_trial, len_pause):
     diff = [(freqs["pos"][str(i-1)]-freqs["pos"][str(0)])/freqs["pos"][str(i-1)],freqs["neg"][str(i-1)]-freqs["neg"][str(0)]/freqs["neg"][str(i-1)]]
 
     return diff, freqs
+

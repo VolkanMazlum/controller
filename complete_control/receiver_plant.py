@@ -21,6 +21,7 @@ sys.path.insert(1, '../')
 
 from sensoryneuron import SensoryNeuron
 from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
+
 import trajectories as tj
 import perturbation as pt
 
@@ -28,10 +29,18 @@ import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 from mpi4py import MPI
 
+
+import json
+
+
+exp = Experiment()
+
+param_file = exp.param_file
 saveFig = True
 
 # Opening JSON file
 f = open('new_params.json')
+
 params = json.load(f)
 print(params["modules"])
 f.close()
@@ -50,6 +59,7 @@ conn_params = params["connections"]
 # f = open(pathFig+"params.json","w")
 # json.dump(params, f, indent =6)
 # f.close()
+
 #%%  SIMULATION
 
 ###################### SIMULATION ######################
@@ -445,6 +455,7 @@ plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
 # errors_xy = [error_x, error_y, np.array(errors[-1])]
 plt.plot(_init_pos[0],_init_pos[1],marker='o',color='blue',label="starting pos")
 plt.plot(_tgt_pos[0]-0.008,_tgt_pos[1],marker='o',color='red',label="target pos")
+
 plt.axis('equal')
 plt.xlabel('position x (m)')
 plt.ylabel('position y (m)')
@@ -500,6 +511,8 @@ np.savetxt("error.txt",np.array(errors)*100)
 # if saveFig:
 #     plt.savefig(pathFig+cond+"error_ee_x_perc.png")
 
+
+nep.save_file_fig(pathFig)
 # Show sensory neurons
 # for i in range(njt):
 #     plotPopulation(time, sn_p[i], sn_n[i], title=lgd[i],buffer_size=0.015)
