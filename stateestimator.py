@@ -56,7 +56,7 @@ class StateEstimator_mass:
 
 
 class StateEstimator:
-    # without state neurons
+
     ############## Constructor (plant value is just for testing) ##############
     def __init__(self, numNeurons, time_vect, plant, kpred=0.0, ksens=1.0, pathData="./data/", **kwargs):
 

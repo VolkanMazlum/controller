@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 
+from arm_1dof.bullet_arm_1dof import BulletArm1Dof
+from arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
 import sys
 import queue
 import numpy as np
 import matplotlib.pyplot as plt
+import json
+
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-from util import plot_errors, neptune_manager, plot_error_trend
-
-from pointMass import PointMass
 from sensoryneuron import SensoryNeuron
-from settings import Experiment, Simulation, Brain, MusicCfg
+from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
+from util import plotPopulation
 
 import trajectories as tj
 import perturbation as pt
@@ -29,14 +31,10 @@ exp = Experiment()
 
 param_file = exp.param_file
 saveFig = True
-ScatterPlot = True
-pathFig = exp.pathFig
-pthDat   = exp.pathData
-pthFig = exp.pathFig
-cond = exp.cond
 
 # Opening JSON file
-f = open(param_file)
+f = open('new_params.json')
+
 params = json.load(f)
 print(params["modules"])
 f.close()
@@ -51,11 +49,11 @@ state_se_params = params["modules"]["state_se"]
 pops_params = params["pops"]
 conn_params = params["connections"]
 
-pathFig = params["path"]
 
-f = open(pathFig+"params.json","w")
-json.dump(params, f, indent =6)
-f.close()
+# f = open(pathFig+"params.json","w")
+# json.dump(params, f, indent =6)
+# f.close()
+
 #%%  SIMULATION
 
 ###################### SIMULATION ######################
@@ -71,15 +69,43 @@ exp_duration = (timeMax+time_pause)*n_trial
 time_tot     = np.arange(0,exp_duration,res)
 n_time       = len(time_tot)
 
-scale   = 10.0   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale   = 350000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale_des = scale/scale
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
 
+######################## INIT BULLET ##########################
+
+# Initialize bullet and load robot
+bullet = BulletArm1Dof()
+# bullet.InitPybullet()
+
+import pybullet as p
+bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+bullet_robot = bullet.LoadRobot()
+
+
+upperarm = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.UPPER_ARM_LINK_ID,
+    computeLinkVelocity=True)[0]
+forearm = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.FOREARM_LINK_ID,
+            computeLinkVelocity=True)[0]
+hand = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.HAND_LINK_ID,
+            computeLinkVelocity=True)[0]
+# hand = bullet_robot.EEPose()[0]
+_init_pos = [hand[0], hand[2]]
+rho = np.linalg.norm(np.array(upperarm)-np.array(hand))
+z = upperarm[2] -rho*np.cos(1.57)
+y = upperarm[0] +rho*np.sin(1.57)
+_tgt_pos  = [y,z]
 ##################### EXPERIMENT #####################
 
 exp = Experiment()
 
+
+pathFig =exp.pathFig
+# pathFig = params["path"]
 pthDat = exp.pathData
+cond = exp.cond
 
 # Perturbation
 angle = exp.frcFld_angle
@@ -95,15 +121,17 @@ njt    = exp.dynSys.numVariables()
 # End-effector space
 init_pos_ee = exp.init_pos
 tgt_pos_ee  = exp.tgt_pos
-trj_ee, pol = tj.minimumJerk(init_pos_ee, tgt_pos_ee, time)
 
-# Joint space
+
 init_pos = dynSys.inverseKin( init_pos_ee )
 tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
-trj      = dynSys.inverseKin( trj_ee )
+trj, pol = tj.minimumJerk(init_pos[0], tgt_pos[0], time)
+
+# Joint space
+trj_ee      = dynSys.forwardKin( trj )
 trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
-inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)
+inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
 
 ############################ BRAIN ############################
@@ -213,7 +241,7 @@ spkRate_neg  = np.zeros([n_time,njt])
 spkRate_net  = np.zeros([n_time,njt])
 
 # Sequence of position and velocities
-pos   = np.zeros([n_time,2])   # End-effector space
+pos   = np.zeros([n_time,3])   # End-effector space
 vel   = np.zeros([n_time,2])
 pos_j = np.zeros([n_time,njt]) # Joint space
 vel_j = np.zeros([n_time,njt])
@@ -223,6 +251,7 @@ inputCmd     = np.zeros([n_time,njt]) # Input commands (from motor commands)
 perturb      = np.zeros([n_time,2])   # Perturbation (end-effector)
 perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
 inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
+
 
 
 ######################## RUNTIME ##########################
@@ -246,11 +275,15 @@ step    = 0 # simulation step
 tickt = runtime.time()
 while tickt < exp_duration:
 
+    # Get bullet joint states
+    bullet_robot.UpdateStats()
+
     # Position and velocity at the beginning of the timestep
-    pos_j[step,:] = dynSys.pos                      # Joint space
-    vel_j[step,:] = dynSys.vel
-    pos[step,:]   = dynSys.forwardKin( dynSys.pos ) # End-effector space
-    vel[step,:]   = dynSys.forwardKin( dynSys.vel )
+    pos_j[step,:] = bullet_robot.JointPos(RobotArm1Dof.ELBOW_JOINT_ID)  # Joint space
+    vel_j[step,:] = bullet_robot.JointVel(RobotArm1Dof.ELBOW_JOINT_ID)
+    pos[step,:]   = bullet_robot.EEPose()[0][0:3]         # End effector space. Convert to 2D
+    #print(pos[step,:] )
+    vel[step,:]   = bullet_robot.EEVel()[0][0:3:2]
 
     # After a certain number of trials I switch on the force field
     # The number of trials is defined by "ff_application" variable
@@ -264,8 +297,9 @@ while tickt < exp_duration:
 
     # After completing the task and during the pause: initialize position and velocity
     if tickt%(timeMax+time_pause) >= timeMax:
-        dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
-        dynSys.vel = np.array([0.0,0.0])             # Initial condition (velocity)
+        #dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
+        #dynSys.vel = np.array([0.0])             # Initial condition (velocity)
+        pass
     else:
         # Send sensory feedback and compute input commands for this timestep
         buf_st = tickt-bufSize # Start of buffer
@@ -281,16 +315,18 @@ while tickt < exp_duration:
             inputCmd[step,i]       = spkRate_net[step,i] / scale
 
         perturb[step,:]      = pt.curledForceField(vel[step,:], angle, k)                     # End-effector forces
-        perturb_j[step,:]    = np.matmul( dynSys.jacobian(pos_j[step,:]) , perturb[step,:] )  # Torques
-        inputCmd_tot[step,:] = inputCmd[step,:] + perturb_j[step,:]                           # Total torques
+        #perturb_j[step,:]    = np.matmul( dynSys.jacobian(pos_j[step,:]) , perturb[step,:] )  # Torques
+        inputCmd_tot[step,:] = inputCmd[step,:] #+ perturb_j[step,:]                           # Total torques
+
+        # Set joint torque
+        bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:] )
 
         # Integrate dynamical system
-        dynSys.integrateTimeStep(inputCmd_tot[step,:], res)
+        bullet.Simulate(sim_time=res)
 
     step = step+1
     runtime.tick()
     tickt = runtime.time()
-
 runtime.finalize()
 
 
@@ -368,7 +404,7 @@ np.savetxt( pthDat+"perturbation_j.csv", perturb_j, delimiter=',' )  # Perturbat
 
 
 ########################### PLOTTING ###########################
-lgd = ['x','y','des']
+lgd = ['theta','des']
 plt.figure()
 plt.plot(time_tot,inputCmd)
 plt.plot(time,inputDes,linestyle=':')
@@ -383,8 +419,8 @@ plt.figure()
 plt.plot(time_tot,pos_j)
 plt.plot(time,trj,linestyle=':')
 plt.xlabel('time (s)')
-plt.ylabel('position (m)')
-plt.legend(['x','y','x_des','y_des'])
+plt.ylabel('angle (rad)')
+plt.legend(['theta','des'])
 if saveFig:
     plt.savefig(pathFig+cond+"position_joint.png")
 
@@ -401,25 +437,22 @@ for trial in range(n_trial):
         style = 'k'
     else:
         style = 'r:'  # Cerebellum must compensate delay and Force field
-    plt.plot(pos[start:end,0],pos[start:end,1],style)
-    plt.plot(pos[end,0],pos[end,1],marker='x',color='k')
-    errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0])**2 + (pos[end,1] - tgt_pos_ee[1])**2))
-    err_x.append(pos[end,0] -tgt_pos_ee[0])
+    plt.plot(pos[start:end,0],pos[start:end,2],style)
+    plt.plot(pos[end,0],pos[end,2],marker='x',color='k')
+    # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
+    # err_x.append(pos[end,0] -tgt_pos_ee[0])
+plt.plot(pos[start:end,0],pos[start:end,2],style, label="trajectory")
+plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
+# error_x = pos[end,0] -tgt_pos_ee[0]
+# error_y = pos[end,1] -tgt_pos_ee[1]
+# errors_xy = [error_x, error_y, np.array(errors[-1])]
+plt.plot(_init_pos[0],_init_pos[1],marker='o',color='blue',label="starting pos")
+plt.plot(_tgt_pos[0],_tgt_pos[1],marker='o',color='red',label="target pos")
 
-nep= neptune_manager()
-fig = plot_errors(pos, n_trial, np.int((timeMax+time_pause)/res), np.int(timeMax/res), to_html=False,to_png=True,  path=pathFig)
-nep.save_fig(fig,"traj")
-fig =  plot_error_trend(errors, n_trial, to_html=False,to_png=True,  path=pathFig)
-nep.save_fig(fig,"errors")
-error_x = pos[end,0] -tgt_pos_ee[0]
-error_y = pos[end,1] -tgt_pos_ee[1]
-errors_xy = [error_x, error_y, np.array(errors[-1])]
-plt.plot(init_pos_ee[0],init_pos_ee[1],marker='o',color='blue')
-plt.plot(tgt_pos_ee[0],tgt_pos_ee[1],marker='o',color='red')
 plt.axis('equal')
 plt.xlabel('position x (m)')
 plt.ylabel('position y (m)')
-plt.legend(['trajectory', 'init','target','final'])
+plt.legend()
 if saveFig:
     plt.savefig(pathFig+cond+"position_ee.png")
 
@@ -431,32 +464,33 @@ if saveFig:
     plt.savefig(pathFig+cond+"error_ee.png")
 
 np.savetxt("error.txt",np.array(errors)*100)
-np.savetxt("error_xy.txt",np.array(errors_xy)*100)
+# np.savetxt("error_xy.txt",np.array(errors_xy)*100)
 
-target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)
-err_perc = [i/target_distance for i in errors]
-plt.figure()
-plt.plot(err_perc)
-plt.xlabel('Trial')
-plt.ylabel('Error [%]')
-if saveFig:
-    plt.savefig(pathFig+cond+"error_ee_perc.png")
+# target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)
+# err_perc = [i/target_distance for i in errors]
+# plt.figure()
+# plt.plot(err_perc)
+# plt.xlabel('Trial')
+# plt.ylabel('Error [%]')
+# if saveFig:
+#     plt.savefig(pathFig+cond+"error_ee_perc.png")
 
-plt.figure()
-plt.plot(err_x)
-plt.xlabel('Trial')
-plt.ylabel('Horizontal error [m]')
-if saveFig:
-    plt.savefig(pathFig+cond+"error_ee_x.png")
+# plt.figure()
+# plt.plot(err_x)
+# plt.xlabel('Trial')
+# plt.ylabel('Horizontal error [m]')
+# if saveFig:
+#     plt.savefig(pathFig+cond+"error_ee_x.png")
 
-target_distance_x = abs(tgt_pos_ee[0] - init_pos_ee[0])
-err_x_perc = [i/target_distance_x for i in err_x]
-plt.figure()
-plt.plot(err_x)
-plt.xlabel('Trial')
-plt.ylabel('Horizontal error [%]')
-if saveFig:
-    plt.savefig(pathFig+cond+"error_ee_x_perc.png")
+# target_distance_x = abs(tgt_pos_ee[0] - init_pos_ee[0])
+# err_x_perc = [i/target_distance_x for i in err_x]
+# plt.figure()
+# plt.plot(err_x)
+# plt.xlabel('Trial')
+# plt.ylabel('Horizontal error [%]')
+# if saveFig:
+#     plt.savefig(pathFig+cond+"error_ee_x_perc.png")
+
 
 nep.save_file_fig(pathFig)
 # Show sensory neurons
