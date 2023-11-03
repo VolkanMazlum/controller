@@ -17,12 +17,13 @@ from planner import Planner
 from stateestimator import StateEstimator, StateEstimator_mass
 from cerebellum import Cerebellum
 from population_view import plotPopulation
-from util import savePattern
+
+from util import plot_activity, plot_activity_pos_neg, plot_scatter, add_rect_pause, add_slider, collapse_gdf_data, read_gdf_data, neptune_manager
 from population_view import PopView
 from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
 import random
-
+#from plotting import plot_activity, plot_activity_pos_neg
 
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
@@ -36,11 +37,15 @@ saveFig = True
 ScatterPlot = False
 
 
+exp = Experiment()
+
 # Opening JSON file
 f = open('new_params.json')
+
 params = json.load(f)
 print(params["modules"])
 f.close()
+
 
 mc_params = params["modules"]["motor_cortex"]
 plan_params = params["modules"]["planner"]
@@ -51,6 +56,7 @@ state_se_params = params["modules"]["state_se"]
 
 pops_params = params["pops"]
 conn_params = params["connections"]
+
 
 
 #%%  SIMULATION
@@ -76,7 +82,6 @@ nest.SetKernelStatus({'rng_seeds' : range(msd+N_vp+1, msd+2*N_vp+1)})
 #%%  EXPERIMENT
 print("init exp")
 
-exp = Experiment()
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     # Remove existing .dat and/or .gdf files generated in previous simulations
     exp.remove_files()
@@ -98,6 +103,7 @@ pthDat   = exp.pathData
 pathFig = exp.pathFig
 cond = exp.cond
 
+
 #%% BRAIN ########################
 print("init brain")
 
@@ -112,14 +118,17 @@ cereb_controlled_joint = brain.cerebellum_controlled_joint
 cerebellum_application_forw = exp.cerebellum_application_forw  # Trial at which the cerebellum si connected to StateEstimator
 cerebellum_application_inv = exp.cerebellum_application_inv  # Trial at which the cerebellum si connected to StateEstimator
 
+
 #### Planner
 print("init planner")
 
 planner = Planner(N, time_vect, tgt_pos[0], dynSys, plan_params["kpl"], pthDat, time_pause, plan_params["base_rate"],plan_params["kp"])
 
+
 #### Motor cortex
 print("init mc")
 preciseControl = brain.precCtrl # Precise or approximated ffwd commands?
+
 
 mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, **mc_params)
 
@@ -127,6 +136,7 @@ mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, 
 print("init state")
 kpred    = state_se_params["kpred"]
 ksens    = state_se_params["ksens"]
+
 
 
 stEst = StateEstimator_mass(N, time_vect, dynSys, state_params)
@@ -152,7 +162,6 @@ for j in range(njt):
 # in order to have firing rate suitable for the State estimator
 # and all the other structures inside the control system
 
-# To assure proper behavior in state estimator
 prediction_p = nest.Create("diff_neuron", N)
 nest.SetStatus(prediction_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
 prediction_n = nest.Create("diff_neuron", N)
@@ -160,7 +169,9 @@ nest.SetStatus(prediction_n, {"kp": pops_params["prediction"]["kp"], "pos": Fals
 
 pops_params["fbk_smoothed"]["kp"]
 
+
 for j in range(njt):
+    ''
     if j == cereb_controlled_joint:
         # Modify variability sensory feedback ("smoothed")
         fbk_smoothed_p = nest.Create("diff_neuron", N)
@@ -169,6 +180,7 @@ for j in range(njt):
         nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": False, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
         
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
+
         nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
         # Positive neurons
@@ -181,12 +193,14 @@ for j in range(njt):
         nest.Connect(fbk_smoothed_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["fbk_smoothed_state"])
         nest.SetStatus(stEst.pops_n[j].pop, {"num_first": float(N), "num_second": float(N)})
     else:
+
         # Positive neurons
         nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
         nest.SetStatus(stEst.pops_p[j].pop, {"num_second": float(N)})
         # Negative neurons
         nest.Connect(sn_n[j].pop, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
         nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
+
 print("init connections feedback")
 
 #%% CONNECTIONS
@@ -207,6 +221,14 @@ for j in range(njt):
 #### Connection State Estimator - Motor Cortex feedback (Inhibitory)
 wgt_stEst_mtxFbk = conn_params["state_mc_fbk"]["weight"]
 
+
+''
+nest.Connect(mc.out_p[cereb_controlled_joint].pop, motor_commands_p, "all_to_all", syn_spec={"weight": conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
+nest.Connect(mc.out_n[cereb_controlled_joint].pop, motor_commands_n, "all_to_all", syn_spec={"weight": -conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
+''
+nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'},syn_spec={'weight':1.0})
+nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'},syn_spec={'weight':1.0})#TODO add weight
+''
 # Scale the feedback signal to 0-60 Hz in order to be suitable for the cerebellum
 feedback_p = nest.Create("diff_neuron", N)
 nest.SetStatus(feedback_p, {"kp": pops_params["feedback"]["kp"], "pos": True, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"]})
@@ -215,6 +237,7 @@ nest.SetStatus(feedback_n, {"kp": pops_params["feedback"]["kp"], "pos": False, "
 
 nest.Connect(sn_p[cereb_controlled_joint].pop, feedback_p, 'all_to_all', syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 nest.Connect(sn_n[cereb_controlled_joint].pop, feedback_n, 'all_to_all', syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
+
 
 # Connect state estimator (bayesian) to the Motor Cortex
 for j in range(njt):
@@ -227,6 +250,7 @@ for j in range(njt):
 brain_stem_new_p=[]
 brain_stem_new_n=[]
 
+
 for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("basic_neuron", N)
@@ -237,11 +261,13 @@ for j in range(njt):
     nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
     brain_stem_new_n.append( PopView(tmp_n, time_vect) )
 
+
 for j in range(njt):
     nest.Connect(mc.out_p[j].pop,brain_stem_new_p[j].pop, "all_to_all", {"weight": conn_params["mc_out_brain_stem"]["weight"], "delay": conn_params["mc_out_brain_stem"]["delay"]})
     # nest.Connect(stEst.pops_p[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": wgt_stEst_mtxFbk, "delay": res})
     # nest.Connect(stEst.pops_n[j].pop,mc.fbk_p[j].pop, "one_to_one", {"weight": -wgt_stEst_mtxFbk, "delay": res})
     nest.Connect(mc.out_n[j].pop,brain_stem_new_n[j].pop, "all_to_all", {"weight": -conn_params["mc_out_brain_stem"]["weight"], "delay": conn_params["mc_out_brain_stem"]["delay"]})
+
 
 # feedback from sensory
 feedback_inv_p = nest.Create("diff_neuron", N)
@@ -249,12 +275,38 @@ nest.SetStatus(feedback_inv_p, {"kp": pops_params["feedback_inv"]["kp"], "pos": 
 feedback_inv_n = nest.Create("diff_neuron", N)
 nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": False, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
 
+
 #%% MUSIC CONFIG
 
 msc = MusicCfg()
 
 #### MUSIC output port (with nTot channels)
 proxy_out = nest.Create('music_event_out_proxy', 1, params = {'port_name':'mot_cmd_out'})
+
+# ii=0
+# for j in range(njt):
+#     for i, n in enumerate(mc.out_p[j].pop):
+#         nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+#         ii=ii+1
+#     for i, n in enumerate(mc.out_n[j].pop):
+#         nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+#         ii=ii+1
+
+# ii=0
+# # for j in range(njt):
+# for i, n in enumerate(brain_stem_p):
+#     nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+#     ii=ii+1
+# for i, n in enumerate(mc.out_p[1].pop):
+#     nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+#     ii=ii+1
+# for i, n in enumerate(brain_stem_n):
+#     nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+#     ii=ii+1
+# for i, n in enumerate(mc.out_n[1].pop):
+#     nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+#     ii=ii+1
+
 
 ii=0
 for j in range(njt):
@@ -264,6 +316,7 @@ for j in range(njt):
     for i, n in enumerate(brain_stem_new_n[j].pop):
         nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
         ii=ii+1
+
 
 #### MUSIC input ports (nTot ports with one channel each)
 proxy_in = nest.Create ('music_event_in_proxy', nTot, params = {'port_name': 'fbk_in'})
@@ -294,6 +347,10 @@ nest.SetAcceptableLatency('fbk_in', 0.1-msc.const)
 ###################### Extra Spikedetectors ######################
 spikedetector_fbk_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback pos"})
 spikedetector_fbk_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback neg"})
+
+spikedetector_fbk_inv_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback inv pos"})
+spikedetector_fbk_inv_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback inv neg"})
+
 spikedetector_fbk_cereb_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum pos"})
 spikedetector_fbk_cereb_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum neg"})
 spikedetector_io_forw_input_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw pos"})
@@ -321,6 +378,7 @@ spikedetector_brain_stem_neg = nest.Create("spike_detector", params={"withgid": 
 nest.Connect(brain_stem_new_p[j].pop, spikedetector_brain_stem_pos)
 nest.Connect(brain_stem_new_n[j].pop, spikedetector_brain_stem_neg)
 
+
 nest.Connect(sn_p[cereb_controlled_joint].pop, spikedetector_fbk_pos)
 nest.Connect(sn_n[cereb_controlled_joint].pop, spikedetector_fbk_neg)
 nest.Connect(feedback_p, spikedetector_fbk_cereb_pos)
@@ -329,6 +387,7 @@ nest.Connect(planner.pops_p[cereb_controlled_joint].pop, spikedetector_planner_p
 nest.Connect(planner.pops_n[cereb_controlled_joint].pop, spikedetector_planner_neg)
 nest.Connect(stEst.pops_p[cereb_controlled_joint].pop, spikedetector_stEst_max_pos)
 nest.Connect(stEst.pops_n[cereb_controlled_joint].pop, spikedetector_stEst_max_neg)
+
 
 ###################### SIMULATE ######################
 nest.SetKernelStatus({"data_path": pthDat})
@@ -343,6 +402,7 @@ if cerebellum_application_forw != 0:
     nest.SetStatus(conns_pos_forw, {"weight": 0.0})
     nest.SetStatus(conns_neg_forw, {"weight": 0.0})
 
+
 #%% SIMULATE ######################
 nest.SetKernelStatus({"data_path": pthDat})
 total_len = int(time_span + time_pause)
@@ -350,6 +410,7 @@ for trial in range(n_trial):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
     nest.Simulate(total_len)
+
 
 
 #%% PLOTTING
@@ -480,4 +541,5 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 # #         else:
 # #             print('Già fatto')
 # #     print('Collapsing files ended')
+
 
