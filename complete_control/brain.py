@@ -14,22 +14,23 @@ sys.path.insert(1, '../')
 import trajectories as tj
 from motorcortex import MotorCortex
 from planner import Planner
-from stateestimator import StateEstimator, StateEstimator_mass
-from cerebellum import Cerebellum
+#from stateestimator import StateEstimator, StateEstimator_mass
+#from cerebellum import Cerebellum
 from population_view import plotPopulation
 
 from util import plot_activity, plot_activity_pos_neg, plot_scatter, add_rect_pause, add_slider, collapse_gdf_data, read_gdf_data, neptune_manager
 from population_view import PopView
 from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
+from mpi4py import MPI
 import random
 #from plotting import plot_activity, plot_activity_pos_neg
 
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
-nest.Install("util_neurons_module")
-nest.Install("cerebmodule")
+#nest.Install("util_neurons_module")
+#nest.Install("cerebmodule")
  
 import json
 
@@ -50,9 +51,9 @@ f.close()
 mc_params = params["modules"]["motor_cortex"]
 plan_params = params["modules"]["planner"]
 
-spine_params = params["modules"]["spine"]
-state_params = params["modules"]["state"]
-state_se_params = params["modules"]["state_se"]
+#spine_params = params["modules"]["spine"]
+#state_params = params["modules"]["state"]
+#state_se_params = params["modules"]["state_se"]
 
 pops_params = params["pops"]
 conn_params = params["connections"]
@@ -76,7 +77,7 @@ nest.SetKernelStatus({"overwrite_files": True})
 # Randomize
 msd = int( time.time() * 1000.0 )
 N_vp = nest.GetKernelStatus(['total_num_virtual_procs'])[0]
-nest.SetKernelStatus({'rng_seeds' : range(msd+N_vp+1, msd+2*N_vp+1)})
+#nest.SetKernelStatus({'rng_seeds' : range(msd+N_vp+1, msd+2*N_vp+1)})
 
 
 #%%  EXPERIMENT
@@ -113,11 +114,15 @@ brain = Brain()
 N    = brain.nNeurPop # For each subpopulation positive/negative
 nTot = 2*N*njt        # Total number of neurons
 
+'''
 # # Cerebellum
 cereb_controlled_joint = brain.cerebellum_controlled_joint
 cerebellum_application_forw = exp.cerebellum_application_forw  # Trial at which the cerebellum si connected to StateEstimator
 cerebellum_application_inv = exp.cerebellum_application_inv  # Trial at which the cerebellum si connected to StateEstimator
-
+'''
+# Install the module containing neurons for planner and motor cortex
+print("installing module")
+nest.Install("controller_module")
 
 #### Planner
 print("init planner")

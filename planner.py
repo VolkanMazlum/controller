@@ -66,13 +66,14 @@ class Planner:
             traj_file = "./data/joint" + str(i) + ".dat"
 
             # Positive population (joint i)
-            tmp_pop_p = nest.Create("tracking_neuron", n=n, params=params)
-            nest.SetStatus(tmp_pop_p, {"pos": True, "pattern_file": traj_file})
+            tmp_pop_p = nest.Create("tracking_neuron_nestml", n=n, params={"kp": kp, "base_rate": base_rate, "pos": True, "traj": self.traj_plan_j.flatten().tolist(), "simulation_steps": len(self.traj_plan_j.flatten().tolist())})
+            #nest.SetStatus(tmp_pop_p, {"pos": True, "traj": self.traj_plan_j.flatten().tolist(), "simulation_steps": len(self.traj_plan_j.flatten().tolist())})
+            #print(nest.GetStatus(tmp_pop_p)[0])
             self.pops_p.append( PopView(tmp_pop_p,self.time_vect) )
 
             # Negative population (joint i)
-            tmp_pop_n = nest.Create("tracking_neuron", n=n, params=params)
-            nest.SetStatus(tmp_pop_n, {"pos": False, "pattern_file": traj_file})
+            tmp_pop_n = nest.Create("tracking_neuron_nestml", n=n, params={"kp": kp, "base_rate": base_rate, "pos": False, "traj": self.traj_plan_j.flatten().tolist(), "simulation_steps": len(self.traj_plan_j.flatten().tolist())})
+            #nest.SetStatus(tmp_pop_n, {"pos": False, "pattern_file": traj_file})
             self.pops_n.append( PopView(tmp_pop_n,self.time_vect) )
 
 

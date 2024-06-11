@@ -45,7 +45,7 @@ class Events(list):
 ###################### UTIL ######################
 
 def new_spike_detector(pop,**kwargs):
-    spike_detector = nest.Create("spike_detector")
+    spike_detector = nest.Create("spike_recorder")
     nest.SetStatus(spike_detector, params=kwargs)
     nest.Connect(pop, spike_detector)
     return spike_detector
