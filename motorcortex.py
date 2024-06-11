@@ -197,15 +197,16 @@ class MotorCortex:
             #TODO: check if files exist
 
             # Positive population (joint i)
-            tmp_pop_p = nest.Create("tracking_neuron", n=numNeurons, params=par_ffwd)
-            nest.SetStatus(tmp_pop_p, {"pos": True, "pattern_file": cmd_file})
+            tmp_pop_p = nest.Create("tracking_neuron_nestml", n=numNeurons, params=par_ffwd)
+            nest.SetStatus(tmp_pop_p, {"pos": True, "traj": self.motorCommands.flatten().tolist(), "simulation_steps": len(self.motorCommands.flatten().tolist())})
             self.ffwd_p.append( PopView(tmp_pop_p,self.time_vect) )
 
             # Negative population (joint i)
-            tmp_pop_n = nest.Create("tracking_neuron", n=numNeurons, params=par_ffwd)
-            nest.SetStatus(tmp_pop_n, {"pos": False, "pattern_file": cmd_file})
+            tmp_pop_n = nest.Create("tracking_neuron_nestml", n=numNeurons, params=par_ffwd)
+            nest.SetStatus(tmp_pop_n, {"pos": False, "traj": self.motorCommands.flatten().tolist(), "simulation_steps": len(self.motorCommands.flatten().tolist())})
             self.ffwd_n.append( PopView(tmp_pop_n,self.time_vect) )
 
+            '''
             ############ FEEDBACK POPULATION ############
             # Positive and negative populations for each joint
 
@@ -244,17 +245,21 @@ class MotorCortex:
             nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz})
             #self.out_n.append( PopView(tmp_pop_n,self.time_vect) )
             self.out_n.append( PopView(tmp_pop_n,self.time_vect,to_file=True,label=filename) )
-
+            '''
             ###### CONNECT FFWD AND FBK POULATIONS TO OUT POPULATION ######
             # Populations of each joint are connected together according to connection
             # rules and network topology. There is no connections across joints.
 
+            # Since in this simple version there is no feedback, we can also omit the "out" node
+
+            '''
             self.ffwd_p[i].connect(self.out_p[i], rule='one_to_one', w= params['wgt_ffwd_out'], d=res)
             self.ffwd_p[i].connect(self.out_n[i], rule='one_to_one', w= params['wgt_ffwd_out'], d=res)
             self.ffwd_n[i].connect(self.out_p[i], rule='one_to_one', w=-params['wgt_ffwd_out'], d=res)
             self.ffwd_n[i].connect(self.out_n[i], rule='one_to_one', w=-params['wgt_ffwd_out'], d=res)
-
+            
             self.fbk_p[i].connect(self.out_p[i], rule='one_to_one', w= params['wgt_fbk_out'], d=res)
             self.fbk_p[i].connect(self.out_n[i], rule='one_to_one', w= params['wgt_fbk_out'], d=res)
             self.fbk_n[i].connect(self.out_p[i], rule='one_to_one', w=-params['wgt_fbk_out'], d=res)
             self.fbk_n[i].connect(self.out_n[i], rule='one_to_one', w=-params['wgt_fbk_out'], d=res)
+            '''
