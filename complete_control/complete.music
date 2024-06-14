@@ -1,12 +1,12 @@
 # Applications
-[nest]
+[from]
   binary=./brain.py
   np=9
 
-[plant]
+[to]
   binary=./receiver_plant.py
   np=1
 
 # How ports are connected
-nest.mot_cmd_out -> plant.mot_cmd_in [100]
-plant.fbk_out -> nest.fbk_in [100]
+from.mot_cmd_out -> to.mot_cmd_in [100]
+to.fbk_out -> from.fbk_in [100]

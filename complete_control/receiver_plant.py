@@ -3,6 +3,7 @@
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
+print(music.__path__)
 import sys
 import queue
 import numpy as np

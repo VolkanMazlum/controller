@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-
-import nest
+import sys
+sys.path.remove('/usr/lib/python3.10/site-packages')
+#
 import numpy as np
 import time
 import sys
 import os
 import music
 import matplotlib.pyplot as plt
-
+# Import the module
+import nest
+print(nest.__path__)
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
@@ -123,7 +126,7 @@ cerebellum_application_inv = exp.cerebellum_application_inv  # Trial at which th
 # Install the module containing neurons for planner and motor cortex
 print("installing module")
 nest.Install("controller_module")
-
+print(nest.node_models)
 #### Planner
 print("init planner")
 
@@ -137,6 +140,7 @@ preciseControl = brain.precCtrl # Precise or approximated ffwd commands?
 
 mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, **mc_params)
 
+'''
 #### State Estimator
 print("init state")
 kpred    = state_se_params["kpred"]
@@ -207,10 +211,12 @@ for j in range(njt):
         nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
 
 print("init connections feedback")
-
+'''
 #%% CONNECTIONS
+'''
 #### Connection Planner - Motor Cortex feedback (excitatory)
 wgt_plnr_mtxFbk   = conn_params["planner_mc_fbk"]["weight"]
+
 
 # Delay between planner and motor cortex feedback.
 # It needs to compensate for the delay introduced by the state estimator
@@ -250,43 +256,43 @@ for j in range(njt):
     nest.Connect(stEst.pops_p[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": wgt_stEst_mtxFbk, "delay": res})
     nest.Connect(stEst.pops_n[j].pop,mc.fbk_p[j].pop, "one_to_one", {"weight": -wgt_stEst_mtxFbk, "delay": res})
     nest.Connect(stEst.pops_n[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": -wgt_stEst_mtxFbk, "delay": res})
-
-
+'''
+# BRAIN STEM: in this first simplified controller, ffwd motor cortex connects to basic neurons in brainstem
 brain_stem_new_p=[]
 brain_stem_new_n=[]
 
 
 for j in range(njt):
     # Positive neurons
-    tmp_p = nest.Create ("basic_neuron", N)
+    tmp_p = nest.Create ("basic_neuron_nestml", N)
     nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
     brain_stem_new_p.append( PopView(tmp_p, time_vect) )
     # Negative neurons
-    tmp_n = nest.Create ("basic_neuron", N)
+    tmp_n = nest.Create ("basic_neuron_nestml", N)
     nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
     brain_stem_new_n.append( PopView(tmp_n, time_vect) )
 
 
 for j in range(njt):
-    nest.Connect(mc.out_p[j].pop,brain_stem_new_p[j].pop, "all_to_all", {"weight": conn_params["mc_out_brain_stem"]["weight"], "delay": conn_params["mc_out_brain_stem"]["delay"]})
+    nest.Connect(mc.ffwd_p[j].pop,brain_stem_new_p[j].pop, "all_to_all", {"weight": conn_params["mc_out_brain_stem"]["weight"], "delay": conn_params["mc_out_brain_stem"]["delay"]})
     # nest.Connect(stEst.pops_p[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": wgt_stEst_mtxFbk, "delay": res})
     # nest.Connect(stEst.pops_n[j].pop,mc.fbk_p[j].pop, "one_to_one", {"weight": -wgt_stEst_mtxFbk, "delay": res})
-    nest.Connect(mc.out_n[j].pop,brain_stem_new_n[j].pop, "all_to_all", {"weight": -conn_params["mc_out_brain_stem"]["weight"], "delay": conn_params["mc_out_brain_stem"]["delay"]})
+    nest.Connect(mc.ffwd_n[j].pop,brain_stem_new_n[j].pop, "all_to_all", {"weight": -conn_params["mc_out_brain_stem"]["weight"], "delay": conn_params["mc_out_brain_stem"]["delay"]})
 
-
+'''
 # feedback from sensory
 feedback_inv_p = nest.Create("diff_neuron", N)
 nest.SetStatus(feedback_inv_p, {"kp": pops_params["feedback_inv"]["kp"], "pos": True, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
 feedback_inv_n = nest.Create("diff_neuron", N)
 nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": False, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
-
+'''
 
 #%% MUSIC CONFIG
 
 msc = MusicCfg()
 
 #### MUSIC output port (with nTot channels)
-proxy_out = nest.Create('music_event_out_proxy', 1, params = {'port_name':'mot_cmd_out'})
+proxy_out = nest.Create('music_cont_out_proxy', 1, params = {'port_name':'mot_cmd_out'})
 
 # ii=0
 # for j in range(njt):
