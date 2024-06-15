@@ -3,7 +3,6 @@
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
-print(music.__path__)
 import sys
 import queue
 import numpy as np
@@ -15,7 +14,7 @@ sys.path.insert(1, '../')
 
 from sensoryneuron import SensoryNeuron
 from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
-from util import plotPopulation
+#from util import plotPopulation
 
 import trajectories as tj
 import perturbation as pt
@@ -30,7 +29,7 @@ import json
 
 exp = Experiment()
 
-param_file = exp.param_file
+#param_file = exp.param_file
 saveFig = True
 
 # Opening JSON file
@@ -42,11 +41,11 @@ f.close()
 
 mc_params = params["modules"]["motor_cortex"]
 plan_params = params["modules"]["planner"]
-
 spine_params = params["modules"]["spine"]
+'''
 state_params = params["modules"]["state"]
 state_se_params = params["modules"]["state_se"]
-
+'''
 pops_params = params["pops"]
 conn_params = params["connections"]
 
@@ -64,7 +63,8 @@ sim = Simulation()
 res          = sim.resolution/1e3            # Resolution (translate into seconds)
 timeMax      = sim.timeMax/1e3               # Maximum time (translate into seconds)
 time         = np.arange(0,timeMax+res,res)  # Time vector
-time_pause   = sim.timePause/1e3             # Pause time (translate into seconds)
+#time_pause   = sim.timePause/1e3
+time_pause = 0             # Pause time (translate into seconds)
 n_trial      = sim.n_trials
 exp_duration = (timeMax+time_pause)*n_trial
 time_tot     = np.arange(0,exp_duration,res)
@@ -108,12 +108,13 @@ pathFig =exp.pathFig
 pthDat = exp.pathData
 cond = exp.cond
 
+'''
 # Perturbation
 angle = exp.frcFld_angle
 k     = 0                # Default = No Force field
 ff_application = exp.ff_application
 ff_removal = exp.ff_removal
-
+'''
 # Dynamical system
 dynSys = exp.dynSys
 njt    = exp.dynSys.numVariables()
@@ -146,13 +147,14 @@ N = brain.nNeurPop
 w = spine_params["wgt_motCtx_motNeur"]
 
 # Sensory feedback delay (seconds)
-delay_fbk = spine_params["fbk_delay"]/1e3
+#delay_fbk = spine_params["fbk_delay"]/1e3
 
+'''
 # First ID sensory neurons
 sensNeur_idSt     = brain.firstIdSensNeurons
 sensNeur_baseRate = spine_params["sensNeur_base_rate"]
 sensNeur_gain     = spine_params["sensNeur_kp"]
-
+'''
 
 ############################## MUSIC CONFIG ##############################
 
@@ -172,7 +174,7 @@ nlocal  = N*2*njt  # Number of neurons taken care of by this MPI rank
 # The MUSIC setup object is used to configure the simulation
 setup   = music.Setup()
 indata  = setup.publishEventInput("mot_cmd_in")
-outdata = setup.publishEventOutput("fbk_out")
+#outdata = setup.publishEventOutput("fbk_out")
 
 #NOTE: The actual neuron IDs from the sender side are LOST!!!
 # By knowing how many joints and neurons, one should be able to retreive the
@@ -200,15 +202,15 @@ indata.map(inhandler,
            base=firstId,
            size=nlocal,
            accLatency=accLat)
-
+'''
 # Config of the output port
 outdata.map (music.Index.GLOBAL,
              base=firstId,
              size=nlocal)
-
+'''
 
 ################ SENSORY NEURONS
-
+'''
 sn_p = [] # Positive sensory neurons
 sn_n = [] # Negative sensory neurons
 for i in range(njt):
@@ -222,7 +224,7 @@ for i in range(njt):
     tmp    = SensoryNeuron(N, pos=False, idStart=idSt_n, bas_rate=sensNeur_baseRate, kp=sensNeur_gain)
     tmp.connect(outdata)   # Connect to output port
     sn_n.append(tmp)
-
+'''
 
 ######################## SETUP ARRAYS ################################
 
@@ -249,8 +251,8 @@ vel_j = np.zeros([n_time,njt])
 
 # Sequence of motor commands, perturbation and total input
 inputCmd     = np.zeros([n_time,njt]) # Input commands (from motor commands)
-perturb      = np.zeros([n_time,2])   # Perturbation (end-effector)
-perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
+#perturb      = np.zeros([n_time,2])   # Perturbation (end-effector)
+#perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
 inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
 
@@ -288,37 +290,39 @@ while tickt < exp_duration:
 
     # After a certain number of trials I switch on the force field
     # The number of trials is defined by "ff_application" variable
+    '''
     if tickt >= ff_application*(timeMax+time_pause) and tickt <= ff_application*(timeMax+time_pause)+0.02:
         print('Added Force Field')
         k = exp.frcFld_k
     elif tickt >= ff_removal*(timeMax+time_pause) and tickt <= ff_removal*(timeMax+time_pause)+0.02:
         print('Removed Force Field')
         k = 0
-
+    '''
 
     # After completing the task and during the pause: initialize position and velocity
-    if tickt%(timeMax+time_pause) >= timeMax:
+    #if tickt%(timeMax+time_pause) >= timeMax:
         #dynSys.pos = dynSys.inverseKin(exp.init_pos) # Initial condition (position)
         #dynSys.vel = np.array([0.0])             # Initial condition (velocity)
-        pass
-    else:
-        # Send sensory feedback and compute input commands for this timestep
-        buf_st = tickt-bufSize # Start of buffer
-        buf_ed = tickt         # End of buffer
-        for i in range(njt):
-            # Generate and send sensory feedback spikes given plan position
-            sn_p[i].update(pos_j[step,i], res, tickt)
-            sn_n[i].update(pos_j[step,i], res, tickt)
-            # Compute input commands
-            spkRate_pos[step,i], c = computeRate(spikes_pos[i], w, N, buf_st, buf_ed)
-            spkRate_neg[step,i], c = computeRate(spikes_neg[i], w, N, buf_st, buf_ed)
-            spkRate_net[step,i]    = spkRate_pos[step,i] - spkRate_neg[step,i]
-            inputCmd[step,i]       = spkRate_net[step,i] / scale
+        #pass
+    #else:
+    # Send sensory feedback and compute input commands for this timestep
+    buf_st = tickt-bufSize # Start of buffer
+    buf_ed = tickt         # End of buffer
+    for i in range(njt):
+    	# Generate and send sensory feedback spikes given plan position
+        #sn_p[i].update(pos_j[step,i], res, tickt)
+        #sn_n[i].update(pos_j[step,i], res, tickt)
+        # Compute input commands
+        spkRate_pos[step,i], c = computeRate(spikes_pos[i], w, N, buf_st, buf_ed)
+        spkRate_neg[step,i], c = computeRate(spikes_neg[i], w, N, buf_st, buf_ed)
+        spkRate_net[step,i]    = spkRate_pos[step,i] - spkRate_neg[step,i]
+        #print('net spike rate: ', spkRate_net[step,i]) 
+        inputCmd[step,i]       = spkRate_net[step,i] / scale
 
-        perturb[step,:]      = pt.curledForceField(vel[step,:], angle, k)                     # End-effector forces
+        #perturb[step,:]      = pt.curledForceField(vel[step,:], angle, k)                     # End-effector forces
         #perturb_j[step,:]    = np.matmul( dynSys.jacobian(pos_j[step,:]) , perturb[step,:] )  # Torques
         inputCmd_tot[step,:] = inputCmd[step,:] #+ perturb_j[step,:]                           # Total torques
-
+        #print('inputCmd_tot[step,:]: ', inputCmd_tot[step,:])
         # Set joint torque
         bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:] )
 
@@ -358,7 +362,7 @@ for i in range(njt):
     else:
         tmp_dat_n = np.array( spikes_neg[i] )
         np.savetxt(tmp_fnm_n, tmp_dat_n)
-
+    '''    
     ########### Sensory neurons (output to MUSIC)
     # Positive
     tmp_fnm_p = pthDat+"sensNeur_outSpikes_j"+str(i)+"_p.txt"
@@ -379,10 +383,11 @@ for i in range(njt):
     else:
         tmp_dat_n = np.array( sn_n[i].spike )
         np.savetxt(tmp_fnm_n, tmp_dat_n)
-
+    '''
 # Motor neuron spike rates (of each population for each joint)
 np.savetxt(pthDat+"motNeur_rate_pos.csv",spkRate_pos, delimiter=',')
 np.savetxt(pthDat+"motNeur_rate_neg.csv",spkRate_neg, delimiter=',')
+np.savetxt(pthDat+"motNeur_rate_net.csv",spkRate_net, delimiter=',')
 
 # Position and velocities (joint space)
 np.savetxt( pthDat+"pos_real_joint.csv", pos_j, delimiter=',' )
@@ -400,8 +405,8 @@ np.savetxt( pthDat+"pos_des_joint.csv", trj, delimiter=',' ) # Joints
 np.savetxt( pthDat+"inputCmd_des.csv", inputDes, delimiter=',' )     # Desired torques
 np.savetxt( pthDat+"inputCmd_motNeur.csv", inputCmd, delimiter=',' ) # Torques from motor neurons
 np.savetxt( pthDat+"inputCmd_tot.csv", inputCmd_tot, delimiter=',' ) # Torques from motor neurons + perturbation
-np.savetxt( pthDat+"perturbation_ee.csv", perturb, delimiter=',' )   # Perturbation force in end-effector space
-np.savetxt( pthDat+"perturbation_j.csv", perturb_j, delimiter=',' )  # Perturbation torque
+#np.savetxt( pthDat+"perturbation_ee.csv", perturb, delimiter=',' )   # Perturbation force in end-effector space
+#np.savetxt( pthDat+"perturbation_j.csv", perturb_j, delimiter=',' )  # Perturbation torque
 
 
 ########################### PLOTTING ###########################
@@ -434,10 +439,13 @@ err_x = []
 for trial in range(n_trial):
     start = trial*trial_delta
     end = start + task_steps - 1
+    '''
     if trial < ff_application: # Only cerebellum
         style = 'k'
     else:
         style = 'r:'  # Cerebellum must compensate delay and Force field
+    '''
+    style = 'k'
     plt.plot(pos[start:end,0],pos[start:end,2],style)
     plt.plot(pos[end,0],pos[end,2],marker='x',color='k')
     # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
@@ -493,7 +501,7 @@ np.savetxt("error.txt",np.array(errors)*100)
 #     plt.savefig(pathFig+cond+"error_ee_x_perc.png")
 
 
-nep.save_file_fig(pathFig)
+#np.save_file_fig(pathFig)
 # Show sensory neurons
 # for i in range(njt):
 #     plotPopulation(time, sn_p[i], sn_n[i], title=lgd[i],buffer_size=0.015)

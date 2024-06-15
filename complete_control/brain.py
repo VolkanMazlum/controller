@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import sys
-sys.path.remove('/usr/lib/python3.10/site-packages')
+#sys.path.remove('/usr/lib/python3.10/site-packages')
 #
 import numpy as np
 import time
@@ -10,7 +10,6 @@ import music
 import matplotlib.pyplot as plt
 # Import the module
 import nest
-print(nest.__path__)
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
@@ -69,7 +68,8 @@ sim = Simulation()
 
 res        = sim.resolution
 time_span  = sim.timeMax
-time_pause = sim.timePause
+#time_pause = sim.timePause
+time_pause = 0
 n_trial   = sim.n_trials
 time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
 
@@ -117,16 +117,17 @@ brain = Brain()
 N    = brain.nNeurPop # For each subpopulation positive/negative
 nTot = 2*N*njt        # Total number of neurons
 
-'''
+
 # # Cerebellum
 cereb_controlled_joint = brain.cerebellum_controlled_joint
+'''
 cerebellum_application_forw = exp.cerebellum_application_forw  # Trial at which the cerebellum si connected to StateEstimator
 cerebellum_application_inv = exp.cerebellum_application_inv  # Trial at which the cerebellum si connected to StateEstimator
 '''
 # Install the module containing neurons for planner and motor cortex
 print("installing module")
+#os.environ['LD_LIBRARY_PATH']=os.getcwd()+os.environ.get['LD_LIBRARY_PATH']
 nest.Install("controller_module")
-print(nest.node_models)
 #### Planner
 print("init planner")
 
@@ -265,11 +266,11 @@ brain_stem_new_n=[]
 for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("basic_neuron_nestml", N)
-    nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
+    nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(time_vect)})
     brain_stem_new_p.append( PopView(tmp_p, time_vect) )
     # Negative neurons
     tmp_n = nest.Create ("basic_neuron_nestml", N)
-    nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
+    nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(time_vect)})
     brain_stem_new_n.append( PopView(tmp_n, time_vect) )
 
 
@@ -292,8 +293,7 @@ nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": 
 msc = MusicCfg()
 
 #### MUSIC output port (with nTot channels)
-proxy_out = nest.Create('music_cont_out_proxy', 1, params = {'port_name':'mot_cmd_out'})
-
+proxy_out = nest.Create('music_event_out_proxy', 1, params = {'port_name':'mot_cmd_out'})
 # ii=0
 # for j in range(njt):
 #     for i, n in enumerate(mc.out_p[j].pop):
@@ -322,17 +322,17 @@ proxy_out = nest.Create('music_cont_out_proxy', 1, params = {'port_name':'mot_cm
 ii=0
 for j in range(njt):
     for i, n in enumerate(brain_stem_new_p[j].pop):
-        nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+        nest.Connect(n, proxy_out, "one_to_one",{'music_channel': ii})
         ii=ii+1
     for i, n in enumerate(brain_stem_new_n[j].pop):
-        nest.Connect([n], proxy_out, "one_to_one",{'music_channel': ii})
+        nest.Connect(n, proxy_out, "one_to_one",{'music_channel': ii})
         ii=ii+1
 
-
+'''
 #### MUSIC input ports (nTot ports with one channel each)
 proxy_in = nest.Create ('music_event_in_proxy', nTot, params = {'port_name': 'fbk_in'})
 for i, n in enumerate(proxy_in):
-    nest.SetStatus([n], {'music_channel': i})
+    nest.SetStatus(n, {'music_channel': i})
 
 # Divide channels based on function (using channel order)
 for j in range(njt):
@@ -350,60 +350,64 @@ for j in range(njt):
     idxSt_n = idxEd_p
     idxEd_n = idxSt_n + N
     nest.Connect( proxy_in[idxSt_n:idxEd_n], sn_n[j].pop, 'one_to_one', {"weight":wgt_sensNeur_spine, "delay":delay} )
-
+'''
 # We need to tell MUSIC, through NEST, that it's OK (due to the delay)
 # to deliver spikes a bit late. This is what makes the loop possible.
-nest.SetAcceptableLatency('fbk_in', 0.1-msc.const)
+# nest.SetAcceptableLatency('fbk_in', 0.1-msc.const)
 
 ###################### Extra Spikedetectors ######################
-spikedetector_fbk_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback pos"})
-spikedetector_fbk_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback neg"})
+'''
+spikedetector_fbk_pos = nest.Create("spike_recorder", params={"label": "Feedback pos"})
+spikedetector_fbk_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback neg"})
 
-spikedetector_fbk_inv_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback inv pos"})
-spikedetector_fbk_inv_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback inv neg"})
+spikedetector_fbk_inv_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback inv pos"})
+spikedetector_fbk_inv_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback inv neg"})
 
-spikedetector_fbk_cereb_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum pos"})
-spikedetector_fbk_cereb_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum neg"})
-spikedetector_io_forw_input_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw pos"})
-spikedetector_io_forw_input_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw neg"})
+spikedetector_fbk_cereb_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum pos"})
+spikedetector_fbk_cereb_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback cerebellum neg"})
+spikedetector_io_forw_input_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw pos"})
+spikedetector_io_forw_input_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Forw neg"})
 
-spikedetector_io_inv_input_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Inv pos"})
-spikedetector_io_inv_input_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Inv neg"})
+spikedetector_io_inv_input_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Inv pos"})
+spikedetector_io_inv_input_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Input inferior Olive Inv neg"})
 
-spikedetector_stEst_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator pos"})
-spikedetector_stEst_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator neg"})
-spikedetector_planner_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Planner pos"})
-spikedetector_planner_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Planner neg"})
-spikedetector_pred_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb pred pos"})
-spikedetector_pred_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb pred neg"})
-spikedetector_motor_pred_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb motor pred pos"})
-spikedetector_motor_pred_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb motor pred neg"})
-spikedetector_stEst_max_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator Max pos"})
-spikedetector_stEst_max_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator Max neg"})
-spikedetector_fbk_smoothed_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed pos"})
-spikedetector_fbk_smoothed_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed neg"})
-
-spikedetector_brain_stem_pos = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Brain stem pos"})
-spikedetector_brain_stem_neg = nest.Create("spike_detector", params={"withgid": True,"withtime": True, "to_file": True, "label": "Brain stem neg"})
+spikedetector_stEst_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator pos"})
+spikedetector_stEst_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator neg"})
+'''
+spikedetector_planner_pos = nest.Create("spike_recorder", params={"label": "Planner pos"})
+spikedetector_planner_neg = nest.Create("spike_recorder", params={"label": "Planner neg"})
+'''
+spikedetector_pred_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb pred pos"})
+spikedetector_pred_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb pred neg"})
+spikedetector_motor_pred_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb motor pred pos"})
+spikedetector_motor_pred_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Cereb motor pred neg"})
+spikedetector_stEst_max_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator Max pos"})
+spikedetector_stEst_max_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "State estimator Max neg"})
+spikedetector_fbk_smoothed_pos = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed pos"})
+spikedetector_fbk_smoothed_neg = nest.Create("spike_recorder", params={"withgid": True,"withtime": True, "to_file": True, "label": "Feedback smoothed neg"})
+'''
+spikedetector_brain_stem_pos = nest.Create("spike_recorder", params={"label": "Brain stem pos"})
+spikedetector_brain_stem_neg = nest.Create("spike_recorder", params={"label": "Brain stem neg"})
 
 nest.Connect(brain_stem_new_p[j].pop, spikedetector_brain_stem_pos)
 nest.Connect(brain_stem_new_n[j].pop, spikedetector_brain_stem_neg)
 
-
+'''
 nest.Connect(sn_p[cereb_controlled_joint].pop, spikedetector_fbk_pos)
 nest.Connect(sn_n[cereb_controlled_joint].pop, spikedetector_fbk_neg)
 nest.Connect(feedback_p, spikedetector_fbk_cereb_pos)
 nest.Connect(feedback_n, spikedetector_fbk_cereb_neg)
+'''
 nest.Connect(planner.pops_p[cereb_controlled_joint].pop, spikedetector_planner_pos)
 nest.Connect(planner.pops_n[cereb_controlled_joint].pop, spikedetector_planner_neg)
+'''
 nest.Connect(stEst.pops_p[cereb_controlled_joint].pop, spikedetector_stEst_max_pos)
 nest.Connect(stEst.pops_n[cereb_controlled_joint].pop, spikedetector_stEst_max_neg)
+'''
 
 
 ###################### SIMULATE ######################
-nest.SetKernelStatus({"data_path": pthDat})
-total_len = int(time_span + time_pause)
-
+'''
 # Disable Cerebellar prediction in State estimation 
 conns_pos_forw = nest.GetConnections(source = prediction_p, target = stEst.pops_p[cereb_controlled_joint].pop)
 conns_neg_forw = nest.GetConnections(source = prediction_n, target = stEst.pops_n[cereb_controlled_joint].pop)
@@ -412,7 +416,7 @@ conns_neg_forw = nest.GetConnections(source = prediction_n, target = stEst.pops_
 if cerebellum_application_forw != 0:
     nest.SetStatus(conns_pos_forw, {"weight": 0.0})
     nest.SetStatus(conns_neg_forw, {"weight": 0.0})
-
+'''
 
 #%% SIMULATE ######################
 nest.SetKernelStatus({"data_path": pthDat})
@@ -432,8 +436,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     # Positive
     fig, ax = plt.subplots(1,1)
     for i in range(njt):
-        planner.pops_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,color='r',label='planner')
-        sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
+        planner.pops_p[i].plot_rate(time_vect_paused,ax=ax,bar=True,color='r',label='planner')
+        #sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
         # stEst.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
     ax.legend()
     ax.set_xlabel("time (ms)")
@@ -444,15 +448,15 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     # Negative
     fig, ax = plt.subplots(1,1)
     for i in range(njt):
-        planner.pops_n[i].plot_rate(time_vect_paused,ax=ax,bar=False,color='r',label='planner')
-        sn_n[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
+        planner.pops_n[i].plot_rate(time_vect_paused,ax=ax,bar=False,color='b',label='planner')
+        #sn_n[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
         # stEst.out_n[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state neg')
         ax.legend()
     ax.set_xlabel("time (ms)")
     plt.suptitle("Negative")
     if saveFig:
         plt.savefig(pathFig+cond+"plan_fbk_neg.png")
-
+    '''
     # # MC fbk
     for i in range(njt):
         plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], title=lgd[i],buffer_size=10)
@@ -460,7 +464,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
         plt.xlabel("time (ms)")
         if saveFig:
             plt.savefig(pathFig+cond+"mtctx_fbk_"+lgd[i]+".png")
-
+    '''
     # # MC ffwd
     for i in range(njt):
         plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], title=lgd[i],buffer_size=10)
@@ -472,15 +476,66 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 
     lgd = ['theta']
     
+    ## Planner
     for i in range(njt):
         plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], title=lgd[i],buffer_size=15)
         plt.suptitle("Planner")
+        if saveFig:
+            plt.savefig(pathFig+cond+"planner_"+lgd[i]+".png")
+            
+    ## Brainstem
+    fig, ax = plt.subplots(1,1)
+    for i in range(njt):
+        brain_stem_new_p[i].plot_rate(time_vect_paused,ax=ax,bar=True,color='r',label='brainstem')
+        #sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
+        # stEst.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
+    ax.legend()
+    ax.set_xlabel("time (ms)")
+    plt.suptitle("Positive")
+    if saveFig:
+        plt.savefig(pathFig+cond+"brainstem_pos.png")
     
+    fig, ax = plt.subplots(1,1)
+    for i in range(njt):
+        brain_stem_new_n[i].plot_rate(time_vect_paused,ax=ax,bar=True,color='b',label='brainstem')
+        #sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
+        # stEst.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
+    ax.legend()
+    ax.set_xlabel("time (ms)")
+    plt.suptitle("Negative")
+    if saveFig:
+        plt.savefig(pathFig+cond+"brainstem_neg.png")
+    '''
+    for i in range(njt):
+        events_bs_pos = nest.GetStatus(spikedetector_brain_stem_pos, keys="events")[0]
+        evs_p = events_bs_pos["senders"]
+        ts_p = events_bs_pos["times"]
+        
+        events_bs_neg = nest.GetStatus(spikedetector_brain_stem_neg, keys="events")[0]
+        evs_n = events_bs_neg["senders"]
+        ts_n = events_bs_neg["times"]
+        
+        y_p =   evs_p - brain_stem_new_p[0].pop + 1
+        y_n = -(evs_n - brain_stem_new_n[0].pop + 1)
+        
+        fig, ax = plt.subplots(2,1,sharex=True)
+        ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
+        ax[0].scatter(ts_n, y_n, marker='.', s=1)
+        ax[0].set_ylabel("raster")
+        pop_pos.plot_rate(time_vect_paused, 15, ax=ax[1],color="r")
+        pop_neg.plot_rate(time_vect_paused, 15, ax=ax[1], title='PSTH (Hz)')
+        ax[0].set_title(lgd[0])
+        ax[0].set_ylim( bottom=-(len(brain_stem_new_n.pop)+1), top=len(brain_stem_new_p.pop)+1 )
+        plt.suptitle("Brainstem")
+        if saveFig:
+    	    plt.savefig(pathFig+cond+"brainstem_"+lgd[i]+".png")
+    '''
+    '''
     # Sensory feedback
     for i in range(njt):
         plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
         plt.suptitle("Sensory feedback")
-
+    '''
 
     # lgd = ['x','y']
     #
@@ -488,22 +543,28 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     # for i in range(njt):
     #     plotPopulation(time_vect_paused, se.out_p[i],se.out_n[i], title=lgd[i],buffer_size=15)
     #     plt.suptitle("State estimator")
-    
+    '''
     # Sensory feedback
     for i in range(njt):
         plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
         plt.suptitle("Sensory feedback")
-    
+    '''
 
 
-    # motCmd = mc.getMotorCommands()
-    # fig, ax = plt.subplots(2,1)
-    # ax[0].plot(time_vect_paused,trj)
-    # ax[1].plot(time_vect_paused,motCmd)
+    motCmd = mc.getMotorCommands()
+    fig, ax = plt.subplots(2,1)
+    ax[0].plot(time_vect_paused,trj)
+    ax[0].set_title('Trajectory [theta]')
+    ax[0].set_xlabel('Time [ms]')
+    ax[1].plot(time_vect_paused,motCmd)
+    ax[1].set_title('Motor command')
+    ax[0].set_xlabel('Time [ms]')
+    if saveFig:
+            plt.savefig(pathFig+cond+"motor_commands"+lgd[i]+".png")
     #
     #
     lgd = ['theta']
-
+    '''
     fig, ax = plt.subplots(2,1)
     for i in range(njt):
         mc.out_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='out')
@@ -517,7 +578,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
         plt.xlabel("time (ms)")
         plt.ylabel("spike rate positive - negative")
         plt.legend(lgd)
-
+    '''
     #plt.savefig("mctx_out_pos-neg.png")
 
 # ## Collapsing data files into one file
