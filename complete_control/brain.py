@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 import sys
-#sys.path.remove('/usr/lib/python3.10/site-packages')
-#
 import numpy as np
 import time
-import sys
 import os
 import music
 import matplotlib.pyplot as plt
+
+# Adjust env vars to be able to import the NESTML-generated module
+ld_lib_path = os.environ.get('LD_LIBRARY_PATH', '')
+new_path = ld_lib_path + ":"+"../nestml/target"
+os.environ['LD_LIBRARY_PATH'] = new_path
+
 # Import the module
 import nest
 # Just to get the following imports right!
