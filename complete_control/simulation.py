@@ -94,7 +94,7 @@ nest.Connect(motor_n, spikedetector_motor_cortex_neg)
 ########## SIMULATION #############
 for trial in range(n_trial):
    nest.Simulate(time_span)
-
+'''
 ########## PLOTTING ############### (test, poi da rimuovere)
 def computePSTH(time, ts, evs, buffer_sz=10):
         t_init = time[0]
@@ -179,9 +179,36 @@ for i in range(njt):
    plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
    plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
 plt.savefig("brainstem.png")
-
+'''
 
 ########## COMPUTE OUTPUT (net firing rate)
-   
+bs_data_p = nest.GetStatus(spikedetector_brain_stem_pos, keys= "events")[0]
+spikes_p = bs_data_p["times"]
+bs_data_n = nest.GetStatus(spikedetector_brain_stem_neg, keys= "events")[0]
+spikes_n = bs_data_n["times"]
+w = 1.0625540740843757
+buffer_size = 10 #[ms]
+scale   = 350.0
+def computeRate(spikes, w, nNeurons, time_vector, buffer_size):
+    rates = []
+    for t in time_vector: 
+        count = 0
+        rate  = 0
+        timeSt = t - buffer_size
+        timeEnd = t
+        if len(spikes)>0:
+            tmp = np.array(spikes)
+            idx = np.bitwise_and(tmp>=timeSt, tmp<timeEnd)
+            count = w*np.sum(idx)
+            rate = (count/((timeEnd-timeSt)*nNeurons))
+        rates.append(rate)
+    return np.array(rates)
+
+spkRate_pos = computeRate(spikes_p, w, N, time_vect, buffer_size)
+spkRate_neg = computeRate(spikes_n, w, N, time_vect, buffer_size)
+spkRate_net = spkRate_pos - spkRate_neg
+inputCmd = spkRate_net/ scale
+
+np.savetxt('output_firing_rate.txt', inputCmd)
 
 

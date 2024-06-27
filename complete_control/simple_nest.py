@@ -13,12 +13,9 @@ import nest
 sys.path.insert(1, '../')
 
 from robot1j import Robot1J 
-#import mpi4py
-#from mpi4py import MPI
-import random
 import json
 import ctypes
-ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+#ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 
 ############## INITIALIZATION #############
