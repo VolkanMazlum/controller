@@ -23,6 +23,9 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 
 ############## INITIALIZATION #############
+### Definition of parameters and computation of the input analog signal to the Planner and Motor Cortex block.
+### As discussed, this part could be outsourced to a separate Python script managed by the NRP directly.
+
 # Load parameters from json file (could be also defined here directly)
 f = open('new_params.json')
 params = json.load(f)
@@ -66,7 +69,7 @@ njt = dynSys.numVariables()
 init_pos = dynSys.inverseKin( init_pos_ee )
 tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
 
-# Compute minimum jerk trajectory (input to Planner)
+## Compute minimum jerk trajectory (input to Planner)
 
 def minimumJerk(x_init, x_des, timespan):
     T_max = timespan[ len(timespan)-1 ]
@@ -87,7 +90,7 @@ def minimumJerk(x_init, x_des, timespan):
 trj, pol = minimumJerk(init_pos[0], tgt_pos[0], time_vect) # Joint space (angle)
 trj_ee = dynSys.forwardKin( trj ) # End-effector space
 
-# Compute motor commands (input to Motor Cortex)
+## Compute motor commands (input to Motor Cortex)
 # Double derivative of the trajectory
 def minimumJerk_ddt(x_init, x_des, timespan):
     T_max = timespan[ len(timespan)-1 ]
@@ -146,7 +149,6 @@ def generateMotorCommands(init_pos, des_pos, time_vector):
     return mcmd[0]
 
 motorCommands = generateMotorCommands(init_pos[0], tgt_pos[0], time_vect/1e3)
-#motorCommands = generateMotorCommands(init_pos[0], tgt_pos[0], time_vect)
 
 fig, ax = plt.subplots(1,1)
 plt.plot(time_vect, motorCommands)
@@ -156,24 +158,26 @@ plt.savefig('mcmd.png')
 N = 50 # Number of neurons for each (sub-)population
 nTot = 2*N*njt # Total number of neurons (one positive and one negative population for each DOF)
 
-####################### CREATE NODES/MODULES #####################
+####################### CREATE NODES AND NETWORK #####################
 ### Install NESTML-generated module
 nest.Install("controller_module")
 
 ### PLANNER: create and initialize the Planner population
 # Input: target --> minimum jerk trajectory
 # Output: spikes (firing rate proportional to elbow angle)
-planner_p = nest.Create("tracking_neuron_nestml", n=N, params={"kp": plan_params["kp"], "base_rate": plan_params["base_rate"], "pos": True, "traj": trj.flatten().tolist(), "simulation_steps": len(trj.flatten().tolist())})
+for i in range(njt):
+    planner_p = nest.Create("tracking_neuron_nestml", n=N, params={"kp": plan_params["kp"], "base_rate": plan_params["base_rate"], "pos": True, "traj": trj.flatten().tolist(), "simulation_steps": len(trj.flatten().tolist())})
 
-planner_n = nest.Create("tracking_neuron_nestml", n=N, params={"kp": plan_params["kp"], "base_rate": plan_params["base_rate"], "pos": False, "traj": trj.flatten().tolist(), "simulation_steps": len(trj.flatten().tolist())})
+    planner_n = nest.Create("tracking_neuron_nestml", n=N, params={"kp": plan_params["kp"], "base_rate": plan_params["base_rate"], "pos": False, "traj": trj.flatten().tolist(), "simulation_steps": len(trj.flatten().tolist())})
 
 
 ### FEEDFORWARD MOTOR CORTEX: create and initialize the Motor cortex populationù
 # Input: target --> double derivative + inverse dynamics --> torque to be applied to elbow joint (motor command)
 # Output: spikes (firing rate proportional to torque)
-motor_p = nest.Create("tracking_neuron_nestml", n=N, params={"kp":mc_params["ffwd_kp"], 'base_rate':mc_params['ffwd_base_rate'], 'pos': True, 'traj': motorCommands.flatten().tolist(), 'simulation_steps': len(motorCommands.flatten().tolist())})
+for i in range(njt):
+    motor_p = nest.Create("tracking_neuron_nestml", n=N, params={"kp":mc_params["ffwd_kp"], 'base_rate':mc_params['ffwd_base_rate'], 'pos': True, 'traj': motorCommands.flatten().tolist(), 'simulation_steps': len(motorCommands.flatten().tolist())})
 
-motor_n = nest.Create("tracking_neuron_nestml", n=N, params={'kp':mc_params["ffwd_kp"], 'base_rate':mc_params['ffwd_base_rate'], 'pos': False, 'traj': motorCommands.flatten().tolist(), 'simulation_steps': len(motorCommands.flatten().tolist())})
+    motor_n = nest.Create("tracking_neuron_nestml", n=N, params={'kp':mc_params["ffwd_kp"], 'base_rate':mc_params['ffwd_base_rate'], 'pos': False, 'traj': motorCommands.flatten().tolist(), 'simulation_steps': len(motorCommands.flatten().tolist())})
 
 ### BRAINSTEM
 # Input: spikes from FFWD motor cortex
@@ -216,6 +220,34 @@ for trial in range(n_trial):
    nest.Simulate(time_span)
 
 ########## PLOTTING ############### (test, poi da rimuovere)
+def computePSTH(time, ts, evs, buffer_sz=10):
+        t_init = time[0]
+        t_end  = time[ len(time)-1 ]
+        count, bins = np.histogram( ts, bins=np.arange(t_init,t_end+1,buffer_sz) )
+        rate = 1000*count/(N*buffer_sz)
+        return bins, count, rate
+        
+def plot_rate(time, ts, evs, buffer_sz=10, title='', ax=None, bar=True, **kwargs):
+
+        t_init = time[0]
+        t_end  = time[ len(time)-1 ]
+
+        bins,count,rate = computePSTH(time, ts, evs,buffer_sz)
+        rate_sm = np.convolve(rate, np.ones(5)/5,mode='same')
+
+        no_ax = ax is None
+        if no_ax:
+            fig, ax = plt.subplots(1)
+
+        if bar:
+            ax.bar(bins[:-1], rate, width=bins[1]-bins[0],**kwargs)
+            ax.plot(bins[:-1],rate_sm,color='k')
+        else:
+            ax.plot(bins[:-1],rate_sm,**kwargs)
+        ax.set(xlim=(t_init, t_end))
+        ax.set_ylabel(title)
+        
+        
 ## Planner
 plan_data_p = nest.GetStatus(spikedetector_planner_pos, keys= "events")[0]
 plan_data_n = nest.GetStatus(spikedetector_planner_neg, keys= "events")[0]
@@ -225,16 +257,16 @@ y_p = plan_data_p["senders"]
 y_p = [n_id - min(y_p) + 1 for n_id in y_p]
 y_n = plan_data_n["senders"]
 y_n = [-n_id + min(y_n) + 1 for n_id in y_n]
+
+
 for i in range(njt):
    fig, ax = plt.subplots(2,1)
    ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
    ax[0].scatter(ts_n, y_n, marker='.', s=1)
    ax[0].set_ylabel("raster")
-   #brain_stem_new_p[i].plot_rate(time_vect_paused,ax=ax[1],bar=True,color='r',label='brainstem')
-   #brain_stem_new_n[i].plot_rate(time_vect_paused,ax=ax[1],bar=True,color='b',label='brainstem')
-   #ax[1].set_xlabel("time (ms)")
-   #plt.suptitle("Positive")
-plt.savefig("planner_pos.png")
+   plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
+   plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
+   plt.savefig("planner.png")
 
 ## Motor cortex
 mc_data_p = nest.GetStatus(spikedetector_motor_cortex_pos, keys= "events")[0]
@@ -250,11 +282,9 @@ for i in range(njt):
    ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
    ax[0].scatter(ts_n, y_n, marker='.', s=1)
    ax[0].set_ylabel("raster")
-   #brain_stem_new_p[i].plot_rate(time_vect_paused,ax=ax[1],bar=True,color='r',label='brainstem')
-   #brain_stem_new_n[i].plot_rate(time_vect_paused,ax=ax[1],bar=True,color='b',label='brainstem')
-   #ax[1].set_xlabel("time (ms)")
-   #plt.suptitle("Positive")
-plt.savefig("mc_pos.png")
+   plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
+   plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
+plt.savefig("mc_ffw.png")
 
 ## Brainstem
 bs_data_p = nest.GetStatus(spikedetector_brain_stem_pos, keys= "events")[0]
@@ -270,11 +300,9 @@ for i in range(njt):
    ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
    ax[0].scatter(ts_n, y_n, marker='.', s=1)
    ax[0].set_ylabel("raster")
-   #brain_stem_new_p[i].plot_rate(time_vect_paused,ax=ax[1],bar=True,color='r',label='brainstem')
-   #brain_stem_new_n[i].plot_rate(time_vect_paused,ax=ax[1],bar=True,color='b',label='brainstem')
-   #ax[1].set_xlabel("time (ms)")
-   #plt.suptitle("Positive")
-plt.savefig("brainstem_pos.png")
+   plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
+   plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
+plt.savefig("brainstem.png")
 
 
 ########## COMPUTE OUTPUT (net firing rate)
