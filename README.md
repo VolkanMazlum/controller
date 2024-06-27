@@ -6,5 +6,5 @@ This will create a `target` folder containing the compiled module that can be in
 
 The script `generate_trajectories.py` computes the input signals and writes them into `trajectory.txt` and '`motor_commands.txt` (both already provided in the repo).
 
-The script `simulation.py` sets up the network, runs the simulation in NEST, computes the output firing rate and writes it to file.
+The script `simulation.py` sets up the network, runs the simulation in NEST, computes the output firing rate and writes it to file. Inputs and outputs of each block are furtherly listed in this script as well.
 
