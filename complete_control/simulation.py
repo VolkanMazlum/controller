@@ -94,92 +94,6 @@ nest.Connect(motor_n, spikedetector_motor_cortex_neg)
 ########## SIMULATION #############
 for trial in range(n_trial):
    nest.Simulate(time_span)
-'''
-########## PLOTTING ############### (test, poi da rimuovere)
-def computePSTH(time, ts, evs, buffer_sz=10):
-        t_init = time[0]
-        t_end  = time[ len(time)-1 ]
-        count, bins = np.histogram( ts, bins=np.arange(t_init,t_end+1,buffer_sz) )
-        rate = 1000*count/(N*buffer_sz)
-        return bins, count, rate
-        
-def plot_rate(time, ts, evs, buffer_sz=10, title='', ax=None, bar=True, **kwargs):
-
-        t_init = time[0]
-        t_end  = time[ len(time)-1 ]
-
-        bins,count,rate = computePSTH(time, ts, evs,buffer_sz)
-        rate_sm = np.convolve(rate, np.ones(5)/5,mode='same')
-
-        no_ax = ax is None
-        if no_ax:
-            fig, ax = plt.subplots(1)
-
-        if bar:
-            ax.bar(bins[:-1], rate, width=bins[1]-bins[0],**kwargs)
-            ax.plot(bins[:-1],rate_sm,color='k')
-        else:
-            ax.plot(bins[:-1],rate_sm,**kwargs)
-        ax.set(xlim=(t_init, t_end))
-        ax.set_ylabel(title)
-        
-        
-## Planner
-plan_data_p = nest.GetStatus(spikedetector_planner_pos, keys= "events")[0]
-plan_data_n = nest.GetStatus(spikedetector_planner_neg, keys= "events")[0]
-ts_p = plan_data_p["times"]
-ts_n = plan_data_n["times"]
-y_p = plan_data_p["senders"]
-y_p = [n_id - min(y_p) + 1 for n_id in y_p]
-y_n = plan_data_n["senders"]
-y_n = [-n_id + min(y_n) + 1 for n_id in y_n]
-
-
-for i in range(njt):
-   fig, ax = plt.subplots(2,1)
-   ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
-   ax[0].scatter(ts_n, y_n, marker='.', s=1)
-   ax[0].set_ylabel("raster")
-   plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
-   plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
-   plt.savefig("planner.png")
-
-## Motor cortex
-mc_data_p = nest.GetStatus(spikedetector_motor_cortex_pos, keys= "events")[0]
-mc_data_n = nest.GetStatus(spikedetector_motor_cortex_neg, keys= "events")[0]
-ts_p = mc_data_p["times"]
-ts_n = mc_data_n["times"]
-y_p = mc_data_p["senders"]
-y_p = [n_id - min(y_p) + 1 for n_id in y_p]
-y_n = mc_data_n["senders"]
-y_n = [-n_id + min(y_n) + 1 for n_id in y_n]
-for i in range(njt):
-   fig, ax = plt.subplots(2,1)
-   ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
-   ax[0].scatter(ts_n, y_n, marker='.', s=1)
-   ax[0].set_ylabel("raster")
-   plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
-   plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
-plt.savefig("mc_ffw.png")
-
-## Brainstem
-bs_data_p = nest.GetStatus(spikedetector_brain_stem_pos, keys= "events")[0]
-bs_data_n = nest.GetStatus(spikedetector_brain_stem_neg, keys= "events")[0]
-ts_p = bs_data_p["times"]
-ts_n = bs_data_n["times"]
-y_p = bs_data_p["senders"]
-y_p = [n_id - min(y_p) + 1 for n_id in y_p]
-y_n = bs_data_n["senders"]
-y_n = [-n_id + min(y_n) + 1 for n_id in y_n]
-for i in range(njt):
-   fig, ax = plt.subplots(2,1)
-   ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
-   ax[0].scatter(ts_n, y_n, marker='.', s=1)
-   ax[0].set_ylabel("raster")
-   plot_rate(time_vect, ts_p, y_p,ax=ax[1],bar=True,color='r',label='brainstem')
-   plot_rate(time_vect, ts_n, y_n,ax=ax[1],bar=True,color='b',label='brainstem')
-plt.savefig("brainstem.png")
-'''
 
 ########## COMPUTE OUTPUT (net firing rate)
 bs_data_p = nest.GetStatus(spikedetector_brain_stem_pos, keys= "events")[0]
@@ -210,5 +124,3 @@ spkRate_net = spkRate_pos - spkRate_neg
 inputCmd = spkRate_net/ scale
 
 np.savetxt('output_firing_rate.txt', inputCmd)
-
-
