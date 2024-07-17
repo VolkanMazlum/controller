@@ -42,10 +42,10 @@ f.close()
 mc_params = params["modules"]["motor_cortex"]
 plan_params = params["modules"]["planner"]
 spine_params = params["modules"]["spine"]
-'''
+
 state_params = params["modules"]["state"]
 state_se_params = params["modules"]["state_se"]
-'''
+
 pops_params = params["pops"]
 conn_params = params["connections"]
 
@@ -70,7 +70,8 @@ exp_duration = (timeMax+time_pause)*n_trial
 time_tot     = np.arange(0,exp_duration,res)
 n_time       = len(time_tot)
 
-scale   = 350000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
+#scale   = -350000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
+scale   = 500000.0
 scale_des = scale/scale
 bufSize = 10/1e3 # Buffer to calculate spike rate (seconds)
 
@@ -149,12 +150,12 @@ w = spine_params["wgt_motCtx_motNeur"]
 # Sensory feedback delay (seconds)
 #delay_fbk = spine_params["fbk_delay"]/1e3
 
-'''
+
 # First ID sensory neurons
-sensNeur_idSt     = brain.firstIdSensNeurons
+sensNeur_idSt     = brain.firstIdSensNeurons #0
 sensNeur_baseRate = spine_params["sensNeur_base_rate"]
 sensNeur_gain     = spine_params["sensNeur_kp"]
-'''
+
 
 ############################## MUSIC CONFIG ##############################
 
@@ -174,7 +175,8 @@ nlocal  = N*2*njt  # Number of neurons taken care of by this MPI rank
 # The MUSIC setup object is used to configure the simulation
 setup   = music.Setup()
 indata  = setup.publishEventInput("mot_cmd_in")
-#outdata = setup.publishEventOutput("fbk_out")
+
+outdata = setup.publishEventOutput("fbk_out")
 
 #NOTE: The actual neuron IDs from the sender side are LOST!!!
 # By knowing how many joints and neurons, one should be able to retreive the
@@ -195,22 +197,26 @@ def inhandler(t, indextype, channel_id):
     # Just to handle possible errors
     if flagSign<0 or flagSign>=2:
         raise Exception("Wrong neuron number during reading!")
-
+print('qui')
+print(music.Index.GLOBAL)
+print(firstId)
+print(nlocal)
+print(accLat)
 # Config of the input port
 indata.map(inhandler,
            music.Index.GLOBAL,
            base=firstId,
            size=nlocal,
            accLatency=accLat)
-'''
+
 # Config of the output port
 outdata.map (music.Index.GLOBAL,
              base=firstId,
              size=nlocal)
-'''
+#print('lì')
 
 ################ SENSORY NEURONS
-'''
+
 sn_p = [] # Positive sensory neurons
 sn_n = [] # Negative sensory neurons
 for i in range(njt):
@@ -224,7 +230,7 @@ for i in range(njt):
     tmp    = SensoryNeuron(N, pos=False, idStart=idSt_n, bas_rate=sensNeur_baseRate, kp=sensNeur_gain)
     tmp.connect(outdata)   # Connect to output port
     sn_n.append(tmp)
-'''
+
 
 ######################## SETUP ARRAYS ################################
 
@@ -310,8 +316,8 @@ while tickt < exp_duration:
     buf_ed = tickt         # End of buffer
     for i in range(njt):
     	# Generate and send sensory feedback spikes given plan position
-        #sn_p[i].update(pos_j[step,i], res, tickt)
-        #sn_n[i].update(pos_j[step,i], res, tickt)
+        sn_p[i].update(pos_j[step,i], res, tickt)
+        sn_n[i].update(pos_j[step,i], res, tickt)
         # Compute input commands
         spkRate_pos[step,i], c = computeRate(spikes_pos[i], w, N, buf_st, buf_ed)
         spkRate_neg[step,i], c = computeRate(spikes_neg[i], w, N, buf_st, buf_ed)
@@ -362,8 +368,9 @@ for i in range(njt):
     else:
         tmp_dat_n = np.array( spikes_neg[i] )
         np.savetxt(tmp_fnm_n, tmp_dat_n)
-    '''    
+       
     ########### Sensory neurons (output to MUSIC)
+    
     # Positive
     tmp_fnm_p = pthDat+"sensNeur_outSpikes_j"+str(i)+"_p.txt"
     if len(sn_p[i].spike)>0:
@@ -383,7 +390,7 @@ for i in range(njt):
     else:
         tmp_dat_n = np.array( sn_n[i].spike )
         np.savetxt(tmp_fnm_n, tmp_dat_n)
-    '''
+
 # Motor neuron spike rates (of each population for each joint)
 np.savetxt(pthDat+"motNeur_rate_pos.csv",spkRate_pos, delimiter=',')
 np.savetxt(pthDat+"motNeur_rate_neg.csv",spkRate_neg, delimiter=',')
@@ -439,7 +446,7 @@ err_x = []
 for trial in range(n_trial):
     start = trial*trial_delta
     end = start + task_steps - 1
-    '''
+    ''''
     if trial < ff_application: # Only cerebellum
         style = 'k'
     else:
@@ -450,29 +457,29 @@ for trial in range(n_trial):
     plt.plot(pos[end,0],pos[end,2],marker='x',color='k')
     # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
     # err_x.append(pos[end,0] -tgt_pos_ee[0])
-plt.plot(pos[start:end,0],pos[start:end,2],style, label="trajectory")
-plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
-# error_x = pos[end,0] -tgt_pos_ee[0]
-# error_y = pos[end,1] -tgt_pos_ee[1]
-# errors_xy = [error_x, error_y, np.array(errors[-1])]
-plt.plot(_init_pos[0],_init_pos[1],marker='o',color='blue',label="starting pos")
-plt.plot(_tgt_pos[0],_tgt_pos[1],marker='o',color='red',label="target pos")
+    plt.plot(pos[start:end,0],pos[start:end,2],style, label="trajectory")
+    plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
+    # error_x = pos[end,0] -tgt_pos_ee[0]
+    # error_y = pos[end,1] -tgt_pos_ee[1]
+    # errors_xy = [error_x, error_y, np.array(errors[-1])]
+    plt.plot(_init_pos[0],_init_pos[1],marker='o',color='blue',label="starting pos")
+    plt.plot(_tgt_pos[0],_tgt_pos[1],marker='o',color='red',label="target pos")
 
-plt.axis('equal')
-plt.xlabel('position x (m)')
-plt.ylabel('position y (m)')
-plt.legend()
-if saveFig:
-    plt.savefig(pathFig+cond+"position_ee.png")
+    plt.axis('equal')
+    plt.xlabel('position x (m)')
+    plt.ylabel('position y (m)')
+    plt.legend()
+    if saveFig:
+        plt.savefig(pathFig+cond+"position_ee.png")
 
-plt.figure()
-plt.plot(errors)
-plt.xlabel('Trial')
-plt.ylabel('Error [m]')
-if saveFig:
-    plt.savefig(pathFig+cond+"error_ee.png")
+    plt.figure()
+    plt.plot(errors)
+    plt.xlabel('Trial')
+    plt.ylabel('Error [m]')
+    if saveFig:
+        plt.savefig(pathFig+cond+"error_ee.png")
 
-np.savetxt("error.txt",np.array(errors)*100)
+    np.savetxt("error.txt",np.array(errors)*100)
 # np.savetxt("error_xy.txt",np.array(errors_xy)*100)
 
 # target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)

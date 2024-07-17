@@ -15,9 +15,7 @@ from population_view import PopView
 class StateEstimator_mass:
 
     ############## Constructor  ##############
-    def __init__(self, numNeurons, time_vect, plant, pathData="./data/", **kwargs):
-        
-        self.pathData = pathData
+    def __init__(self, numNeurons, numJoints, time_vect, **kwargs):
 
         # Numerosity of each subpopulation
         self._numNeuronsPop = numNeurons
@@ -26,22 +24,25 @@ class StateEstimator_mass:
         self._param_neurons = {
             "kp":           1.0,   # Gain
             "base_rate":    0.0,   # Baseline rate
-            "buffer_size":  5.0    # Size of the buffer
+            "buffer_size":  5.0,   # Size of the buffer
+            "N_fbk": 50,
+            "N_pred": 50,
+            "fbk_bf_size": 2500,
+            "pred_bf_size": 2500
             }
         self.param_neurons.update(kwargs)
 
         # Create populations
-        numJoints = plant.numVariables()
         self.pops_p = []
         self.pops_n = []
         for i in range(numJoints):
 
-            tmp_pop_p = nest.Create("state_neuron", numNeurons)
+            tmp_pop_p = nest.Create("state_neuron_nestml", numNeurons)
             nest.SetStatus(tmp_pop_p, self._param_neurons)
             nest.SetStatus(tmp_pop_p, {"pos": True})
             self.pops_p.append( PopView(tmp_pop_p, time_vect) )
 
-            tmp_pop_n = nest.Create("state_neuron", numNeurons)
+            tmp_pop_n = nest.Create("state_neuron_nestml", numNeurons)
             nest.SetStatus(tmp_pop_n, self._param_neurons)
             nest.SetStatus(tmp_pop_p, {"pos": False})
             self.pops_n.append( PopView(tmp_pop_n, time_vect) )

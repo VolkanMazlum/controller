@@ -26,7 +26,7 @@
           "state": {
                 "kp": 1.0,
                 "base_rate": 0.0,
-                "buf_sz": 20.0
+                "buffer_size": 20.0
           },
           "state_se": {
                 "kpred": 0.0,
