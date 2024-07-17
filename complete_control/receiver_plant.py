@@ -17,7 +17,7 @@ from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
 #from util import plotPopulation
 
 import trajectories as tj
-import perturbation as pt
+#import perturbation as pt
 
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)

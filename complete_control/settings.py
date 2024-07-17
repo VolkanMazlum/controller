@@ -15,7 +15,7 @@ import numpy as np
 sys.path.insert(1, '../')
 
 from robot1j import Robot1J
-import perturbation as pt
+#import perturbation as pt
 import os
 
 
