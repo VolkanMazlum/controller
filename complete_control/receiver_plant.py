@@ -420,7 +420,7 @@ np.savetxt( pthDat+"inputCmd_tot.csv", inputCmd_tot, delimiter=',' ) # Torques f
 lgd = ['theta','des']
 plt.figure()
 plt.plot(time_tot,inputCmd)
-plt.plot(time,inputDes,linestyle=':')
+#plt.plot(time,inputDes,linestyle=':')
 plt.xlabel("time (s)")
 plt.ylabel("motor commands (N)")
 plt.legend(lgd)

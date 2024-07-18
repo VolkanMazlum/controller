@@ -484,11 +484,11 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 
     lgd = ['theta']
     for i in range(njt):
-        fig, ax = plt.subplots(2,1)
-        ax[0].plot(time_vect,trj)
+        fig, ax = plt.subplots(2,1, figsize=(10,10))
+        ax[0].plot(time_vect,trj, linewidth=5)
         ax[0].set_title('Trajectory [theta]')
         ax[0].set_xlabel('Time [ms]')
-        ax[1].plot(time_vect,motorCommands)
+        ax[1].plot(time_vect,motorCommands, linewidth=5)
         ax[1].set_title('Motor command')
         ax[1].set_xlabel('Time [ms]')
         if saveFig:
