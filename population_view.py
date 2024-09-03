@@ -82,21 +82,35 @@ def get_rate(spike_detector, pop, trial_len, n_trials=1):
     return rate
 
 
-def plotPopulation(time_v, pop_pos, pop_neg, title='',buffer_size=15):
+def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, styles, title='',buffer_size=15):
     evs_p, ts_p = pop_pos.get_events()
     evs_n, ts_n = pop_neg.get_events()
 
     y_p =   evs_p - pop_pos.pop[0] + 1
     y_n = -(evs_n - pop_neg.pop[0] + 1)
+    
+    if not reference:
+        fig, ax = plt.subplots(2,1,sharex=True)
+        ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
+        ax[0].scatter(ts_n, y_n, marker='.', s=1)
+        ax[0].set_ylabel("raster")
+        pop_pos.plot_rate(time_v, buffer_size, ax=ax[1],color="r")
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], title='PSTH (Hz)')
+        ax[0].set_title(title)
+        ax[0].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
+    else:
+        fig, ax = plt.subplots(3,1,sharex=True)
+        for i, signal in enumerate(reference):
+            ax[0].plot(time_vecs[i], signal, styles[i],label=legend[i])
+            ax[0].legend()
+        ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
+        ax[1].scatter(ts_n, y_n, marker='.', s=1)
+        ax[1].set_ylabel("raster")
+        pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)')
+        #ax[1].set_title(title)
+        ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
 
-    fig, ax = plt.subplots(2,1,sharex=True)
-    ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
-    ax[0].scatter(ts_n, y_n, marker='.', s=1)
-    ax[0].set_ylabel("raster")
-    pop_pos.plot_rate(time_v, buffer_size, ax=ax[1],color="r")
-    pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], title='PSTH (Hz)')
-    ax[0].set_title(title)
-    ax[0].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
 
     return fig, ax
 

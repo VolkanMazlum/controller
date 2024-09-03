@@ -24,6 +24,7 @@ model tracking_neuron:
         # Check if neuron is sensitive to the current input sign; if not, set the signal to 0
         if (((pos == true) and (curr_traj < 0)) or ((pos == false) and (curr_traj) > 0)): 
             curr_traj = 0
+            
         
         # Calculate the new firing rate, proportional to the angle/trajectory
         out_rate = base_rate + kp * abs(curr_traj)
@@ -394,3 +395,51 @@ model rb_neuron:
         # If probability not null, emit spike
         if spike_count_out > 0:
             emit_spike()
+model tracking_neuron_planner:
+    state:
+        out_rate real = 0.0
+        lambda real = 0.0
+        spike_count_out integer = 0
+        current_step integer = 0
+        curr_traj real = 0.0
+        
+    parameters:
+        kp real = 1 # Gain parameter
+        pos boolean = true # Sensitivity of neuron to positive or negative values
+        base_rate real = 0 # Base firing rate
+        simulation_steps integer = 100 # Simulation steps -> computed before calling the neuron model as the length of the time vector
+        traj[simulation_steps] real = 10.0 # Trajectory vector (defined by function GetDesiredTrajectory)
+    
+    input:
+        inh_spikes <- inhibitory spike
+        exc_spikes <- excitatory spike
+        spikes <- spike
+        
+    update:
+        current_step = steps(t)
+        curr_traj = traj[current_step]
+        #print("\n\n{curr_traj}\n")
+        #print("Pos: {pos}\n")
+        # Check if neuron is sensitive to the current input sign; if not, set the signal to 0
+        if (((pos == true) and (curr_traj < 0)) or ((pos == false) and (curr_traj) > 0)): 
+            curr_traj = 0
+            #print("nullified\n")  
+        
+        # Calculate the new firing rate, proportional to the angle/trajectory
+        #print("base_rate: {base_rate} \n" )
+        out_rate = base_rate + kp * abs(curr_traj)
+        
+        #print("out_rate: {out_rate}\n")
+        # Update the probability distribution
+        lambda = out_rate * resolution() * 0.001 # Parameter for the Poisson distribution
+        
+        # Now draw randomly according to probability distribution        
+        spike_count_out = random_poisson(lambda)
+        
+        if spike_count_out > 0:
+            emit_spike()
+
+        
+    output:
+        spike
+

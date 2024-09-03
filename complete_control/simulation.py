@@ -107,12 +107,14 @@ for j in range(njt):
 # Scale the cerebellar prediction up to 1000 Hz
 # in order to have firing rate suitable for the State estimator
 # and all the other structures inside the control system
-
-prediction_p = nest.Create("diff_neuron_nestml", N)
-nest.SetStatus(prediction_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
-prediction_n = nest.Create("diff_neuron_nestml", N)
-nest.SetStatus(prediction_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
-
+prediction_p = []
+prediction_n = []
+tmp_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(tmp_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
+prediction_p.append(PopView(tmp_p,time_vect))
+tmp_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(tmp_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
+prediction_n.append(PopView(tmp_n,time_vect))
 pops_params["fbk_smoothed"]["kp"]
 
 
@@ -134,7 +136,7 @@ for j in range(njt):
             for k, post in enumerate(stEst.pops_p[j].pop):
                 nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1})
 
-        for i, pre in enumerate(prediction_p):
+        for i, pre in enumerate(prediction_p[0].pop):
             for k, post in enumerate(stEst.pops_p[j].pop):
                 nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1 + N})
         
@@ -144,7 +146,7 @@ for j in range(njt):
             for k, post in enumerate(stEst.pops_n[j].pop):
                 nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1})
 
-        for i, pre in enumerate(prediction_n):
+        for i, pre in enumerate(prediction_n[0].pop):
             for k, post in enumerate(stEst.pops_n[j].pop):
                 nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1 + N})
     else:
@@ -357,6 +359,98 @@ for trial in range(n_trial):
 
 
 #%% PLOTTING
+# Figure per la presentazione
+# Planner + trajectory
+lgd = ['theta']
+time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
+
+reference =[trj]
+legend = ['trajectory']
+styles=['k']
+time_vecs=[time_vect_paused]
+for i in range(njt):
+        plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], reference, time_vecs,legend, styles, title=lgd[i],buffer_size=15)
+        plt.suptitle("Planner")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"planner_"+lgd[i]+".png")
+
+reference =[motorCommands]
+legend = ['motor commands']
+
+for i in range(njt):
+        plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], reference, time_vecs,legend, styles,title=lgd[i],buffer_size=15)
+        plt.suptitle("Mc ffwd")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"mc_ffwd_"+lgd[i]+".png")
+
+bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
+bins_n,count_n,rate_n = planner.pops_n[0].computePSTH(time_vect_paused, 15)
+bins_stEst_p,count_stEst_p,rate_stEst_p = stEst.pops_p[0].computePSTH(time_vect_paused, 15)
+bins_stEst_n,count_stEst_n,rate_stEst_n = stEst.pops_n[0].computePSTH(time_vect_paused, 15)
+
+reference =[rate_p-rate_stEst_p, rate_n - rate_stEst_n]
+time_vecs = [bins_p[:-1], bins_n[:-1]]
+legend = ['diff_p', 'diff_n']
+styles = ['r--', 'b--']
+for i in range(njt):
+        plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+        plt.suptitle("Mc fbk")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"mc_fbk_"+lgd[i]+".png")
+
+bins_p,count_p,rate_p = mc.ffwd_p[0].computePSTH(time_vect_paused, 15)
+bins_n,count_n,rate_n = mc.ffwd_n[0].computePSTH(time_vect_paused, 15)
+bins_fbk_p,count_fbk_p,rate_fbk_p = mc.fbk_p[0].computePSTH(time_vect_paused, 15)
+bins_fbk_n,count_fbk_n,rate_fbk_n = mc.fbk_n[0].computePSTH(time_vect_paused, 15)
+
+reference =[rate_p+rate_fbk_p, rate_n + rate_fbk_n]
+time_vecs = [bins_p[:-1], bins_n[:-1]]
+legend = ['sum_p', 'sum_n']
+styles = ['r--', 'b--']
+for i in range(njt):
+        plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+        plt.suptitle("Mc out")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"mc_out_"+lgd[i]+".png")
+
+bins_p,count_p,rate_p = mc.out_p[0].computePSTH(time_vect_paused, 15)
+bins_n,count_n,rate_n = mc.out_n[0].computePSTH(time_vect_paused, 15)
+
+reference =[rate_p, rate_n]
+time_vecs = [bins_p[:-1], bins_n[:-1]]
+legend = ['out_p', 'out_n']
+styles = ['r', 'b']
+for i in range(njt):
+        plotPopulation(time_vect_paused, brain_stem_new_p[i],brain_stem_new_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+        plt.suptitle("Mc out")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"_brain_stem_"+lgd[i]+".png")
+
+reference =[]
+time_vecs = []
+legend = []
+styles = []
+for i in range(njt):
+        plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+        plt.suptitle("Sensory")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"_sensory_"+lgd[i]+".png")
+
+bins_p,count_p,rate_p = sn_p[0].computePSTH(time_vect_paused, 15)
+bins_n,count_n,rate_n = sn_n[0].computePSTH(time_vect_paused, 15)
+bins_pred_p,count_pred_p,rate_pred_p = prediction_p[0].computePSTH(time_vect_paused, 15)
+bins_pred_n,count_pred_n,rate_pred_n = prediction_n[0].computePSTH(time_vect_paused, 15)
+
+reference =[rate_p-rate_n, rate_pred_p - rate_pred_n]
+time_vecs = [bins_p[:-1], bins_n[:-1]]
+legend = ['net_sensory', 'net_prediction']
+styles = ['g--', 'r--']
+for i in range(njt):
+        plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+        plt.suptitle("State")
+        if saveFig:
+            plt.savefig(pathFig+"/presentation/"+"_state_"+lgd[i]+".png")
+
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     lgd = ['theta']
     time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
@@ -417,7 +511,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
         plt.suptitle("Planner")
         if saveFig:
             plt.savefig(pathFig+"planner_"+lgd[i]+".png")
-    '''      
+    '''
+'''    
     ## Brainstem
     fig, ax = plt.subplots(1,1)
     for i in range(njt):
@@ -441,6 +536,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     if saveFig:
         plt.savefig(pathFig+"brainstem_neg.png")
     '''
+'''
     # Brainstem
     for i in range(njt):
         events_bs_pos = nest.GetStatus(spikedetector_brain_stem_pos, keys="events")[0]
@@ -496,7 +592,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     #
     #
 
-'''
+
+    '''
     fig, ax = plt.subplots(2,1)
     for i in range(njt):
         mc.out_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='out')
@@ -511,6 +608,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
         plt.ylabel("spike rate positive - negative")
         plt.legend(lgd)
     '''
+'''
     #plt.savefig("mctx_out_pos-neg.png")
 
 # ## Collapsing data files into one file
@@ -545,3 +643,4 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 # #         else:
 # #             print('Già fatto')
 # #     print('Collapsing files ended')
+'''
