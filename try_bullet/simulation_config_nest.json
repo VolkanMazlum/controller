@@ -34,8 +34,10 @@
 			"streamDataPackMessage": true,
 			"ProtobufPackages": ["Dump"],
 			"dumps":[
-				{"name": "test_datapack1", "network": false, "file": true},
-				{"name": "test_datapack2", "network": false, "file": true}
+				{"name": "bs_p_sds", "network": false, "file": true},
+				{"name": "bs_p_ts", "network": false, "file": true},
+				{"name": "bs_n_sds", "network": false, "file": true},
+				{"name": "bs_n_ts", "network": false, "file": true}
 			]
 		}
 	],

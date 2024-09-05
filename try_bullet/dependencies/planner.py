@@ -34,7 +34,7 @@ class Planner:
             "base_rate": base_rate,
             "kp": kp
             }
-
+        print('planner base rate: ', params["base_rate"])
         # Initialize population arrays
         # Create populations
         for i in range(self.numJoints):

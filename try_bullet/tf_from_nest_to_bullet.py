@@ -37,6 +37,10 @@ def to_bullet(positions, brainstem_n, brainstem_p, sn_p, sn_n):
     # Get data from NEST
     spikes_p = brainstem_p.data[0]['events']['times']
     spikes_n = brainstem_n.data[0]['events']['times']
+    if not spikes_p:
+    	print('empty list')
+    else: 
+    	print(type(spikes_p[-1]))
     
     #print("spikes_p", spikes_p)
     #print("spikes_n", spikes_n)

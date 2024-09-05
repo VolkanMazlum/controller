@@ -32,8 +32,8 @@ n_trial = 1
 time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
 
 njt = 1
-trj = np.loadtxt('dependencies/trajectory.txt')
-motorCommands=np.loadtxt('dependencies/motor_commands.txt')
+trj = np.loadtxt('dependencies/data/trajectory.txt')
+motorCommands=np.loadtxt('dependencies/data/motor_commands.txt')
 assert len(trj) == len(time_vect), "Arrays do not have the same length"
 assert len(motorCommands) == len(time_vect), "Arrays do not have the same length"
 N = 25 # Number of neurons for each (sub-)population
@@ -238,34 +238,68 @@ nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": 
 
 
 ###################### Extra Spikedetectors ######################
-
-spikedetector_fbk_pos = nest.Create("spike_recorder", params={"label": "Feedback pos"})
-spikedetector_fbk_neg = nest.Create("spike_recorder", params={"label": "Feedback neg"})
-
-
-spikedetector_stEst_pos = nest.Create("spike_recorder", params={"label": "State estimator pos"})
-spikedetector_stEst_neg = nest.Create("spike_recorder", params={"label": "State estimator neg"})
-
 spikedetector_planner_pos = nest.Create("spike_recorder", params={"label": "Planner pos"})
 spikedetector_planner_neg = nest.Create("spike_recorder", params={"label": "Planner neg"})
-
-spikedetector_fbk_smoothed_pos = nest.Create("spike_recorder", params={"label": "Feedback smoothed pos"})
-spikedetector_fbk_smoothed_neg = nest.Create("spike_recorder", params={"label": "Feedback smoothed neg"})
-
-spikedetector_brain_stem_pos = nest.Create("spike_recorder", params={"label": "Brain stem pos"})
-spikedetector_brain_stem_neg = nest.Create("spike_recorder", params={"label": "Brain stem neg"})
-
-nest.Connect(brain_stem_new_p, spikedetector_brain_stem_pos)
-nest.Connect(brain_stem_new_n, spikedetector_brain_stem_neg)
-
-
 nest.Connect(planner.pops_p, spikedetector_planner_pos)
 nest.Connect(planner.pops_n, spikedetector_planner_neg)
 
 
+spikedetector_ffwd_pos = nest.Create("spike_recorder", params={"label": "Feedforward pos"})
+spikedetector_ffwd_neg = nest.Create("spike_recorder", params={"label": "Feedforward neg"})
+nest.Connect(mc.ffwd_p, spikedetector_ffwd_pos)
+nest.Connect(mc.ffwd_n, spikedetector_ffwd_neg)
+
+spikedetector_fbk_pos = nest.Create("spike_recorder", params={"label": "Feedback pos"})
+spikedetector_fbk_neg = nest.Create("spike_recorder", params={"label": "Feedback neg"})
+nest.Connect(mc.fbk_p, spikedetector_fbk_pos)
+nest.Connect(mc.fbk_n, spikedetector_fbk_neg)
+
+spikedetector_out_pos = nest.Create("spike_recorder", params={"label": "Mc out pos"})
+spikedetector_out_neg = nest.Create("spike_recorder", params={"label": "Mc out neg"})
+nest.Connect(mc.out_p, spikedetector_out_pos)
+nest.Connect(mc.out_n, spikedetector_out_neg)
+
+spikedetector_stEst_pos = nest.Create("spike_recorder", params={"label": "State estimator pos"})
+spikedetector_stEst_neg = nest.Create("spike_recorder", params={"label": "State estimator neg"})
+nest.Connect(stEst.pops_p, spikedetector_stEst_pos)
+nest.Connect(stEst.pops_n, spikedetector_stEst_neg)
+
+'''
+spikedetector_fbk_smoothed_pos = nest.Create("spike_recorder", params={"label": "Feedback smoothed pos"})
+spikedetector_fbk_smoothed_neg = nest.Create("spike_recorder", params={"label": "Feedback smoothed neg"})
+'''
+spikedetector_brain_stem_pos = nest.Create("spike_recorder", params={"label": "Brain stem pos"})
+spikedetector_brain_stem_neg = nest.Create("spike_recorder", params={"label": "Brain stem neg"})
+nest.Connect(brain_stem_new_p, spikedetector_brain_stem_pos)
+nest.Connect(brain_stem_new_n, spikedetector_brain_stem_neg)
+
+spikedetector_sensory_pos = nest.Create("spike_recorder", params={"label": "Sensory pos"})
+spikedetector_sensory_neg = nest.Create("spike_recorder", params={"label": "Sensory neg"})
+nest.Connect(sn_parrot_p, spikedetector_sensory_pos)
+nest.Connect(sn_parrot_n, spikedetector_sensory_neg)
+
+spikedetector_pred_pos = nest.Create("spike_recorder", params={"label": "Prediction pos"})
+spikedetector_pred_neg = nest.Create("spike_recorder", params={"label": "Prediction neg"})
+nest.Connect(prediction_p, spikedetector_pred_pos)
+nest.Connect(prediction_n, spikedetector_pred_neg)
+
 populations = {
-    'sn_p': sn_p,
-    'sn_n': sn_n,
+    'planner_p': spikedetector_planner_pos,
+    'planner_n': spikedetector_planner_neg,
+    'ffwd_p': spikedetector_ffwd_pos,
+    'ffwd_n': spikedetector_ffwd_neg,
+    'fbk_p': spikedetector_fbk_pos,
+    'fbk_n': spikedetector_fbk_neg,
+    'out_p': spikedetector_out_pos,
+    'out_n': spikedetector_out_neg,
+    'stEst_p': spikedetector_stEst_pos,
+    'stEst_n': spikedetector_stEst_neg,
     'spikedetector_brain_stem_pos': spikedetector_brain_stem_pos,
-    'spikedetector_brain_stem_neg': spikedetector_brain_stem_neg
+    'spikedetector_brain_stem_neg': spikedetector_brain_stem_neg,
+    'sn_parrot_p': spikedetector_sensory_pos,
+    'sn_parrot_n': spikedetector_sensory_neg,
+    'pred_p': spikedetector_pred_pos,
+    'pred_n': spikedetector_pred_neg,
+    'sn_p': sn_p, # PyBullet sensory neurons
+    'sn_n': sn_n 
 }

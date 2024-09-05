@@ -1,0 +1,3 @@
+python3 dependencies/generate_analog_signals.py
+NRPCoreSim -c simulation_config_nest.json
+python3 dependencies/generate_figures.py

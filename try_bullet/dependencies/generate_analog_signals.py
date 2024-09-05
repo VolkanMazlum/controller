@@ -54,8 +54,9 @@ def minimumJerk(x_init, x_des, timespan):
 trj, pol = minimumJerk(init_pos[0], tgt_pos[0], time_vect) # Joint space (angle)
 trj_ee = dynSys.forwardKin( trj ) # End-effector space
 
+
 ## Save trajectory to file
-np.savetxt('trajectory.txt', trj.flatten().tolist())
+np.savetxt(os.getcwd()+'/dependencies/data/trajectory.txt', trj.flatten().tolist())
 
 ## Compute motor commands (input to Motor Cortex)
 # Double derivative of the trajectory
@@ -115,8 +116,9 @@ def generateMotorCommands(init_pos, des_pos, time_vector):
     mcmd = dynSys.inverseDyn(pos, vel, acc)
     return mcmd[0]
 
+
 motorCommands = generateMotorCommands(init_pos[0], tgt_pos[0], time_vect/1e3)
-np.savetxt('motor_commands.txt', motorCommands.flatten().tolist())
+np.savetxt(os.getcwd()+'/dependencies/data/motor_commands.txt', motorCommands.flatten().tolist())
 
 '''
 # Plot (test)
