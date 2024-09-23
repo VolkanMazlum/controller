@@ -372,7 +372,7 @@ for i in range(njt):
         plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], reference, time_vecs,legend, styles, title=lgd[i],buffer_size=15)
         plt.suptitle("Planner")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"planner_"+lgd[i]+".png")
+            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/planner_"+lgd[i]+".png")
 
 reference =[motorCommands]
 legend = ['motor commands']
@@ -381,8 +381,7 @@ for i in range(njt):
         plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], reference, time_vecs,legend, styles,title=lgd[i],buffer_size=15)
         plt.suptitle("Mc ffwd")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"mc_ffwd_"+lgd[i]+".png")
-
+            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_ffwd_"+lgd[i]+".png")
 bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
 bins_n,count_n,rate_n = planner.pops_n[0].computePSTH(time_vect_paused, 15)
 bins_stEst_p,count_stEst_p,rate_stEst_p = stEst.pops_p[0].computePSTH(time_vect_paused, 15)
@@ -396,7 +395,7 @@ for i in range(njt):
         plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
         plt.suptitle("Mc fbk")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"mc_fbk_"+lgd[i]+".png")
+            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_fbk_"+lgd[i]+".png")
 
 bins_p,count_p,rate_p = mc.ffwd_p[0].computePSTH(time_vect_paused, 15)
 bins_n,count_n,rate_n = mc.ffwd_n[0].computePSTH(time_vect_paused, 15)
@@ -411,7 +410,7 @@ for i in range(njt):
         plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
         plt.suptitle("Mc out")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"mc_out_"+lgd[i]+".png")
+            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_out_"+lgd[i]+".png")
 
 bins_p,count_p,rate_p = mc.out_p[0].computePSTH(time_vect_paused, 15)
 bins_n,count_n,rate_n = mc.out_n[0].computePSTH(time_vect_paused, 15)
@@ -422,19 +421,19 @@ legend = ['out_p', 'out_n']
 styles = ['r', 'b']
 for i in range(njt):
         plotPopulation(time_vect_paused, brain_stem_new_p[i],brain_stem_new_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-        plt.suptitle("Mc out")
+        plt.suptitle("Brainstem")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"_brain_stem_"+lgd[i]+".png")
+            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/brainstem_"+lgd[i]+".png")
 
 reference =[]
 time_vecs = []
 legend = []
 styles = []
 for i in range(njt):
-        plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+        plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,buffer_size=15)
         plt.suptitle("Sensory")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"_sensory_"+lgd[i]+".png")
+           plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/sensory_"+lgd[i]+".png")
 
 bins_p,count_p,rate_p = sn_p[0].computePSTH(time_vect_paused, 15)
 bins_n,count_n,rate_n = sn_n[0].computePSTH(time_vect_paused, 15)
@@ -449,8 +448,8 @@ for i in range(njt):
         plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
         plt.suptitle("State")
         if saveFig:
-            plt.savefig(pathFig+"/presentation/"+"_state_"+lgd[i]+".png")
-
+            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
+'''
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     lgd = ['theta']
     time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
@@ -593,7 +592,6 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     #
 
 
-    '''
     fig, ax = plt.subplots(2,1)
     for i in range(njt):
         mc.out_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='out')

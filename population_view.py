@@ -94,6 +94,7 @@ def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, style
         ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
         ax[0].scatter(ts_n, y_n, marker='.', s=1)
         ax[0].set_ylabel("raster")
+        ax[0].legend()
         pop_pos.plot_rate(time_v, buffer_size, ax=ax[1],color="r")
         pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], title='PSTH (Hz)')
         ax[0].set_title(title)
@@ -104,13 +105,21 @@ def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, style
             ax[0].plot(time_vecs[i], signal, styles[i],label=legend[i])
             ax[0].legend()
         ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
-        ax[1].scatter(ts_n, y_n, marker='.', s=1)
+        ax[1].scatter(ts_n, y_n, marker='.', s=1, color='b')
         ax[1].set_ylabel("raster")
         pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
-        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)')
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
         #ax[1].set_title(title)
         ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
 
+    subplot_labels = ['A', 'B', 'C']
+    for i, axs in enumerate(ax):
+        axs.text(-0.1, 1.1, subplot_labels[i], transform=axs.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='right')
+        ax[i].spines['top'].set_visible(False)
+        ax[i].spines['right'].set_visible(False)
+        ax[i].spines['bottom'].set_visible(True)
+        ax[i].spines['left'].set_visible(True)
 
     return fig, ax
 
@@ -173,9 +182,14 @@ class PopView:
         t_init = time[0]
         t_end  = time[ len(time)-1 ]
 
+        
         bins,count,rate = self.computePSTH(time, buffer_sz)
+        '''
         rate_sm = np.convolve(rate, np.ones(5)/5,mode='same')
-
+        '''
+        rate_padded = np.pad(rate, pad_width=2, mode='reflect') 
+        rate_sm = np.convolve(rate_padded, np.ones(5) / 5, mode='valid')
+    
         no_ax = ax is None
         if no_ax:
             fig, ax = plt.subplots(1)
@@ -187,6 +201,7 @@ class PopView:
             ax.plot(bins[:-1],rate_sm,**kwargs)
         ax.set(xlim=(t_init, t_end))
         ax.set_ylabel(title)
+        ax.set_xlabel('Time [ms]')
 
 
     ########## ACROSS TRIALS STUFF ##########

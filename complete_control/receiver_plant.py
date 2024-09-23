@@ -93,6 +93,7 @@ forearm = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.FOREARM_LINK_ID,
             computeLinkVelocity=True)[0]
 hand = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.HAND_LINK_ID,
             computeLinkVelocity=True)[0]
+
 # hand = bullet_robot.EEPose()[0]
 _init_pos = [hand[0], hand[2]]
 rho = np.linalg.norm(np.array(upperarm)-np.array(hand))
@@ -136,7 +137,7 @@ trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
 inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
-
+p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos)
 ############################ BRAIN ############################
 
 brain = Brain()
@@ -426,6 +427,7 @@ plt.ylabel("motor commands (N)")
 plt.legend(lgd)
 if saveFig:
     plt.savefig(pathFig+cond+"motCmd.png")
+    
 
 # Joint space
 plt.figure()
@@ -435,7 +437,8 @@ plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
 plt.legend(['theta','des'])
 if saveFig:
-    plt.savefig(pathFig+cond+"position_joint.png")
+    #plt.savefig(pathFig+cond+"position_joint.png")
+    plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
 
 # End-effector space
 plt.figure()
@@ -470,7 +473,8 @@ for trial in range(n_trial):
     plt.ylabel('position y (m)')
     plt.legend()
     if saveFig:
-        plt.savefig(pathFig+cond+"position_ee.png")
+        #plt.savefig(pathFig+cond+"position_ee.png")
+        plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_ee.png")
 
     plt.figure()
     plt.plot(errors)
@@ -478,6 +482,7 @@ for trial in range(n_trial):
     plt.ylabel('Error [m]')
     if saveFig:
         plt.savefig(pathFig+cond+"error_ee.png")
+        
 
     np.savetxt("error.txt",np.array(errors)*100)
 # np.savetxt("error_xy.txt",np.array(errors_xy)*100)

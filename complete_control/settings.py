@@ -41,8 +41,17 @@ class Experiment:
         # Initial and target position (end-effector space)
         self._init_pos = np.ndarray([1,2])
         self._tgt_pos  = np.ndarray([1,2])
-        self._init_pos[:] = [0.31,0.0]
+        '''
+        self._init_pos[:] = [0.31, 0.0]
         self._tgt_pos[:]  =[0.0,0.31]
+        
+        self._init_pos[:] = [0.3059,-0.05]
+        self._tgt_pos[:]  =[0.0,0.31]
+        '''
+        
+        self._init_pos[:] = [0.0,0.31]
+        self._tgt_pos[:]  =[0.31,0.0]
+        
         # self._init_pos[:] = [-0.00155569,1.16870009]
         # self._tgt_pos[:]  =[-0.00155569+0.31,1.16870009+0.31]
         #self._tgt_pos  = np.array([0.25,0.43])
