@@ -107,7 +107,7 @@ exp = Experiment()
 
 pathFig =exp.pathFig
 # pathFig = params["path"]
-pthDat = exp.pathData
+pthDat = exp.pathData + "bullet/"
 cond = exp.cond
 
 '''
@@ -198,11 +198,7 @@ def inhandler(t, indextype, channel_id):
     # Just to handle possible errors
     if flagSign<0 or flagSign>=2:
         raise Exception("Wrong neuron number during reading!")
-print('qui')
-print(music.Index.GLOBAL)
-print(firstId)
-print(nlocal)
-print(accLat)
+
 # Config of the input port
 indata.map(inhandler,
            music.Index.GLOBAL,
@@ -214,7 +210,7 @@ indata.map(inhandler,
 outdata.map (music.Index.GLOBAL,
              base=firstId,
              size=nlocal)
-#print('lì')
+
 
 ################ SENSORY NEURONS
 
@@ -292,7 +288,6 @@ while tickt < exp_duration:
     pos_j[step,:] = bullet_robot.JointPos(RobotArm1Dof.ELBOW_JOINT_ID)  # Joint space
     vel_j[step,:] = bullet_robot.JointVel(RobotArm1Dof.ELBOW_JOINT_ID)
     pos[step,:]   = bullet_robot.EEPose()[0][0:3]         # End effector space. Convert to 2D
-    #print(pos[step,:] )
     vel[step,:]   = bullet_robot.EEVel()[0][0:3:2]
 
     # After a certain number of trials I switch on the force field
@@ -323,7 +318,6 @@ while tickt < exp_duration:
         spkRate_pos[step,i], c = computeRate(spikes_pos[i], w, N, buf_st, buf_ed)
         spkRate_neg[step,i], c = computeRate(spikes_neg[i], w, N, buf_st, buf_ed)
         spkRate_net[step,i]    = spkRate_pos[step,i] - spkRate_neg[step,i]
-        #print('net spike rate: ', spkRate_net[step,i]) 
         inputCmd[step,i]       = spkRate_net[step,i] / scale
 
         #perturb[step,:]      = pt.curledForceField(vel[step,:], angle, k)                     # End-effector forces
@@ -437,8 +431,8 @@ plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
 plt.legend(['theta','des'])
 if saveFig:
-    #plt.savefig(pathFig+cond+"position_joint.png")
-    plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
+    plt.savefig(pathFig+"position_joint.png")
+    #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
 
 # End-effector space
 plt.figure()
@@ -473,8 +467,8 @@ for trial in range(n_trial):
     plt.ylabel('position y (m)')
     plt.legend()
     if saveFig:
-        #plt.savefig(pathFig+cond+"position_ee.png")
-        plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_ee.png")
+        plt.savefig(pathFig+"position_ee.png")
+        #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_ee.png")
 
     plt.figure()
     plt.plot(errors)

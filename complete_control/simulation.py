@@ -50,6 +50,10 @@ conn_params = params["connections"]
 #%%  SIMULATION
 exp = Experiment()
 pathFig = exp.pathFig
+pathData = exp.pathData + "nest/"
+for root, dirs, files in os.walk(exp.pathData):
+        for file in files:
+            os.remove(os.path.join(root, file))
 res = 0.1 #[ms]
 time_span = 500.0 #[ms]
 n_trial = 1
@@ -64,6 +68,8 @@ nTot = 2*N*njt # Total number of neurons (one positive and one negative populati
 
 nest.ResetKernel()
 nest.SetKernelStatus({"resolution": res})
+nest.SetKernelStatus({"overwrite_files": True})
+nest.SetKernelStatus({"data_path": pathData})
 
 # # Cerebellum
 cereb_controlled_joint = 0 # x = 0, y = 1
@@ -72,7 +78,7 @@ cereb_controlled_joint = 0 # x = 0, y = 1
 nest.Install("controller_module")
 #### Planner
 print("init planner")
-planner = Planner(N, njt, time_vect, trj, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
+planner = Planner(N, njt, time_vect, trj, pathData, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
 
 #### Motor cortex
 print("init mc")
@@ -98,10 +104,10 @@ sn_n=[]
 for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("parrot_neuron", N)
-    sn_p.append( PopView(tmp_p, time_vect, to_file=False, label='sens_fbk_'+str(j)+'_p') )
+    sn_p.append( PopView(tmp_p, time_vect, to_file=True, label="sn_p") )
     # Negative neurons
     tmp_n = nest.Create ("parrot_neuron", N)
-    sn_n.append( PopView(tmp_n, time_vect, to_file=False, label='sens_fbk_'+str(j)+'_n') )
+    sn_n.append( PopView(tmp_n, time_vect, to_file=True, label="sn_n") )
 
 #%% State estimator #######
 # Scale the cerebellar prediction up to 1000 Hz
@@ -111,11 +117,12 @@ prediction_p = []
 prediction_n = []
 tmp_p = nest.Create("diff_neuron_nestml", N)
 nest.SetStatus(tmp_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
-prediction_p.append(PopView(tmp_p,time_vect))
+prediction_p.append(PopView(tmp_p,time_vect, to_file=True, label="pred_p"))
 tmp_n = nest.Create("diff_neuron_nestml", N)
 nest.SetStatus(tmp_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
-prediction_n.append(PopView(tmp_n,time_vect))
-pops_params["fbk_smoothed"]["kp"]
+prediction_n.append(PopView(tmp_n,time_vect, to_file=True, label="pred_n"))
+
+wgt_fbk_sm_state = params["connections"]["fbk_smoothed_state"]["weight"]
 
 
 for j in range(njt):
@@ -134,7 +141,7 @@ for j in range(njt):
         # Positive neurons
         for i, pre in enumerate(fbk_smoothed_p):
             for k, post in enumerate(stEst.pops_p[j].pop):
-                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1})
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": wgt_fbk_sm_state, "receptor_type": i + 1})
 
         for i, pre in enumerate(prediction_p[0].pop):
             for k, post in enumerate(stEst.pops_p[j].pop):
@@ -144,7 +151,7 @@ for j in range(njt):
         # Negative neurons
         for i, pre in enumerate(fbk_smoothed_n):
             for k, post in enumerate(stEst.pops_n[j].pop):
-                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1})
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": wgt_fbk_sm_state, "receptor_type": i + 1})
 
         for i, pre in enumerate(prediction_n[0].pop):
             for k, post in enumerate(stEst.pops_n[j].pop):
@@ -219,11 +226,11 @@ for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("basic_neuron_nestml", N)
     nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(time_vect)})
-    brain_stem_new_p.append( PopView(tmp_p, time_vect) )
+    brain_stem_new_p.append( PopView(tmp_p, time_vect, to_file=True, label="brainstem_p") )
     # Negative neurons
     tmp_n = nest.Create ("basic_neuron_nestml", N)
     nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(time_vect)})
-    brain_stem_new_n.append( PopView(tmp_n, time_vect) )
+    brain_stem_new_n.append( PopView(tmp_n, time_vect, to_file=True, label="brainstem_n") )
 
 
 for j in range(njt):
@@ -357,98 +364,166 @@ for trial in range(n_trial):
     nest.Simulate(total_len)
 
 
+# Gather data
+
+files = [f for f in os.listdir(pathData) if os.path.isfile(os.path.join(pathData,f))]
+names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
+pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, prediction_p, prediction_n, sn_p, sn_n, stEst.pops_p, stEst.pops_n]
+pops_dict = {name: pop for name, pop in zip(names, pops)}
+
+if mpi4py.MPI.COMM_WORLD.rank == 0:
+    for name, pop in pops_dict.items():
+        file_list = []  # Reset file list for each population
+        senders = []
+        times = []
+        
+        # Find relevant files for this population
+        for f in files:
+            if f.startswith(name):
+                file_list.append(f)
+        
+        # Ensure combined_data is cleared before processing the next population
+        combined_data = []
+        
+        # Read and combine data from the files
+        for f in file_list:
+            with open(pathData + f, "r") as fd:
+                lines = fd.readlines()
+                for line in lines:
+                    if line.startswith("#") or line.startswith("sender"):
+                        continue  # Skip header lines
+                    combined_data.append(line.strip())  # Store all valid lines
+        
+        # Remove duplicate entries across all files (if needed)
+        unique_lines = list(set(combined_data))
+        
+        # Split data into senders and times
+        for line in unique_lines:
+            sender, time = line.split()
+            senders.append(int(sender))
+            times.append(float(time))
+
+        # Assign the combined and filtered data to the pop objects
+        for i in range(njt):
+            pop[i].gather_data(senders, times)
+
+        # Write the combined data to the output file
+        with open(pathData + name + ".gdf", "w") as wfd:
+            for line in unique_lines:
+                wfd.write(line + "\n")  # Write each line back to file
+
+        # Remove the processed files after saving
+        for f in file_list:
+            os.remove(pathData + f)
+
+    print('Collapsing files ended')
 
 #%% PLOTTING
 # Figure per la presentazione
 # Planner + trajectory
-lgd = ['theta']
-time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
+if mpi4py.MPI.COMM_WORLD.rank == 0:
+    lgd = ['theta']
+    time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
 
-reference =[trj]
-legend = ['trajectory']
-styles=['k']
-time_vecs=[time_vect_paused]
-for i in range(njt):
-        plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], reference, time_vecs,legend, styles, title=lgd[i],buffer_size=15)
-        plt.suptitle("Planner")
-        if saveFig:
-            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/planner_"+lgd[i]+".png")
+    print('planner')
+    reference =[trj]
+    legend = ['trajectory']
+    styles=['k']
+    time_vecs=[time_vect_paused]
+    for i in range(njt):
+            plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], reference, time_vecs,legend, styles, title=lgd[i],buffer_size=15)
+            plt.suptitle("Planner")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/planner_"+lgd[i]+".png")
+                plt.savefig(pathFig+"planner_"+lgd[i]+".png")
+    reference =[motorCommands]
+    legend = ['motor commands']
 
-reference =[motorCommands]
-legend = ['motor commands']
+    print('mc ffwd')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], reference, time_vecs,legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Mc ffwd")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_ffwd_"+lgd[i]+".png")
+                plt.savefig(pathFig+"mc_ffwd_"+lgd[i]+".png")
+    
+    
+    bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = planner.pops_n[0].computePSTH(time_vect_paused, 15)
+    bins_stEst_p,count_stEst_p,rate_stEst_p = stEst.pops_p[0].computePSTH(time_vect_paused, 15)
+    bins_stEst_n,count_stEst_n,rate_stEst_n = stEst.pops_n[0].computePSTH(time_vect_paused, 15)
 
-for i in range(njt):
-        plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], reference, time_vecs,legend, styles,title=lgd[i],buffer_size=15)
-        plt.suptitle("Mc ffwd")
-        if saveFig:
-            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_ffwd_"+lgd[i]+".png")
-bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
-bins_n,count_n,rate_n = planner.pops_n[0].computePSTH(time_vect_paused, 15)
-bins_stEst_p,count_stEst_p,rate_stEst_p = stEst.pops_p[0].computePSTH(time_vect_paused, 15)
-bins_stEst_n,count_stEst_n,rate_stEst_n = stEst.pops_n[0].computePSTH(time_vect_paused, 15)
+    print('mc fbk')
+    reference =[rate_p-rate_stEst_p, rate_n - rate_stEst_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['diff_p', 'diff_n']
+    styles = ['r--', 'b--']
+    for i in range(njt):
+            plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Mc fbk")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_fbk_"+lgd[i]+".png")
+                plt.savefig(pathFig+"mc_fbk_"+lgd[i]+".png")
 
-reference =[rate_p-rate_stEst_p, rate_n - rate_stEst_n]
-time_vecs = [bins_p[:-1], bins_n[:-1]]
-legend = ['diff_p', 'diff_n']
-styles = ['r--', 'b--']
-for i in range(njt):
-        plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-        plt.suptitle("Mc fbk")
-        if saveFig:
-            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_fbk_"+lgd[i]+".png")
+    bins_p,count_p,rate_p = mc.ffwd_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = mc.ffwd_n[0].computePSTH(time_vect_paused, 15)
+    bins_fbk_p,count_fbk_p,rate_fbk_p = mc.fbk_p[0].computePSTH(time_vect_paused, 15)
+    bins_fbk_n,count_fbk_n,rate_fbk_n = mc.fbk_n[0].computePSTH(time_vect_paused, 15)
+    print('mc out')
+    reference =[rate_p+rate_fbk_p, rate_n + rate_fbk_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['sum_p', 'sum_n']
+    styles = ['r--', 'b--']
+    for i in range(njt):
+            plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Mc out")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_out_"+lgd[i]+".png")
+                plt.savefig(pathFig+"mc_out_"+lgd[i]+".png")
 
-bins_p,count_p,rate_p = mc.ffwd_p[0].computePSTH(time_vect_paused, 15)
-bins_n,count_n,rate_n = mc.ffwd_n[0].computePSTH(time_vect_paused, 15)
-bins_fbk_p,count_fbk_p,rate_fbk_p = mc.fbk_p[0].computePSTH(time_vect_paused, 15)
-bins_fbk_n,count_fbk_n,rate_fbk_n = mc.fbk_n[0].computePSTH(time_vect_paused, 15)
+    bins_p,count_p,rate_p = mc.out_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = mc.out_n[0].computePSTH(time_vect_paused, 15)
 
-reference =[rate_p+rate_fbk_p, rate_n + rate_fbk_n]
-time_vecs = [bins_p[:-1], bins_n[:-1]]
-legend = ['sum_p', 'sum_n']
-styles = ['r--', 'b--']
-for i in range(njt):
-        plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-        plt.suptitle("Mc out")
-        if saveFig:
-            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_out_"+lgd[i]+".png")
+    reference =[rate_p, rate_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['out_p', 'out_n']
+    styles = ['r', 'b']
+    print('brainstem')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, brain_stem_new_p[i],brain_stem_new_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Brainstem")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/brainstem_"+lgd[i]+".png")
+                plt.savefig(pathFig+"brainstem_"+lgd[i]+".png")
 
-bins_p,count_p,rate_p = mc.out_p[0].computePSTH(time_vect_paused, 15)
-bins_n,count_n,rate_n = mc.out_n[0].computePSTH(time_vect_paused, 15)
+    reference =[]
+    time_vecs = []
+    legend = []
+    styles = []
+    print('sensory')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,buffer_size=15)
+            plt.suptitle("Sensory")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/sensory_"+lgd[i]+".png")
+                plt.savefig(pathFig+"sensory_"+lgd[i]+".png")
 
-reference =[rate_p, rate_n]
-time_vecs = [bins_p[:-1], bins_n[:-1]]
-legend = ['out_p', 'out_n']
-styles = ['r', 'b']
-for i in range(njt):
-        plotPopulation(time_vect_paused, brain_stem_new_p[i],brain_stem_new_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-        plt.suptitle("Brainstem")
-        if saveFig:
-            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/brainstem_"+lgd[i]+".png")
+    bins_p,count_p,rate_p = sn_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = sn_n[0].computePSTH(time_vect_paused, 15)
+    bins_pred_p,count_pred_p,rate_pred_p = prediction_p[0].computePSTH(time_vect_paused, 15)
+    bins_pred_n,count_pred_n,rate_pred_n = prediction_n[0].computePSTH(time_vect_paused, 15)
 
-reference =[]
-time_vecs = []
-legend = []
-styles = []
-for i in range(njt):
-        plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,buffer_size=15)
-        plt.suptitle("Sensory")
-        if saveFig:
-           plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/sensory_"+lgd[i]+".png")
-
-bins_p,count_p,rate_p = sn_p[0].computePSTH(time_vect_paused, 15)
-bins_n,count_n,rate_n = sn_n[0].computePSTH(time_vect_paused, 15)
-bins_pred_p,count_pred_p,rate_pred_p = prediction_p[0].computePSTH(time_vect_paused, 15)
-bins_pred_n,count_pred_n,rate_pred_n = prediction_n[0].computePSTH(time_vect_paused, 15)
-
-reference =[rate_p-rate_n, rate_pred_p - rate_pred_n]
-time_vecs = [bins_p[:-1], bins_n[:-1]]
-legend = ['net_sensory', 'net_prediction']
-styles = ['g--', 'r--']
-for i in range(njt):
-        plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-        plt.suptitle("State")
-        if saveFig:
-            plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
+    reference =[rate_p-rate_n, rate_pred_p - rate_pred_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['net_sensory', 'net_prediction']
+    styles = ['g--', 'r--']
+    print('state')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("State")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
+                plt.savefig(pathFig+"state_"+lgd[i]+".png")
 '''
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     lgd = ['theta']

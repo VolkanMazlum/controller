@@ -93,12 +93,12 @@ class MotorCortex:
             # Positive population (joint i)
             tmp_pop_p = nest.Create("tracking_neuron_nestml", n=numNeurons, params=par_ffwd)
             nest.SetStatus(tmp_pop_p, {"pos": True, "traj": self.motorCommands, "simulation_steps": len(self.motorCommands)})
-            self.ffwd_p.append( PopView(tmp_pop_p,self.time_vect) )
+            self.ffwd_p.append( PopView(tmp_pop_p, self.time_vect, to_file=True, label="ffwd_p") )
 
             # Negative population (joint i)
             tmp_pop_n = nest.Create("tracking_neuron_nestml", n=numNeurons, params=par_ffwd)
             nest.SetStatus(tmp_pop_n, {"pos": False, "traj": self.motorCommands, "simulation_steps": len(self.motorCommands)})
-            self.ffwd_n.append( PopView(tmp_pop_n,self.time_vect) )
+            self.ffwd_n.append( PopView(tmp_pop_n,self.time_vect, to_file=True, label="ffwd_n") )
 
             
             ############ FEEDBACK POPULATION ############
@@ -107,12 +107,12 @@ class MotorCortex:
             # Positive population (joint i)
             tmp_pop_p = nest.Create("diff_neuron_nestml", n=numNeurons, params=par_fbk)
             nest.SetStatus(tmp_pop_p, {"pos": True, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
-            self.fbk_p.append( PopView(tmp_pop_p,self.time_vect) )
+            self.fbk_p.append( PopView(tmp_pop_p, self.time_vect, to_file=True, label="fbk_p") )
 
             # Negative population (joint i)
             tmp_pop_n = nest.Create("diff_neuron_nestml", n=numNeurons, params=par_fbk)
             nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
-            self.fbk_n.append( PopView(tmp_pop_n,self.time_vect) )
+            self.fbk_n.append( PopView(tmp_pop_n, self.time_vect, to_file=True, label="fbk_n") )
 
             ############ OUTPUT POPULATION ############
             # Positive and negative populations for each joint.
@@ -123,12 +123,12 @@ class MotorCortex:
             # Positive population (joint i)
             tmp_pop_p = nest.Create("basic_neuron_nestml", n=numNeurons, params=par_out)
             nest.SetStatus(tmp_pop_p, {"pos": True, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
-            self.out_p.append( PopView(tmp_pop_p,self.time_vect,to_file=False) )
+            self.out_p.append( PopView(tmp_pop_p, self.time_vect, to_file=True, label="out_p") )
 
             # Negative population (joint i)
             tmp_pop_n = nest.Create("basic_neuron_nestml", n=numNeurons, params=par_out)
             nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
-            self.out_n.append( PopView(tmp_pop_n,self.time_vect,to_file=False) )
+            self.out_n.append( PopView(tmp_pop_n,self.time_vect, to_file=True, label="out_n") )
             
             ###### CONNECT FFWD AND FBK POULATIONS TO OUT POPULATION ######
             # Populations of each joint are connected together according to connection

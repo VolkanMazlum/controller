@@ -10,7 +10,10 @@ __version__ = "1.0.1"
 import nest
 import numpy as np
 import matplotlib.pyplot as plt
-
+import mpi4py
+from settings import Experiment
+exp = Experiment()
+pathData = exp.pathData + "nest/"
 
 ################ TODO: NOT TESTED
 class Event:
@@ -83,11 +86,22 @@ def get_rate(spike_detector, pop, trial_len, n_trials=1):
 
 
 def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, styles, title='',buffer_size=15):
-    evs_p, ts_p = pop_pos.get_events()
-    evs_n, ts_n = pop_neg.get_events()
+    if hasattr(pop_pos, 'total_ts') and hasattr(pop_neg, 'total_ts'):
+        evs_p = pop_pos.total_evs
+        ts_p = pop_pos.total_ts
 
-    y_p =   evs_p - pop_pos.pop[0] + 1
-    y_n = -(evs_n - pop_neg.pop[0] + 1)
+        evs_n = pop_neg.total_evs
+        ts_n = pop_neg.total_ts
+
+        y_p = [ev - int(pop_pos.pop[0].get('global_id')) + 1 for ev in evs_p]
+        y_n = [-((ev - int(pop_neg.pop[0].get('global_id'))) + 1) for ev in evs_n]
+    else:
+        evs_p, ts_p = pop_pos.get_events()
+        evs_n, ts_n = pop_neg.get_events()
+        y_p =   evs_p - pop_pos.pop[0] + 1
+        y_n = -(evs_n - pop_neg.pop[0] + 1)
+
+    
     
     if not reference:
         fig, ax = plt.subplots(2,1,sharex=True)
@@ -107,11 +121,11 @@ def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, style
         ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
         ax[1].scatter(ts_n, y_n, marker='.', s=1, color='b')
         ax[1].set_ylabel("raster")
-        pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
-        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
+        rate_p = pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
+        rate_n = pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
         #ax[1].set_title(title)
         ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
-
+        print('rate net: ', rate_p[-1]- rate_n[-1])
     subplot_labels = ['A', 'B', 'C']
     for i, axs in enumerate(ax):
         axs.text(-0.1, 1.1, subplot_labels[i], transform=axs.transAxes,
@@ -131,7 +145,9 @@ class PopView:
         if to_file==True:
             if label=='':
                 raise Exception("To save into file, you need to specify a label")
-            param_file = {"to_file": True, "label":label, "file_extension": "dat"}
+            #param_file = {"to_file": True, "label":label, "file_extension": "dat"}
+            #param_file={"record_to": label + ".dat"}
+            param_file = {"record_to": 'ascii', "label": label}
             self.detector = new_spike_detector(pop,**param_file)
         else:
             self.detector = new_spike_detector(pop)
@@ -171,7 +187,11 @@ class PopView:
         t_init = time[0]
         t_end  = time[ len(time)-1 ]
         N = len(self.pop)
-        evs, ts = self.get_events()
+        if hasattr(self, 'total_evs') and hasattr(self, 'total_ts'):
+            evs = self. total_evs
+            ts = self.total_ts
+        else:
+            evs, ts = self.get_events()
         count, bins = np.histogram( ts, bins=np.arange(t_init,t_end+1,buffer_sz) )
         rate = 1000*count/(N*buffer_sz)
         return bins, count, rate
@@ -189,6 +209,7 @@ class PopView:
         '''
         rate_padded = np.pad(rate, pad_width=2, mode='reflect') 
         rate_sm = np.convolve(rate_padded, np.ones(5) / 5, mode='valid')
+        
     
         no_ax = ax is None
         if no_ax:
@@ -203,6 +224,7 @@ class PopView:
         ax.set_ylabel(title)
         ax.set_xlabel('Time [ms]')
 
+        return rate
 
     ########## ACROSS TRIALS STUFF ##########
 
@@ -247,3 +269,10 @@ class PopView:
 
         if no_ax:
             plt.show()
+    
+    def gather_data(self, senders, times):
+        self.total_evs = senders
+        self.total_ts = times
+        
+
+
