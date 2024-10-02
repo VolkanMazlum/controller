@@ -106,12 +106,12 @@ class MotorCortex:
 
             # Positive population (joint i)
             tmp_pop_p = nest.Create("diff_neuron_nestml", n=numNeurons, params=par_fbk)
-            nest.SetStatus(tmp_pop_p, {"pos": True, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
+            nest.SetStatus(tmp_pop_p, {"pos": True, "buffer_size": buf_sz, "simulation_steps": len(self.motorCommands)})
             self.fbk_p.append( PopView(tmp_pop_p, self.time_vect, to_file=True, label="fbk_p") )
 
             # Negative population (joint i)
             tmp_pop_n = nest.Create("diff_neuron_nestml", n=numNeurons, params=par_fbk)
-            nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
+            nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz, "simulation_steps": len(self.motorCommands)})
             self.fbk_n.append( PopView(tmp_pop_n, self.time_vect, to_file=True, label="fbk_n") )
 
             ############ OUTPUT POPULATION ############
@@ -122,12 +122,12 @@ class MotorCortex:
 
             # Positive population (joint i)
             tmp_pop_p = nest.Create("basic_neuron_nestml", n=numNeurons, params=par_out)
-            nest.SetStatus(tmp_pop_p, {"pos": True, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
+            nest.SetStatus(tmp_pop_p, {"pos": True, "buffer_size": buf_sz, "simulation_steps": len(self.motorCommands)})
             self.out_p.append( PopView(tmp_pop_p, self.time_vect, to_file=True, label="out_p") )
 
             # Negative population (joint i)
             tmp_pop_n = nest.Create("basic_neuron_nestml", n=numNeurons, params=par_out)
-            nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz, "simulation_steps": len(self.time_vect)})
+            nest.SetStatus(tmp_pop_n, {"pos": False, "buffer_size": buf_sz, "simulation_steps": len(self.motorCommands)})
             self.out_n.append( PopView(tmp_pop_n,self.time_vect, to_file=True, label="out_n") )
             
             ###### CONNECT FFWD AND FBK POULATIONS TO OUT POPULATION ######

@@ -87,6 +87,7 @@ def get_rate(spike_detector, pop, trial_len, n_trials=1):
 
 def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, styles, title='',buffer_size=15):
     if hasattr(pop_pos, 'total_ts') and hasattr(pop_neg, 'total_ts'):
+        #print('c e')
         evs_p = pop_pos.total_evs
         ts_p = pop_pos.total_ts
 
@@ -123,7 +124,6 @@ def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, style
         ax[1].set_ylabel("raster")
         rate_p = pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
         rate_n = pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
-        #ax[1].set_title(title)
         ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
         print('rate net: ', rate_p[-1]- rate_n[-1])
     subplot_labels = ['A', 'B', 'C']

@@ -22,21 +22,20 @@ from stateestimator import StateEstimator, StateEstimator_mass
 #from cerebellum import Cerebellum
 from population_view import plotPopulation, PopView
 
-from settings import MusicCfg, Experiment
+from settings import MusicCfg, Experiment, Simulation
 import mpi4py
 from mpi4py import MPI
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 import json
+from data_handling import collapse_files, add_entry
 
 saveFig = True
 ScatterPlot = False
 
 # Opening JSON file to get parameters
 f = open('new_params.json')
-
 params = json.load(f)
-print(params["modules"])
 f.close()
 
 mc_params = params["modules"]["motor_cortex"]
@@ -49,20 +48,28 @@ conn_params = params["connections"]
 
 #%%  SIMULATION
 exp = Experiment()
+sim = Simulation()
 pathFig = exp.pathFig
 pathData = exp.pathData + "nest/"
 for root, dirs, files in os.walk(exp.pathData):
+    if root != exp.pathData:
         for file in files:
             os.remove(os.path.join(root, file))
 res = 0.1 #[ms]
-time_span = 500.0 #[ms]
-n_trial = 1
-time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
 
-njt = 1
 trj = np.loadtxt('trajectory.txt')
 motorCommands=np.loadtxt('motor_commands.txt')
 
+assert len(trj) == len(motorCommands)
+n_trials = sim.n_trials
+time_span = (sim.timeMax + sim.timeWait)
+time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
+
+total_time = time_span*n_trials
+total_time_vect = np.linspace(0, total_time, num=int(np.round(total_time/res)), endpoint=True)
+njt = 1
+
+assert len(trj) == len(total_time_vect)
 N = 50 # Number of neurons for each (sub-)population
 nTot = 2*N*njt # Total number of neurons (one positive and one negative population for each DOF)
 
@@ -78,19 +85,19 @@ cereb_controlled_joint = 0 # x = 0, y = 1
 nest.Install("controller_module")
 #### Planner
 print("init planner")
-planner = Planner(N, njt, time_vect, trj, pathData, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
+planner = Planner(N, njt, total_time_vect, trj, pathData, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
 
 #### Motor cortex
 print("init mc")
 preciseControl = False # Precise or approximated ffwd commands?
-mc = MotorCortex(N, njt, time_vect, motorCommands, **mc_params)
+mc = MotorCortex(N, njt, total_time_vect, motorCommands, **mc_params)
 
 #### State Estimator
 print("init state")
 buf_sz = state_params['buffer_size']
-additional_state_params = {'N_fbk': N, 'N_pred': N, 'fbk_bf_size': N*int(buf_sz/res), 'pred_bf_size': N*int(buf_sz/res)}
+additional_state_params = {'N_fbk': N, 'N_pred': N, 'fbk_bf_size': N*int(buf_sz/res), 'pred_bf_size': N*int(buf_sz/res), 'time_wait': sim.timeWait, 'time_trial': sim.timeMax+sim.timeWait}
 state_params.update(additional_state_params)
-stEst = StateEstimator_mass(N, njt, time_vect, **state_params)
+stEst = StateEstimator_mass(N, njt, total_time_vect, **state_params)
 
 #%% SPINAL CORD ########################
 
@@ -104,10 +111,10 @@ sn_n=[]
 for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("parrot_neuron", N)
-    sn_p.append( PopView(tmp_p, time_vect, to_file=True, label="sn_p") )
+    sn_p.append( PopView(tmp_p, total_time_vect, to_file=True, label="sn_p") )
     # Negative neurons
     tmp_n = nest.Create ("parrot_neuron", N)
-    sn_n.append( PopView(tmp_n, time_vect, to_file=True, label="sn_n") )
+    sn_n.append( PopView(tmp_n, total_time_vect, to_file=True, label="sn_n") )
 
 #%% State estimator #######
 # Scale the cerebellar prediction up to 1000 Hz
@@ -116,11 +123,11 @@ for j in range(njt):
 prediction_p = []
 prediction_n = []
 tmp_p = nest.Create("diff_neuron_nestml", N)
-nest.SetStatus(tmp_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
-prediction_p.append(PopView(tmp_p,time_vect, to_file=True, label="pred_p"))
+nest.SetStatus(tmp_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(total_time_vect)}) #5.5
+prediction_p.append(PopView(tmp_p,total_time_vect, to_file=True, label="pred_p"))
 tmp_n = nest.Create("diff_neuron_nestml", N)
-nest.SetStatus(tmp_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(time_vect)}) #5.5
-prediction_n.append(PopView(tmp_n,time_vect, to_file=True, label="pred_n"))
+nest.SetStatus(tmp_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(total_time_vect)}) #5.5
+prediction_n.append(PopView(tmp_n,total_time_vect, to_file=True, label="pred_n"))
 
 wgt_fbk_sm_state = params["connections"]["fbk_smoothed_state"]["weight"]
 
@@ -129,10 +136,10 @@ for j in range(njt):
     ''
     if j == cereb_controlled_joint:
         # Modify variability sensory feedback ("smoothed")
-        fbk_smoothed_p = nest.Create("diff_neuron_nestml", N)
-        nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(time_vect)})
-        fbk_smoothed_n = nest.Create("diff_neuron_nestml", N)
-        nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": False, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(time_vect)})
+        fbk_smoothed_p = nest.Create("basic_neuron_nestml", N)
+        nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(total_time_vect)})
+        fbk_smoothed_n = nest.Create("basic_neuron_nestml", N)
+        nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": False, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(total_time_vect)})
         
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
@@ -168,8 +175,7 @@ for j in range(njt):
         for i, pre in enumerate(sn_n[j].pop):
             for k, post in enumerate(stEst.pops_n[j].pop):
                 nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": conn_params["sn_state"]["weight"], "receptor_type": i + 1})
-#print(type(stEst.pops_p[0].pop))
-#print(nest.GetConnections(target = stEst.pops_p[j].pop))
+
 print("init connections feedback")
 '''
 #%% CONNECTIONS
@@ -225,12 +231,12 @@ brain_stem_new_n=[]
 for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("basic_neuron_nestml", N)
-    nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(time_vect)})
-    brain_stem_new_p.append( PopView(tmp_p, time_vect, to_file=True, label="brainstem_p") )
+    nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(total_time_vect)})
+    brain_stem_new_p.append( PopView(tmp_p, total_time_vect, to_file=True, label="brainstem_p") )
     # Negative neurons
     tmp_n = nest.Create ("basic_neuron_nestml", N)
-    nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(time_vect)})
-    brain_stem_new_n.append( PopView(tmp_n, time_vect, to_file=True, label="brainstem_n") )
+    nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(total_time_vect)})
+    brain_stem_new_n.append( PopView(tmp_n, total_time_vect, to_file=True, label="brainstem_n") )
 
 
 for j in range(njt):
@@ -357,74 +363,35 @@ if cerebellum_application_forw != 0:
 #%% SIMULATE ######################
 #nest.SetKernelStatus({"data_path": pthDat})
 #total_len = int(time_span + time_pause)
+names = exp.names
+pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, sn_p, sn_n, prediction_p, prediction_n, stEst.pops_p, stEst.pops_n]
+
 total_len = int(time_span)
-for trial in range(n_trial):
+for trial in range(n_trials):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
     nest.Simulate(total_len)
-
+    collapse_files(pathData, names, pops, njt)
+'''
+if mpi4py.MPI.COMM_WORLD.rank == 0:
+    choice = input("Save?")
+    if choice == 'y':
+        add_entry(exp)
+'''
 
 # Gather data
 
-files = [f for f in os.listdir(pathData) if os.path.isfile(os.path.join(pathData,f))]
-names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
-pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, prediction_p, prediction_n, sn_p, sn_n, stEst.pops_p, stEst.pops_n]
-pops_dict = {name: pop for name, pop in zip(names, pops)}
 
-if mpi4py.MPI.COMM_WORLD.rank == 0:
-    for name, pop in pops_dict.items():
-        file_list = []  # Reset file list for each population
-        senders = []
-        times = []
-        
-        # Find relevant files for this population
-        for f in files:
-            if f.startswith(name):
-                file_list.append(f)
-        
-        # Ensure combined_data is cleared before processing the next population
-        combined_data = []
-        
-        # Read and combine data from the files
-        for f in file_list:
-            with open(pathData + f, "r") as fd:
-                lines = fd.readlines()
-                for line in lines:
-                    if line.startswith("#") or line.startswith("sender"):
-                        continue  # Skip header lines
-                    combined_data.append(line.strip())  # Store all valid lines
-        
-        # Remove duplicate entries across all files (if needed)
-        unique_lines = list(set(combined_data))
-        
-        # Split data into senders and times
-        for line in unique_lines:
-            sender, time = line.split()
-            senders.append(int(sender))
-            times.append(float(time))
+#add_entry(exp)
 
-        # Assign the combined and filtered data to the pop objects
-        for i in range(njt):
-            pop[i].gather_data(senders, times)
-
-        # Write the combined data to the output file
-        with open(pathData + name + ".gdf", "w") as wfd:
-            for line in unique_lines:
-                wfd.write(line + "\n")  # Write each line back to file
-
-        # Remove the processed files after saving
-        for f in file_list:
-            os.remove(pathData + f)
-
-    print('Collapsing files ended')
 
 #%% PLOTTING
 # Figure per la presentazione
 # Planner + trajectory
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     lgd = ['theta']
-    time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
-
+    #time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
+    time_vect_paused = total_time_vect
     print('planner')
     reference =[trj]
     legend = ['trajectory']
@@ -501,6 +468,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     legend = []
     styles = []
     print('sensory')
+    print('prova: ', sn_n[i].total_ts)
     for i in range(njt):
             plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,buffer_size=15)
             plt.suptitle("Sensory")
@@ -524,6 +492,26 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
                 plt.savefig(pathFig+"state_"+lgd[i]+".png")
+    print('net')
+    bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n =  planner.pops_n[0].computePSTH(time_vect_paused, 15)
+    bins_stEst_p,count_stEst_p,rate_stEst_p = stEst.pops_p[0].computePSTH(time_vect_paused, 15)
+    bins_stEst_n,count_stEst_n,rate_stEst_n = stEst.pops_n[0].computePSTH(time_vect_paused, 15)
+
+    fig, ax = plt.subplots(2, 2)
+    ax[0,0].plot(bins_p[:-1], rate_p, label = 'planner pos' )
+    ax[0,0].plot(bins_p[:-1], rate_stEst_p, label = 'state pos' )
+    ax[0,0].set_xlabel('time')
+    ax[0,0].legend()
+    ax[1,0].plot(bins_n[:-1], rate_n, label = 'planner neg' )
+    ax[1,0].plot(bins_n[:-1], rate_stEst_n, label = 'state neg' )
+    ax[1,0].legend()
+    ax[0,1].plot(bins_p[:-1], rate_p - rate_stEst_p)
+    ax[1,1].plot(bins_n[:-1], rate_n - rate_stEst_n)
+
+    plt.savefig("check_planner_state.png")
+    
+
 '''
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     lgd = ['theta']

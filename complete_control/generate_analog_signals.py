@@ -11,11 +11,18 @@ import trajectories as tj
 
 exp = Experiment()
 sim = Simulation()
-res = sim.resolution
-time_span = sim.timeMax
-n_trial = sim.n_trials
-time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
 
+res = sim.resolution
+n_trials = sim.n_trials
+time_sim = sim.timeMax
+time_wait = sim.timeWait
+time_span = time_sim + time_wait
+total_time = time_span * n_trials
+
+
+time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
+time_sim_vec = np.linspace(0, time_sim, num=int(np.round(time_sim/res)), endpoint=True)
+total_time_vec = np.linspace(0, total_time, num=int(np.round(total_time/res)), endpoint=True)
 nest.ResetKernel()
 nest.SetKernelStatus({"resolution": res})
 nest.SetKernelStatus({"overwrite_files": True})
@@ -33,7 +40,6 @@ tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
 
 
 ## Compute minimum jerk trajectory (input to Planner)
-
 def minimumJerk(x_init, x_des, timespan):
     T_max = timespan[ len(timespan)-1 ]
     tmspn = timespan.reshape(timespan.size,1)
@@ -49,9 +55,14 @@ def minimumJerk(x_init, x_des, timespan):
     pp  = a*np.power(tmspn,5) + b*np.power(tmspn,4) + c*np.power(tmspn,3) + g
 
     return pp, pol
-    
-trj, pol = minimumJerk(init_pos[0], tgt_pos[0], time_vect) # Joint space (angle)
+ 
+trj, pol = minimumJerk(init_pos[0], tgt_pos[0], time_sim_vec) # Joint space (angle)
 trj_ee = dynSys.forwardKin( trj ) # End-effector space
+
+#trj_wait = (init_pos[0]) * np.ones(int(time_wait/res))
+trj_wait = 0 * np.ones(int(time_wait/res))
+trj = np.tile(np.concatenate((trj_wait, trj.flatten())), n_trials)
+
 
 ## Save trajectory to file
 np.savetxt('trajectory.txt', trj.flatten().tolist())
@@ -90,14 +101,13 @@ def minJerk_ddt_minmax(x_init, x_des, timespan):
             tmp      = np.polyval( pol[:,i],[t1,t2] )
             ext[:,i] = np.reshape( tmp,(1,2) )
             t[:,i]   = np.reshape( [t1,t2],(1,2) )
-    print('t: ', len(t))
+    
     return t, ext
     
 # Compute the torques via inverse dynamics
 def generateMotorCommands(init_pos, des_pos, time_vector):
     # Last simulation time
     T_max = time_vector[ len(time_vector)-1 ]
-    print(T_max)
     # Time and value of the minimum jerk curve
     ext_t, ext_val = minJerk_ddt_minmax(init_pos, des_pos, time_vector)
 
@@ -114,13 +124,18 @@ def generateMotorCommands(init_pos, des_pos, time_vector):
     mcmd = dynSys.inverseDyn(pos, vel, acc)
     return mcmd[0]
 
-motorCommands = generateMotorCommands(init_pos[0], tgt_pos[0], time_vect/1e3)
+motorCommands = generateMotorCommands(init_pos[0], tgt_pos[0], time_sim_vec/1e3)
+mc_wait = motorCommands[0] * np.ones(int(time_wait/res))
+motorCommands = np.tile(np.concatenate((mc_wait, motorCommands.flatten())), n_trials)
 np.savetxt('motor_commands.txt', motorCommands.flatten().tolist())
 
-'''
+# Check
+print('Trajectory going from ', init_pos_ee, "to ", tgt_pos_ee, "corresponding to angles ", init_pos, "to ", tgt_pos, "\n")
+print('Time simulation: ', time_sim, 'waiting time: ', time_wait, " # trials: ", n_trials, ". Total time: ", len(trj), ", ", len(motorCommands) )
+
+
 # Plot (test)
 fig, ax = plt.subplots(2,1)
-ax[0].plot(time_vect, trj)
-ax[1].plot(time_vect, motorCommands)
+ax[0].plot(total_time_vec, trj)
+ax[1].plot(total_time_vec, motorCommands)
 plt.savefig('test.png')
-'''

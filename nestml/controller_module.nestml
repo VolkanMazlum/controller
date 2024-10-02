@@ -50,7 +50,8 @@ model diff_neuron:
         base_rate Hz = 0 Hz # Base firing rate
         buffer_size ms = 100 ms # Size of the sliding window
         simulation_steps integer = 1000 # Number of simulation steps (simulation_time/resolution())
-    
+        time_wait real = 300.0
+
     state:
         in_rate Hz = 0 Hz # Input firing rate: to be computed from spikes
         in_rate_pre real = 0.0
@@ -202,6 +203,8 @@ model state_neuron:
         N_pred integer = 50 # Population size for sensory prediction
         fbk_bf_size integer = 10000
         pred_bf_size integer = 10000
+        time_wait ms = 150.0 ms
+        time_trial ms = 650.0 ms
 
     state:
         in_rate Hz = 0 Hz # Input firing rate: to be computed from spikes
@@ -235,8 +238,9 @@ model state_neuron:
     internals:
         res ms = resolution()
         buffer_steps integer = steps(buffer_size)
-        
-        
+        trial_steps integer = steps(time_trial)
+        wait_steps integer = steps(time_wait)
+          
     input: 
         fbk_spikes[N_fbk] <- spike
         pred_spikes[N_pred] <- spike
@@ -337,7 +341,7 @@ model state_neuron:
         # Now draw randomly according to probability distribution        
         spike_count_out = random_poisson(lambda_poisson)
 
-        if spike_count_out > 0:
+        if spike_count_out > 0 and (tick % trial_steps) > wait_steps:
             emit_spike()
 
 model rb_neuron:
