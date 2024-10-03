@@ -386,6 +386,9 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 
 
 #%% PLOTTING
+from datetime import datetime
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
 # Figure per la presentazione
 # Planner + trajectory
 if mpi4py.MPI.COMM_WORLD.rank == 0:
@@ -402,7 +405,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("Planner")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/planner_"+lgd[i]+".png")
-                plt.savefig(pathFig+"planner_"+lgd[i]+".png")
+                #plt.savefig(pathFig+"planner_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"planner_{lgd[i]}_{timestamp}.png")
     reference =[motorCommands]
     legend = ['motor commands']
 
@@ -412,8 +416,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("Mc ffwd")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_ffwd_"+lgd[i]+".png")
-                plt.savefig(pathFig+"mc_ffwd_"+lgd[i]+".png")
-    
+                #plt.savefig(pathFig+"mc_ffwd_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"mc_ffwd_{lgd[i]}_{timestamp}.png")
     
     bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
     bins_n,count_n,rate_n = planner.pops_n[0].computePSTH(time_vect_paused, 15)
@@ -430,7 +434,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("Mc fbk")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_fbk_"+lgd[i]+".png")
-                plt.savefig(pathFig+"mc_fbk_"+lgd[i]+".png")
+                #plt.savefig(pathFig+"mc_fbk_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"mc_fbk_{lgd[i]}_{timestamp}.png")
 
     bins_p,count_p,rate_p = mc.ffwd_p[0].computePSTH(time_vect_paused, 15)
     bins_n,count_n,rate_n = mc.ffwd_n[0].computePSTH(time_vect_paused, 15)
@@ -446,7 +451,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("Mc out")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_out_"+lgd[i]+".png")
-                plt.savefig(pathFig+"mc_out_"+lgd[i]+".png")
+                #plt.savefig(pathFig+"mc_out_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"mc_out_{lgd[i]}_{timestamp}.png")
 
     bins_p,count_p,rate_p = mc.out_p[0].computePSTH(time_vect_paused, 15)
     bins_n,count_n,rate_n = mc.out_n[0].computePSTH(time_vect_paused, 15)
@@ -461,7 +467,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("Brainstem")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/brainstem_"+lgd[i]+".png")
-                plt.savefig(pathFig+"brainstem_"+lgd[i]+".png")
+                #plt.savefig(pathFig+"brainstem_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"brainstem_{lgd[i]}_{timestamp}.png")
 
     reference =[]
     time_vecs = []
@@ -474,7 +481,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("Sensory")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/sensory_"+lgd[i]+".png")
-                plt.savefig(pathFig+"sensory_"+lgd[i]+".png")
+                #plt.savefig(pathFig+"sensory_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"sensory_{lgd[i]}_{timestamp}.png")
 
     bins_p,count_p,rate_p = sn_p[0].computePSTH(time_vect_paused, 15)
     bins_n,count_n,rate_n = sn_n[0].computePSTH(time_vect_paused, 15)
@@ -491,7 +499,8 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
             plt.suptitle("State")
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
-                plt.savefig(pathFig+"state_"+lgd[i]+".png")
+                #plt.savefig(pathFig+"state_"+lgd[i]+".png")
+                plt.savefig(pathFig + f"state_{lgd[i]}_{timestamp}.png")
     print('net')
     bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
     bins_n,count_n,rate_n =  planner.pops_n[0].computePSTH(time_vect_paused, 15)
