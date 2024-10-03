@@ -8,6 +8,7 @@ import queue
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+from data_handling import add_entry, collapse_files_bullet
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
@@ -64,12 +65,16 @@ res          = sim.resolution/1e3            # Resolution (translate into second
 timeMax      = sim.timeMax/1e3               # Maximum time (translate into seconds)
 time         = np.arange(0,timeMax+res,res)  # Time vector
 #time_pause   = sim.timePause/1e3
-time_pause = 0             # Pause time (translate into seconds)
+time_pause = 0
+time_wait = sim.timeWait/1e3     # Pause time (translate into seconds)
 n_trial      = sim.n_trials
-exp_duration = (timeMax+time_pause)*n_trial
+time_trial = time_wait + timeMax
+exp_duration = ((timeMax+time_wait)*n_trial)
+print('exp_duration: ', exp_duration)
 time_tot     = np.arange(0,exp_duration,res)
+print('time_tot: ', time_tot)
 n_time       = len(time_tot)
-
+print('n_time: ', n_time)
 #scale   = -350000.0# mc_params["ffwd_kp"]#   # Scaling coefficient to translate spike rates into forces (must be >=1)
 scale   = 500000.0
 scale_des = scale/scale
@@ -93,6 +98,7 @@ forearm = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.FOREARM_LINK_ID,
             computeLinkVelocity=True)[0]
 hand = p.getLinkState(bullet_robot._body_id, RobotArm1Dof.HAND_LINK_ID,
             computeLinkVelocity=True)[0]
+
 # hand = bullet_robot.EEPose()[0]
 _init_pos = [hand[0], hand[2]]
 rho = np.linalg.norm(np.array(upperarm)-np.array(hand))
@@ -100,13 +106,9 @@ z = upperarm[2] -rho*np.cos(1.57)
 y = upperarm[0] +rho*np.sin(1.57)
 _tgt_pos  = [y,z]
 ##################### EXPERIMENT #####################
-
-exp = Experiment()
-
-
 pathFig =exp.pathFig
 # pathFig = params["path"]
-pthDat = exp.pathData
+pthDat = exp.pathData + "bullet/"
 cond = exp.cond
 
 '''
@@ -128,7 +130,8 @@ tgt_pos_ee  = exp.tgt_pos
 
 init_pos = dynSys.inverseKin( init_pos_ee )
 tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
-trj, pol = tj.minimumJerk(init_pos[0], tgt_pos[0], time)
+#trj, pol = tj.minimumJerk(init_pos[0], tgt_pos[0], time)
+trj = np.loadtxt('trajectory.txt')
 
 # Joint space
 trj_ee      = dynSys.forwardKin( trj )
@@ -136,7 +139,7 @@ trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
 inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
-
+p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos)
 ############################ BRAIN ############################
 
 brain = Brain()
@@ -197,11 +200,7 @@ def inhandler(t, indextype, channel_id):
     # Just to handle possible errors
     if flagSign<0 or flagSign>=2:
         raise Exception("Wrong neuron number during reading!")
-print('qui')
-print(music.Index.GLOBAL)
-print(firstId)
-print(nlocal)
-print(accLat)
+
 # Config of the input port
 indata.map(inhandler,
            music.Index.GLOBAL,
@@ -213,7 +212,7 @@ indata.map(inhandler,
 outdata.map (music.Index.GLOBAL,
              base=firstId,
              size=nlocal)
-#print('lì')
+
 
 ################ SENSORY NEURONS
 
@@ -264,7 +263,8 @@ inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
 
 ######################## RUNTIME ##########################
-
+#names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
+#pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, sn_p, sn_n, prediction_p, prediction_n, stEst.pops_p, stEst.pops_n]
 # Function to copute spike rates within within a buffer
 def computeRate(spikes, w, nNeurons, timeSt, timeEnd):
     count = 0
@@ -280,9 +280,16 @@ def computeRate(spikes, w, nNeurons, timeSt, timeEnd):
 # Start the runtime phase
 runtime = music.Runtime(setup, res)
 step    = 0 # simulation step
-
+errors = []
 tickt = runtime.time()
+save = False
 while tickt < exp_duration:
+    '''
+    if save:
+        collapse_files_bullet(exp.pathData+"nest/", exp.names, njt)
+        add_entry(exp)
+        save = False
+    '''
 
     # Get bullet joint states
     bullet_robot.UpdateStats()
@@ -291,7 +298,6 @@ while tickt < exp_duration:
     pos_j[step,:] = bullet_robot.JointPos(RobotArm1Dof.ELBOW_JOINT_ID)  # Joint space
     vel_j[step,:] = bullet_robot.JointVel(RobotArm1Dof.ELBOW_JOINT_ID)
     pos[step,:]   = bullet_robot.EEPose()[0][0:3]         # End effector space. Convert to 2D
-    #print(pos[step,:] )
     vel[step,:]   = bullet_robot.EEVel()[0][0:3:2]
 
     # After a certain number of trials I switch on the force field
@@ -322,7 +328,6 @@ while tickt < exp_duration:
         spkRate_pos[step,i], c = computeRate(spikes_pos[i], w, N, buf_st, buf_ed)
         spkRate_neg[step,i], c = computeRate(spikes_neg[i], w, N, buf_st, buf_ed)
         spkRate_net[step,i]    = spkRate_pos[step,i] - spkRate_neg[step,i]
-        #print('net spike rate: ', spkRate_net[step,i]) 
         inputCmd[step,i]       = spkRate_net[step,i] / scale
 
         #perturb[step,:]      = pt.curledForceField(vel[step,:], angle, k)                     # End-effector forces
@@ -333,7 +338,21 @@ while tickt < exp_duration:
         bullet_robot.SetJointTorques(joint_ids=[RobotArm1Dof.ELBOW_JOINT_ID], torques=inputCmd_tot[step,:] )
 
         # Integrate dynamical system
+        #print("simulo")
         bullet.Simulate(sim_time=res)
+
+        ## At the end of each trial, compute error and store it
+        if ((tickt % time_trial == 0 and int(tickt/time_trial!=0)) or tickt == exp_duration - res):
+            error = pos_j[step,i] - tgt_pos
+            print("Trial finished")
+            print('Trial ', int(tickt/time_trial), ", error: ", error, "\n")
+            errors.append(error)
+            p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos) # Restart trial from initial position
+            
+            if error < 0.3:
+                print("Error inferior to 0.3")
+                #save = True
+
 
     step = step+1
     runtime.tick()
@@ -426,20 +445,22 @@ plt.ylabel("motor commands (N)")
 plt.legend(lgd)
 if saveFig:
     plt.savefig(pathFig+cond+"motCmd.png")
+    
 
 # Joint space
 plt.figure()
 plt.plot(time_tot,pos_j)
-plt.plot(time,trj,linestyle=':')
+plt.plot(time_tot,trj,linestyle=':')
 plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
 plt.legend(['theta','des'])
 if saveFig:
-    plt.savefig(pathFig+cond+"position_joint.png")
+    plt.savefig(pathFig+"position_joint.png")
+    #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
 
 # End-effector space
 plt.figure()
-trial_delta = int((timeMax+time_pause)/res)
+trial_delta = int((timeMax+time_wait)/res)
 task_steps = int((timeMax)/res)
 errors = []
 err_x = []
@@ -455,8 +476,9 @@ for trial in range(n_trial):
     style = 'k'
     plt.plot(pos[start:end,0],pos[start:end,2],style)
     plt.plot(pos[end,0],pos[end,2],marker='x',color='k')
-    # errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
-    # err_x.append(pos[end,0] -tgt_pos_ee[0])
+    #errors.append(np.sqrt((pos[end,0] -tgt_pos_ee[0,0])**2 + (pos[end,1] - tgt_pos_ee[1,0])**2))
+    #err_x.append(pos[end,0] -tgt_pos_ee[0])
+    print('target position: ', tgt_pos, ', reached position: ', pos_j[-1], ', error: ', tgt_pos - pos_j[-1])
     plt.plot(pos[start:end,0],pos[start:end,2],style, label="trajectory")
     plt.plot(pos[end,0],pos[end,2],marker='x',color='k', label="reached pos")
     # error_x = pos[end,0] -tgt_pos_ee[0]
@@ -470,7 +492,8 @@ for trial in range(n_trial):
     plt.ylabel('position y (m)')
     plt.legend()
     if saveFig:
-        plt.savefig(pathFig+cond+"position_ee.png")
+        plt.savefig(pathFig+"position_ee.png")
+        #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_ee.png")
 
     plt.figure()
     plt.plot(errors)
@@ -478,8 +501,10 @@ for trial in range(n_trial):
     plt.ylabel('Error [m]')
     if saveFig:
         plt.savefig(pathFig+cond+"error_ee.png")
+        
 
-    np.savetxt("error.txt",np.array(errors)*100)
+    #np.savetxt("error.txt",np.array(errors)*100)
+
 # np.savetxt("error_xy.txt",np.array(errors_xy)*100)
 
 # target_distance = np.sqrt((tgt_pos_ee[0] - init_pos_ee[0])**2 + (tgt_pos_ee[1] - init_pos_ee[1])**2)

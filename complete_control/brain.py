@@ -1,6 +1,4 @@
-
 #!/usr/bin/env python3
-
 import nest
 import numpy as np
 import time
@@ -17,13 +15,12 @@ from motorcortex import MotorCortex
 from planner import Planner
 from stateestimator import StateEstimator, StateEstimator_mass
 from cerebellum_build import Cerebellum
-from population_view import plotPopulation
-from util import plot_activity, plot_activity_pos_neg, plot_scatter, add_rect_pause, add_slider, collapse_gdf_data, read_gdf_data
-
-from population_view import PopView
+from population_view import plotPopulation, PopView
 from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
 import random
+from data_handling import collapse_files, add_entry
+
 #from plotting import plot_activity, plot_activity_pos_neg
 
 import ctypes
@@ -43,7 +40,7 @@ if nep_flag:
 # Opening JSON file
 f = open('new_params.json')
 params = json.load(f)
-print(params["modules"])
+#print(params["modules"])
 f.close()
 
 mc_params = params["modules"]["motor_cortex"]
@@ -56,57 +53,40 @@ state_se_params = params["modules"]["state_se"]
 pops_params = params["pops"]
 conn_params = params["connections"]
 
-
 #%%  SIMULATION
+exp = Experiment()
+pathFig = exp.pathFig
+pathData = exp.pathData + "nest/"
+for root, dirs, files in os.walk(exp.pathData):
+    if root != exp.pathData:
+        for file in files:
+            os.remove(os.path.join(root, file))
 
 sim = Simulation()
+trj = np.loadtxt('trajectory.txt')
+motorCommands=np.loadtxt('motor_commands.txt')
+assert len(trj) == len(motorCommands)
 
 res        = sim.resolution
-time_span  = sim.timeMax
-time_pause = sim.timePause
-n_trial   = sim.n_trials
+time_span = (sim.timeMax + sim.timeWait)
+n_trials = sim.n_trials
 time_vect  = np.linspace(0, time_span, num=int(np.round(time_span/res)), endpoint=True)
 
-nest.ResetKernel()
-nest.SetKernelStatus({"resolution": res})
-nest.SetKernelStatus({"overwrite_files": True})
+total_time = time_span*n_trials
+total_time_vect = np.linspace(0, total_time, num=int(np.round(total_time/res)), endpoint=True)
 
+njt = exp.dynSys.numVariables()
+#nest.ResetKernel()
+#nest.Install("controller_module")
 # Randomize
 msd = int( time.time() * 1000.0 )
 N_vp = nest.GetKernelStatus(['total_num_virtual_procs'])[0]
 #nest.SetKernelStatus({'rng_seeds' : range(msd+N_vp+1, msd+2*N_vp+1)})
 
 
-#%%  EXPERIMENT
-print("init exp")
-exp = Experiment()
-if mpi4py.MPI.COMM_WORLD.rank == 0:
-    # Remove existing .dat and/or .gdf files generated in previous simulations
-    exp.remove_files()
-
-dynSys   = exp.dynSys
-njt      = exp.dynSys.numVariables()
-
-# End-effector space
-init_pos_ee = exp.init_pos
-tgt_pos_ee  = exp.tgt_pos
-
-# Joint space
-init_pos = dynSys.inverseKin( init_pos_ee )
-tgt_pos  = dynSys.inverseKin( tgt_pos_ee )
-trj, pol = tj.minimumJerk(init_pos[0], tgt_pos[0], time_vect)
-trj_ee      = dynSys.forwardKin( trj )
-
-pthDat   = exp.pathData
-pathFig = exp.pathFig
-cond = exp.cond
-
-
 #%% BRAIN ########################
 print("init brain")
-
 brain = Brain()
-
 # Number of neurons
 N    = brain.nNeurPop # For each subpopulation positive/negative
 nTot = 2*N*njt        # Total number of neurons
@@ -119,18 +99,20 @@ cerebellum_application_inv = exp.cerebellum_application_inv  # Trial at which th
 filename_h5 = brain.filename_h5
 filename_config = brain.filename_config
 tags = ['forw','inv']
-cerebellum_forw = Cerebellum(filename_h5, filename_config, True, tags[0])
-cerebellum_inv = Cerebellum(filename_h5, filename_config, True, tags[1])
-
-N_mossy_forw = len(cerebellum_forw.S_Mf)
+cerebellum = Cerebellum(filename_h5, filename_config, True, tags[0])
+#cerebellum_inv = Cerebellum(filename_h5, filename_config, True, tags[1])
+'''
+nest.SetKernelStatus({"resolution": res})
+nest.SetKernelStatus({"overwrite_files": True})
+nest.SetKernelStatus({"data_path": pathData})
+'''
+N_mossy_forw = len(cerebellum.forw_Nest_Mf)
 n_forw = int(N_mossy_forw/2)
 
-N_mossy_inv = len(cerebellum_inv.S_Mf)
+N_mossy_inv = len(cerebellum.inv_Nest_Mf)
 n_inv = int(N_mossy_inv/2)
 
 #### Planner
-trj = np.loadtxt('trajectory.txt')
-motorCommands=np.loadtxt('motor_commands.txt')
 print("init planner")
 planner = Planner(N, njt, time_vect, trj, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
 
@@ -140,15 +122,19 @@ print("init mc")
 preciseControl = brain.precCtrl # Precise or approximated ffwd commands?
 
 
-mc = MotorCortex(N, time_vect, trj, dynSys, pthDat, preciseControl, time_pause, **mc_params)
-
+mc = MotorCortex(N, njt, time_vect, motorCommands, **mc_params)
 #### State Estimator
 print("init state")
 kpred    = state_se_params["kpred"]
 ksens    = state_se_params["ksens"]
 
+buf_sz = state_params['buffer_size']
+additional_state_params = {'N_fbk': N, 'N_pred': N, 'fbk_bf_size': N*int(buf_sz/res), 'pred_bf_size': N*int(buf_sz/res), 'time_wait': sim.timeWait, 'time_trial': sim.timeMax+sim.timeWait}
+state_params.update(additional_state_params)
+stEst = StateEstimator_mass(N, njt, time_vect, **state_params)
 
-stEst = StateEstimator_mass(N, time_vect, dynSys, state_params)
+print('dopo: ', nest.GetNodes())
+#stEst = StateEstimator_mass(N, time_vect, dynSys, state_params)
 #%% SPINAL CORD ########################
 
 delay_fbk          = params["modules"]["spine"]["fbk_delay"]
@@ -161,111 +147,128 @@ sn_n=[]
 for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("parrot_neuron", N)
-    sn_p.append( PopView(tmp_p, time_vect, to_file=True, label='sens_fbk_'+str(j)+'_p') )
+    sn_p.append( PopView(tmp_p, total_time_vect, to_file=True, label="sn_p") )
     # Negative neurons
     tmp_n = nest.Create ("parrot_neuron", N)
-    sn_n.append( PopView(tmp_n, time_vect, to_file=True, label='sens_fbk_'+str(j)+'_n') )
+    sn_n.append( PopView(tmp_n, total_time_vect, to_file=True, label="sn_n") )
 
 #%% State estimator #######
 # Scale the cerebellar prediction up to 1000 Hz
 # in order to have firing rate suitable for the State estimator
 # and all the other structures inside the control system
+prediction_p = []
+prediction_n = []
+
+tmp_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(tmp_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(total_time_vect)}) #5.5
+prediction_p.append(PopView(tmp_p,total_time_vect, to_file=True, label="pred_p"))
+tmp_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(tmp_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"], "simulation_steps": len(total_time_vect)}) #5.5
+prediction_n.append(PopView(tmp_n,total_time_vect, to_file=True, label="pred_n"))
+
+print(cerebellum.forw_N_DCNp.get(['global_id']))
+print(prediction_p[cereb_controlled_joint].pop.get(['global_id']))
+#print(type(prediction_p))
+nest.Connect(cerebellum.forw_N_DCNi, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum.forw_N_DCNp, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum.forw_N_DCNi, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum.forw_N_DCNp, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
 
 
-prediction_p = nest.Create("diff_neuron", N)
-nest.SetStatus(prediction_p, {"kp": pops_params["prediction"]["kp"], "pos": True, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
-prediction_n = nest.Create("diff_neuron", N)
-nest.SetStatus(prediction_n, {"kp": pops_params["prediction"]["kp"], "pos": False, "buffer_size": pops_params["prediction"]["buffer_size"], "base_rate": pops_params["prediction"]["base_rate"]}) #5.5
-
-nest.Connect(cerebellum_forw.N_DCNp, prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
-nest.Connect(cerebellum_forw.N_DCNn, prediction_p, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
-nest.Connect(cerebellum_forw.N_DCNp, prediction_n, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
-nest.Connect(cerebellum_forw.N_DCNn, prediction_n, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
-
-pops_params["fbk_smoothed"]["kp"]
-
-
+wgt_fbk_sm_state = params["connections"]["fbk_smoothed_state"]["weight"]
 for j in range(njt):
     ''
     if j == cereb_controlled_joint:
         # Modify variability sensory feedback ("smoothed")
-        fbk_smoothed_p = nest.Create("diff_neuron", N)
-        nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
-        fbk_smoothed_n = nest.Create("diff_neuron", N)
-        nest.SetStatus(fbk_smoothed_n, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": False, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"]})
+        fbk_smoothed_p = nest.Create("basic_neuron_nestml", N)
+        nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(total_time_vect)})
+        fbk_smoothed_n = nest.Create("basic_neuron_nestml", N)
+        nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(total_time_vect)})
         
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
         nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
         # Positive neurons
-        nest.Connect(prediction_p, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["pred_state"])
-        nest.Connect(fbk_smoothed_p, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["fbk_smoothed_state"])
-        nest.SetStatus(stEst.pops_p[j].pop, {"num_first": float(N), "num_second": float(N)})
+        for i, pre in enumerate(fbk_smoothed_p):
+            for k, post in enumerate(stEst.pops_p[j].pop):
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": wgt_fbk_sm_state, "receptor_type": i + 1})
+
+        for i, pre in enumerate(prediction_p[0].pop):
+            for k, post in enumerate(stEst.pops_p[j].pop):
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1 + N})
+        
 
         # Negative neurons
-        nest.Connect(prediction_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["pred_state"])
-        nest.Connect(fbk_smoothed_n, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["fbk_smoothed_state"])
-        nest.SetStatus(stEst.pops_n[j].pop, {"num_first": float(N), "num_second": float(N)})
+        for i, pre in enumerate(fbk_smoothed_n):
+            for k, post in enumerate(stEst.pops_n[j].pop):
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": wgt_fbk_sm_state, "receptor_type": i + 1})
+
+        for i, pre in enumerate(prediction_n[0].pop):
+            for k, post in enumerate(stEst.pops_n[j].pop):
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": 1.0, "receptor_type": i + 1 + N})
     else:
-
         # Positive neurons
-        nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
-        nest.SetStatus(stEst.pops_p[j].pop, {"num_second": float(N)})
+        #nest.Connect(sn_p[j].pop, stEst.pops_p[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
+        for i, pre in enumerate(sn_p[j].pop):
+            for k, post in enumerate(stEst.pops_p[j].pop):
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": conn_params["sn_state"]["weight"], "receptor_type": i + 1})
         # Negative neurons
-        nest.Connect(sn_n[j].pop, stEst.pops_n[j].pop, "all_to_all", syn_spec=conn_params["sn_state"])
-        nest.SetStatus(stEst.pops_n[j].pop, {"num_second": float(N)})
+        for i, pre in enumerate(sn_n[j].pop):
+            for k, post in enumerate(stEst.pops_n[j].pop):
+                nest.Connect(pre, post, "one_to_one", syn_spec = {"weight": conn_params["sn_state"]["weight"], "receptor_type": i + 1})
+
 
 print("init connections feedback")
 
 # Scale the feedback signal to 0-60 Hz in order to be suitable for the cerebellum
-feedback_p = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_p, {"kp": pops_params["feedback"]["kp"], "pos": True, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"]})
-feedback_n = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_n, {"kp": pops_params["feedback"]["kp"], "pos": False, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"]})
+feedback_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(feedback_p, {"kp": pops_params["feedback"]["kp"], "pos": True, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"], "simulation_steps":len(total_time_vect)})
+feedback_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(feedback_n, {"kp": pops_params["feedback"]["kp"], "pos": False, "buffer_size": pops_params["feedback"]["buffer_size"], "base_rate": pops_params["feedback"]["base_rate"], "simulation_steps":len(total_time_vect)})
 
 
 ## modulators for cerebellum
 # Motor commands relay neurons
-motor_commands_p = nest.Create("diff_neuron", n_forw)
-nest.SetStatus(motor_commands_p, {"kp": pops_params["motor_commands"]["kp"], "pos": True, "buffer_size": pops_params["motor_commands"]["buffer_size"], "base_rate": pops_params["motor_commands"]["base_rate"]})
-motor_commands_n = nest.Create("diff_neuron", n_forw)
-nest.SetStatus(motor_commands_n, {"kp": pops_params["motor_commands"]["kp"], "pos": False, "buffer_size": pops_params["motor_commands"]["buffer_size"], "base_rate": pops_params["motor_commands"]["base_rate"]})
+motor_commands_p = nest.Create("diff_neuron_nestml", n_forw)
+nest.SetStatus(motor_commands_p, {"kp": pops_params["motor_commands"]["kp"], "pos": True, "buffer_size": pops_params["motor_commands"]["buffer_size"], "base_rate": pops_params["motor_commands"]["base_rate"], "simulation_steps":len(total_time_vect)})
+motor_commands_n = nest.Create("diff_neuron_nestml", n_forw)
+nest.SetStatus(motor_commands_n, {"kp": pops_params["motor_commands"]["kp"], "pos": False, "buffer_size": pops_params["motor_commands"]["buffer_size"], "base_rate": pops_params["motor_commands"]["base_rate"], "simulation_steps":len(total_time_vect)})
 
 
 # Error signal toward IO neurons ############
 ''
 # Positive subpopulation
-error_p = nest.Create("diff_neuron", N)
-nest.SetStatus(error_p, {"kp": pops_params["error"]["kp"], "pos": True, "buffer_size":pops_params["error"]["buffer_size"], "base_rate": pops_params["error"]["base_rate"]})
+error_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(error_p, {"kp": pops_params["error"]["kp"], "pos": True, "buffer_size":pops_params["error"]["buffer_size"], "base_rate": pops_params["error"]["base_rate"], "simulation_steps":len(total_time_vect)})
 # Negative subpopulation
-error_n = nest.Create("diff_neuron", N)
-nest.SetStatus(error_n, {"kp": pops_params["error"]["kp"], "pos": False, "buffer_size":pops_params["error"]["buffer_size"], "base_rate": pops_params["error"]["base_rate"]})
+error_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(error_n, {"kp": pops_params["error"]["kp"], "pos": False, "buffer_size":pops_params["error"]["buffer_size"], "base_rate": pops_params["error"]["base_rate"], "simulation_steps":len(total_time_vect)})
 
 
 # Input to inverse neurons
-plan_to_inv_p = nest.Create("diff_neuron", n_inv)
-nest.SetStatus(plan_to_inv_p, {"kp": pops_params["plan_to_inv"]["kp"], "pos": True, "buffer_size": pops_params["plan_to_inv"]["buffer_size"],  "base_rate": pops_params["plan_to_inv"]["base_rate"]})
-plan_to_inv_n = nest.Create("diff_neuron", n_inv)
-nest.SetStatus(plan_to_inv_n, {"kp": pops_params["plan_to_inv"]["kp"], "pos": False, "buffer_size": pops_params["plan_to_inv"]["buffer_size"], "base_rate": pops_params["plan_to_inv"]["base_rate"]})
+plan_to_inv_p = nest.Create("diff_neuron_nestml", n_inv)
+nest.SetStatus(plan_to_inv_p, {"kp": pops_params["plan_to_inv"]["kp"], "pos": True, "buffer_size": pops_params["plan_to_inv"]["buffer_size"],  "base_rate": pops_params["plan_to_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
+plan_to_inv_n = nest.Create("diff_neuron_nestml", n_inv)
+nest.SetStatus(plan_to_inv_n, {"kp": pops_params["plan_to_inv"]["kp"], "pos": False, "buffer_size": pops_params["plan_to_inv"]["buffer_size"], "base_rate": pops_params["plan_to_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
 ''
 
-motor_prediction_p = nest.Create("diff_neuron", N)
-nest.SetStatus(motor_prediction_p, {"kp": pops_params["motor_pred"]["kp"], "pos": True, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"]})
-motor_prediction_n = nest.Create("diff_neuron", N)
-nest.SetStatus(motor_prediction_n, {"kp": pops_params["motor_pred"]["kp"], "pos": False, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"]})
+motor_prediction_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(motor_prediction_p, {"kp": pops_params["motor_pred"]["kp"], "pos": True, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"], "simulation_steps":len(total_time_vect)})
+motor_prediction_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(motor_prediction_n, {"kp": pops_params["motor_pred"]["kp"], "pos": False, "buffer_size": pops_params["motor_pred"]["buffer_size"], "base_rate": pops_params["motor_pred"]["base_rate"], "simulation_steps":len(total_time_vect)})
 
 # feedback from sensory
-feedback_inv_p = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_inv_p, {"kp": pops_params["feedback_inv"]["kp"], "pos": True, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
-feedback_inv_n = nest.Create("diff_neuron", N)
-nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": False, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"]})
+feedback_inv_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(feedback_inv_p, {"kp": pops_params["feedback_inv"]["kp"], "pos": True, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
+feedback_inv_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(feedback_inv_n, {"kp": pops_params["feedback_inv"]["kp"], "pos": False, "buffer_size": pops_params["feedback_inv"]["buffer_size"], "base_rate": pops_params["feedback_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
 
-error_inv_p = nest.Create("diff_neuron", N)
-nest.SetStatus(error_inv_p, {"kp": pops_params["error_i"]["kp"], "pos": True, "buffer_size":pops_params["error_i"]["buffer_size"], "base_rate": pops_params["error_i"]["base_rate"]})
+error_inv_p = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(error_inv_p, {"kp": pops_params["error_i"]["kp"], "pos": True, "buffer_size":pops_params["error_i"]["buffer_size"], "base_rate": pops_params["error_i"]["base_rate"], "simulation_steps":len(total_time_vect)})
 # Negative subpopulation
-error_inv_n = nest.Create("diff_neuron", N)
-nest.SetStatus(error_inv_n, {"kp": pops_params["error_i"]["kp"], "pos": False, "buffer_size":pops_params["error_i"]["buffer_size"], "base_rate": pops_params["error_i"]["base_rate"]})
+error_inv_n = nest.Create("diff_neuron_nestml", N)
+nest.SetStatus(error_inv_n, {"kp": pops_params["error_i"]["kp"], "pos": False, "buffer_size":pops_params["error_i"]["buffer_size"], "base_rate": pops_params["error_i"]["base_rate"], "simulation_steps":len(total_time_vect)})
 
 
 #%% CONNECTIONS
@@ -274,36 +277,36 @@ syn_inh = {"weight": -0.1} # Synaptic weight of the inhibitory synapse
 
 ''
 # Construct the error signal for both positive and negative neurons
-nest.Connect(cerebellum_forw.N_DCNp, error_p, {'rule': 'all_to_all'}, syn_spec={"weight":-conn_params["dcn_f_error"]["weight"]})
-nest.Connect(cerebellum_forw.N_DCNn, error_p, {'rule': 'all_to_all'}, syn_spec={"weight":conn_params["dcn_f_error"]["weight"]})
+nest.Connect(cerebellum.forw_N_DCNp, error_p, {'rule': 'all_to_all'}, syn_spec={"weight":-conn_params["dcn_f_error"]["weight"]})
+nest.Connect(cerebellum.forw_N_DCNn, error_p, {'rule': 'all_to_all'}, syn_spec={"weight":conn_params["dcn_f_error"]["weight"]})
 nest.Connect(feedback_p, error_p, 'all_to_all', syn_spec={"weight":conn_params["feedback_error"]["weight"]})
 nest.Connect(feedback_n, error_p, 'all_to_all', syn_spec={"weight":-conn_params["feedback_error"]["weight"]})
 
-nest.Connect(cerebellum_forw.N_DCNp, error_n, {'rule': 'all_to_all'}, syn_spec={"weight":-conn_params["dcn_f_error"]["weight"]})
-nest.Connect(cerebellum_forw.N_DCNn, error_n, {'rule': 'all_to_all'}, syn_spec={"weight":conn_params["dcn_f_error"]["weight"]})
+nest.Connect(cerebellum.forw_N_DCNp, error_n, {'rule': 'all_to_all'}, syn_spec={"weight":-conn_params["dcn_f_error"]["weight"]})
+nest.Connect(cerebellum.forw_N_DCNn, error_n, {'rule': 'all_to_all'}, syn_spec={"weight":conn_params["dcn_f_error"]["weight"]})
 nest.Connect(feedback_p, error_n, 'all_to_all', syn_spec={"weight":conn_params["feedback_error"]["weight"]})
 nest.Connect(feedback_n, error_n, 'all_to_all', syn_spec={"weight":-conn_params["feedback_error"]["weight"]})
-
+'''
 # Connect error neurons toward IO neurons
-nest.Connect(error_p, cerebellum_forw.N_IOp,{'rule': 'all_to_all'}, conn_params["error_io_f"])
-nest.Connect(error_n, cerebellum_forw.N_IOn,{'rule': 'all_to_all'}, conn_params["error_io_f"])
-''
+nest.Connect(error_p, cerebellum.forw_N_IOp,{'rule': 'all_to_all'}, conn_params["error_io_f"])
+nest.Connect(error_n, cerebellum.forw_N_IOn,{'rule': 'all_to_all'}, conn_params["error_io_f"])
+'''
 
 nest.Connect(planner.pops_p[cereb_controlled_joint].pop, plan_to_inv_p, "all_to_all", syn_spec={"weight": conn_params["planner_plan_to_inv"]["weight"], "delay": conn_params["planner_plan_to_inv"]["delay"]})
 nest.Connect(planner.pops_n[cereb_controlled_joint].pop, plan_to_inv_n, "all_to_all", syn_spec={"weight": -conn_params["planner_plan_to_inv"]["weight"], "delay": conn_params["planner_plan_to_inv"]["delay"]})
           
 
 
-nest.Connect(plan_to_inv_p, cerebellum_inv.Nest_Mf[-n_inv:], {'rule': 'one_to_one'}) 
-nest.Connect(plan_to_inv_n, cerebellum_inv.Nest_Mf[0:n_inv], {'rule': 'one_to_one'})
+nest.Connect(plan_to_inv_p, cerebellum.inv_Nest_Mf[-n_inv:], {'rule': 'one_to_one'}) 
+nest.Connect(plan_to_inv_n, cerebellum.inv_Nest_Mf[0:n_inv], {'rule': 'one_to_one'})
 ''
 
 ''
 nest.Connect(mc.out_p[cereb_controlled_joint].pop, motor_commands_p, "all_to_all", syn_spec={"weight": conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 nest.Connect(mc.out_n[cereb_controlled_joint].pop, motor_commands_n, "all_to_all", syn_spec={"weight": -conn_params["mc_out_motor_commands"]["weight"], "delay": conn_params["mc_out_motor_commands"]["delay"]})
 ''
-nest.Connect(motor_commands_p, cerebellum_forw.Nest_Mf[-n_forw:], {'rule': 'one_to_one'})
-nest.Connect(motor_commands_n, cerebellum_forw.Nest_Mf[0:n_forw], {'rule': 'one_to_one'})
+nest.Connect(motor_commands_p, cerebellum.forw_Nest_Mf[-n_forw:], {'rule': 'one_to_one'})
+nest.Connect(motor_commands_n, cerebellum.forw_Nest_Mf[0:n_forw], {'rule': 'one_to_one'})
 ''
 #### Connection Planner - Motor Cortex feedback (excitatory)
 wgt_plnr_mtxFbk   = conn_params["planner_mc_fbk"]["weight"]
@@ -334,18 +337,18 @@ for j in range(njt):
     nest.Connect(stEst.pops_n[j].pop,mc.fbk_n[j].pop, "one_to_one", {"weight": -wgt_stEst_mtxFbk, "delay": res})
 
 
-nest.Connect(cerebellum_inv.N_DCNp, motor_prediction_p, 'all_to_all', syn_spec={"weight": -conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
-nest.Connect(cerebellum_inv.N_DCNn, motor_prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
-nest.Connect(cerebellum_inv.N_DCNp, motor_prediction_n, 'all_to_all', syn_spec={"weight": -conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
-nest.Connect(cerebellum_inv.N_DCNn, motor_prediction_n, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.inv_N_DCNp, motor_prediction_p, 'all_to_all', syn_spec={"weight": -conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.inv_N_DCNn, motor_prediction_p, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.inv_N_DCNp, motor_prediction_n, 'all_to_all', syn_spec={"weight": -conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
+nest.Connect(cerebellum.inv_N_DCNn, motor_prediction_n, 'all_to_all', syn_spec={"weight": conn_params["dcn_i_motor_pred"]["weight"], "delay": conn_params["dcn_i_motor_pred"]["delay"]})
 
 # Construct the error signal for both positive and negative neurons
 nest.Connect(plan_to_inv_p, error_inv_p, {'rule': 'all_to_all'}, syn_spec={"weight": conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
 nest.Connect(plan_to_inv_n, error_inv_p, {'rule': 'all_to_all'}, syn_spec={"weight": -conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
 nest.Connect(plan_to_inv_p, error_inv_n, {'rule': 'all_to_all'}, syn_spec={"weight": conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
 nest.Connect(plan_to_inv_n, error_inv_n, {'rule': 'all_to_all'}, syn_spec={"weight": -conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
-nest.Connect(error_inv_p, cerebellum_inv.N_IOp,{'rule': 'all_to_all'}, conn_params["error_inv_io_i"])
-nest.Connect(error_inv_n, cerebellum_inv.N_IOn,{'rule': 'all_to_all'}, conn_params["error_inv_io_i"])
+#nest.Connect(error_inv_p, cerebellum.inv_N_IOp,{'rule': 'all_to_all'}, conn_params["error_inv_io_i"])
+#nest.Connect(error_inv_n, cerebellum.inv_N_IOn,{'rule': 'all_to_all'}, conn_params["error_inv_io_i"])
 ''
 
 brain_stem_new_p=[]
@@ -353,12 +356,12 @@ brain_stem_new_n=[]
 
 for j in range(njt):
     # Positive neurons
-    tmp_p = nest.Create ("basic_neuron", N)
-    nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
+    tmp_p = nest.Create ("basic_neuron_nestml", N)
+    nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(total_time_vect)})
     brain_stem_new_p.append( PopView(tmp_p, time_vect) )
     # Negative neurons
-    tmp_n = nest.Create ("basic_neuron", N)
-    nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"]})
+    tmp_n = nest.Create ("basic_neuron_nestml", N)
+    nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(total_time_vect)})
     brain_stem_new_n.append( PopView(tmp_n, time_vect) )
 
 

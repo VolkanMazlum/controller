@@ -9,12 +9,12 @@
                 "ffwd_base_rate": 0.0,
                 "ffwd_kp": 2000.0296740997816629,
                 "fbk_base_rate": 0.0,
-                "fbk_kp": 0.52817879115406156,
+                "fbk_kp": 0.20,
                 "out_base_rate": 0.0,
-                "out_kp": 1.0,
-                "wgt_ffwd_out": 1.0,
-                "wgt_fbk_out": 0.1,
-                "buf_sz": 20.0
+                "out_kp": 1.25,
+                "wgt_ffwd_out": 0.90,
+                "wgt_fbk_out": 0.25,
+                "buf_sz": 50.0
           },
           "spine": {
                 "wgt_motCtx_motNeur": 1.0625540740843757,
@@ -24,9 +24,9 @@
                 "fbk_delay": 0.1
           },
           "state": {
-                "kp": 1.0,
+                "kp": 2.0,
                 "base_rate": 0.0,
-                "buffer_size": 20.0
+                "buffer_size": 60.0
           },
           "state_se": {
                 "kpred": 0.0,
@@ -103,7 +103,7 @@
                 "receptor_type": 1
           },
           "fbk_smoothed_state": {
-                "weight": 1.0,
+                "weight": 1.10,
                 "receptor_type": 2
           },
           "sn_state": {
@@ -115,11 +115,11 @@
                 "delay": 0.1
           },
           "state_mc_fbk": {
-                "weight": -1.0,
+                "weight": -0.95,
                 "delay": 0.1
           },
           "mc_out_motor_commands": {
-                "weight": 0.003,
+                "weight": 0.03,
                 "delay": 0.1
           },
           "motor_commands_mossy_forw": {

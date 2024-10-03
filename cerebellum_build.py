@@ -13,11 +13,19 @@ import trajectories as tj
 from population_view import PopView
 import mpi4py
 
-from bsb.core import from_storage
+#from bsb.core import from_storage
+from bsb import ConfigurationError, from_storage, SimulationData
+from bsb_nest import NestAdapter
+from bsb_nest.adapter import NestResult
+from settings import Simulation, Experiment
 #from bsb.output import HDF5Formatter
 #from bsb.core import HDF5Formatter
 #from bsb.config import JSONConfig
 #from bsb.reporting import set_verbosity
+sim = Simulation()
+exp = Experiment()
+res = sim.resolution
+pathData = exp.pathData + "nest/"
 
 class Cerebellum:
 
@@ -25,39 +33,79 @@ class Cerebellum:
     def __init__(self, filename_h5, filename_config, multi = False, suffix = ''):
 
         # Reconfigure scaffold
+        adapter = NestAdapter()
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
         self.suffix = suffix
         self.multi = multi
-        
-        '''
-        if mpi4py.MPI.COMM_WORLD.rank == 0:
-            reconfigured_obj = JSONConfig(filename_config)
-            HDF5Formatter.reconfigure(filename_h5, reconfigured_obj)
-            reconfigured = True
-            print(mpi4py.MPI.COMM_WORLD.rank)
-        else:
-            print(mpi4py.MPI.COMM_WORLD.rank)
-            reconfigured = None
-        print('mi blocco qui')
-        # I can not use the barrier, otherwise the rank controlling music would stop the code here
-        mpi4py.MPI.COMM_WORLD.bcast(reconfigured, root=0)
-        print('ok')
-        '''
 
         # Create scaffold_model from HDF5
-        self.scaffold_model = from_storage(filename_h5)
-        #set_verbosity(3)
+        self.forward_model = from_storage(filename_h5)
+        self.inverse_model = from_storage(filename_h5)
+        simulation_name = "basal_activity"
+        simulation_forw = self.forward_model.get_simulation(simulation_name)
+        simulation_inv = self.inverse_model.get_simulation(simulation_name)
+        adapter.simdata[simulation_forw] = SimulationData(simulation_forw, result=NestResult(simulation_forw))
+        adapter.simdata[simulation_inv] = SimulationData(simulation_inv, result=NestResult(simulation_inv))
+        # At some point in BSB this script the kernel is reset, so we need to load the module and set the parameters before the cerebellar nodes are created
+        nest.Install("controller_module") 
+        nest.SetKernelStatus({"resolution": res})
+        nest.SetKernelStatus({"overwrite_files": True})
+        nest.SetKernelStatus({"data_path": pathData})
+        
+        adapter.load_modules(simulation_forw)
+        adapter.load_modules(simulation_inv)
+
+        adapter.set_settings(simulation_forw)
+        adapter.set_settings(simulation_inv)
+
+        adapter.create_neurons(simulation_forw)
+        adapter.create_neurons(simulation_inv)
+        
         '''
-        # Create adapter
-        self.tuning_adapter = self.scaffold_model.create_adapter("tuning_weights") #tuning_weights
-        if multi:
-            print("Multi instance enabled")
-            self.tuning_adapter.enable_multi(suffix)
-        self.tuning_adapter.prepare()
+        for neuron_model, gids in adapter.simdata[simulation_forw].populations.items():
+            print('forward', neuron_model.name, gids)
+        
+        for neuron_model, gids in adapter.simdata[simulation_inv].populations.items():
+            print('inverse', neuron_model.name, gids)
         '''
+        
+        adapter.connect_neurons(simulation_forw)
+        adapter.connect_neurons(simulation_inv)
+
+        adapter.create_devices(simulation_forw)
+        adapter.create_devices(simulation_inv)
+        '''
+        for device_model, device_ids in adapter.simdata[simulation_forw].devices.items():
+            print(device_model.name, device_ids)
+        '''
+
+        self.forw_Nest_Mf = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "mossy_fibers"][0]
+        #self.io_neurons = self.tuning_adapter.get_nest_ids(self.S_IO)
+        self.forw_N_BC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "basket_cell"][0]
+        #N_BCn = self.tuning_adapter.get_nest_ids(S_BCn)
+        self.forw_N_SC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "stellate_cell"][0]
+        #N_SCn = self.tuning_adapter.get_nest_ids(S_SCn)
+        #self.N_IOp = self.tuning_adapter.get_nest_ids(S_IOp)
+        #self.N_IOn = self.tuning_adapter.get_nest_ids(S_IOn)
+        self.forw_N_DCNp = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "dcn_p"][0]
+        self.forw_N_DCNi = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "dcn_i"][0]
+        self.forw_N_PC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "purkinje_cell"][0]
+        #N_PCn = self.tuning_adapter.get_nest_ids(S_PCn)
+
+        self.inv_Nest_Mf = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "mossy_fibers"][0]
+        #self.io_neurons = self.tuning_adapter.get_nest_ids(self.S_IO)
+        self.inv_N_BC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "basket_cell"][0]
+        #N_BCn = self.tuning_adapter.get_nest_ids(S_BCn)
+        self.inv_N_SC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "stellate_cell"][0]
+        #N_SCn = self.tuning_adapter.get_nest_ids(S_SCn)
+        #self.N_IOp = self.tuning_adapter.get_nest_ids(S_IOp)
+        #self.N_IOn = self.tuning_adapter.get_nest_ids(S_IOn)
+        self.inv_N_DCNp = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "dcn_p"][0]
+        self.inv_N_DCNi = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "dcn_i"][0]
+        self.inv_N_PC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "purkinje_cell"][0]
         # Find ids for each cell type
-        self.find_cells()
+        #self.find_cells()
 
     def find_cells(self):
         '''
@@ -76,7 +124,7 @@ class Cerebellum:
         self.S_SC = self.scaffold_model.get_placement_set("stellate_cell")
         #self.S_DCN_GABA = self.scaffold_model.get_placement_set("dcn_cell_GABA")
         self.S_Mf = self.scaffold_model.get_placement_set("mossy_fibers")
-        print(self.scaffold_model.get_placement_sets())
+        #print(self.scaffold_model.get_placement_sets())
         #self.S_IO = self.scaffold_model.get_placement_set("io_cell")
         '''
         # Subdivision into microzones

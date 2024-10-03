@@ -40,13 +40,13 @@ class StateEstimator_mass:
             tmp_pop_p = nest.Create("state_neuron_nestml", numNeurons)
             nest.SetStatus(tmp_pop_p, self._param_neurons)
             nest.SetStatus(tmp_pop_p, {"pos": True})
-            self.pops_p.append( PopView(tmp_pop_p, time_vect) )
+            self.pops_p.append( PopView(tmp_pop_p, time_vect, to_file=True, label="state_p") )
 
             tmp_pop_n = nest.Create("state_neuron_nestml", numNeurons)
             nest.SetStatus(tmp_pop_n, self._param_neurons)
             nest.SetStatus(tmp_pop_p, {"pos": False})
-            self.pops_n.append( PopView(tmp_pop_n, time_vect) )
-            
+            self.pops_n.append( PopView(tmp_pop_n, time_vect, to_file=True, label="state_n") )
+           
     @property
     def numNeuronsPop(self):
         return self._numNeuronsPop

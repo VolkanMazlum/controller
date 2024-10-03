@@ -50,7 +50,8 @@ model diff_neuron:
         base_rate Hz = 0 Hz # Base firing rate
         buffer_size ms = 100 ms # Size of the sliding window
         simulation_steps integer = 1000 # Number of simulation steps (simulation_time/resolution())
-    
+        time_wait real = 300.0
+
     state:
         in_rate Hz = 0 Hz # Input firing rate: to be computed from spikes
         in_rate_pre real = 0.0
@@ -202,6 +203,8 @@ model state_neuron:
         N_pred integer = 50 # Population size for sensory prediction
         fbk_bf_size integer = 10000
         pred_bf_size integer = 10000
+        time_wait ms = 150.0 ms
+        time_trial ms = 650.0 ms
 
     state:
         in_rate Hz = 0 Hz # Input firing rate: to be computed from spikes
@@ -235,8 +238,9 @@ model state_neuron:
     internals:
         res ms = resolution()
         buffer_steps integer = steps(buffer_size)
-        
-        
+        trial_steps integer = steps(time_trial)
+        wait_steps integer = steps(time_wait)
+          
     input: 
         fbk_spikes[N_fbk] <- spike
         pred_spikes[N_pred] <- spike
@@ -337,7 +341,7 @@ model state_neuron:
         # Now draw randomly according to probability distribution        
         spike_count_out = random_poisson(lambda_poisson)
 
-        if spike_count_out > 0:
+        if spike_count_out > 0 and (tick % trial_steps) > wait_steps:
             emit_spike()
 
 model rb_neuron:
@@ -442,4 +446,110 @@ model tracking_neuron_planner:
         
     output:
         spike
+
+model eglif:
+    parameters:
+        # Neurophysiological quantities
+        C_m pF = 14.6 pF # Membrane potential
+        tau_m ms = 9.125 ms # Membrane time constant
+        E_L mV = -68.0 mV # Membrane resting potential
+        t_ref ms = 1.59 ms # Refractory period duration
+        V_reset mV = -78.0 mV # Reset potential
+        V_th mV = -53.0 mV # Spike generation threshold potential
+
+        Vmin mV = -150.0 mV # Lower bound on membrane voltage potential
+        I_e pA = 3.711 pA # Endogenous current
+        Vinit mV = -60.0 mV
+
+        # Spike generation parameters
+        lambda_0 ms**-1 =  1.8/1 ms
+        tau_V mV = 1.1 mV
+
+        # Functional parameters to be optimized
+        kadap pA/(ms * mV) = 2.025 pA/(ms * mV) # Adaptation threshold
+        k2 ms**-1 = 1.096/1 ms # Adaptation threshold
+        k1 ms**-1 = 1.887/1 ms # Idep decay rate
+        A1 pA = 5.953 pA # Update parameter for Idep
+        A2 pA = 5.863 pA # Update parameter for Iadap
+
+        # Synaptic parameters -> 4 receptors
+        E_rev1 mV = 0.0 mV
+        E_rev2 mV = -80.0 mV
+        E_rev3 mV = 0.0 mV
+        E_rev4 mV = -80.0 mV
+
+        tau_syn1 ms = 0.2 ms
+        tau_syn2 ms = 2.0 ms
+        tau_syn3 ms = 2.0 ms
+        tau_syn4 ms = 2.0 ms
+    
+    state:
+        # State variables of the model
+        V_m mV = Vinit # Membrane voltage potential
+        I_adap pA = 0.0 pA # Slow, hyperpolarizing current (K+ channels)
+        I_dep pA = 0.0 pA # Fast, depolarizing current (Na+ channels)
+
+        r integer = 0 # Counter of ticks during refractory period
+
+        lambda ms**-1 = 0  ms**-1 # Stochasticity function for spike generation
+    
+    internals:
+        RefractoryCounts integer = steps(t_ref) # Duration of the refractory period in simulation steps
+
+    input:
+        I_stim pA <- continuous
+        rec1 <- spike
+        rec2 <- spike
+        rec3 <- spike
+        rec4 <- spike
+    
+    equations:
+        kernel g1 = (e / tau_syn1) * t * exp(-t / tau_syn1) # Eventualmente cambiare con (t - t_spike)
+        kernel g2 = (e / tau_syn2) * t * exp(-t / tau_syn2)
+        kernel g3 = (e / tau_syn3) * t * exp(-t / tau_syn3)
+        kernel g4 = (e / tau_syn4) * t * exp(-t / tau_syn4)
+
+        recordable inline I_syn pA = convolve(g1, rec1) * nS * (E_rev1 - V_m) + convolve(g2, rec2) * nS * (E_rev2 - V_m) + convolve(g3, rec3) * nS * (E_rev3 - V_m) + convolve(g4, rec4) * nS * (E_rev4 - V_m )
+        recordable inline I_tot pA = I_dep - I_adap + I_e + I_stim + I_syn
+        
+        V_m' = 1/tau_m * (max(V_m, Vmin) - E_L) + 1/C_m * I_tot
+        I_dep' = -k1 * I_dep
+        I_adap' = kadap * (max(V_m, Vmin) - E_L) - k2*I_adap
+        
+        
+        
+        
+
+    update:
+        if r == 0:
+            integrate_odes()
+        
+        elif r > 0:
+            r -= 1
+            #V_m = V_reset
+        
+        lambda = lambda_0 * exp ((V_m - V_th) / tau_V)
+        
+        if lambda > 0 /ms:
+            rnd real = random_uniform(0,1)
+            thr real = 1 - exp(-lambda*resolution())
+            if rnd < thr:
+                r = RefractoryCounts
+                V_m = V_reset
+                I_adap += A2
+                I_dep = A1
+
+                emit_spike()
+
+                
+
+    output:
+        spike
+
+
+
+
+
+
+        
 

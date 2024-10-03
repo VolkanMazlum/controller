@@ -29,7 +29,7 @@ class Experiment:
         
         # Where to save data
         self._pathData = "./data/"
-        self._pathFig = "./fig/"
+        self._pathFig = "./figures_thesis/cloop_nocereb/"
 
         if not os.path.exists(self._pathData):
             os.mkdir(self._pathData)
@@ -41,8 +41,32 @@ class Experiment:
         # Initial and target position (end-effector space)
         self._init_pos = np.ndarray([1,2])
         self._tgt_pos  = np.ndarray([1,2])
-        self._init_pos[:] = [0.31,0.0]
+        
+        ### FULL FLEXION (0 -> 90)
+        self._init_pos[:] = [0.31, 0.0]
         self._tgt_pos[:]  =[0.0,0.31]
+        
+        ### FULL EXTENSION (90 -> 0)
+        #self._init_pos[:] = [0.0,0.31]
+        #self._tgt_pos[:]  =[0.31,0.0]
+        
+        ### LOWER HALF FLEXION (0 -> 45)
+        #self._init_pos[:] = [0.31, 0.0]
+        #self._tgt_pos[:]  =[0.219,0.219]
+
+        ### UPPER HALF FLEXION (45 -> 90)
+        #self._init_pos[:]  =[0.219,0.219]
+        #self._tgt_pos[:]  =[0.0,0.31]
+
+        ### LOWER HALF EXTENSION (45 -> 0)
+        #self._init_pos[:]  =[0.219,0.219]
+        #self._tgt_pos[:] = [0.31, 0.0]
+
+        ### UPPER HALF EXTENSION (90 -> 45)
+        #self._init_pos[:] = [0.0,0.31]
+        #self._tgt_pos[:]  =[0.219,0.219]
+        
+
         # self._init_pos[:] = [-0.00155569,1.16870009]
         # self._tgt_pos[:]  =[-0.00155569+0.31,1.16870009+0.31]
         #self._tgt_pos  = np.array([0.25,0.43])
@@ -69,6 +93,8 @@ class Experiment:
         self._cerebellum_application_forw = 1e6
 
         self._cerebellum_application_inv = 1e6
+
+        self.names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
 
     def remove_files(self):
         for f in os.listdir(self._pathData):
@@ -142,10 +168,13 @@ class Simulation():
         self._timeMax = 500.0
 
         # Pause after movement (milliseconds)
-        self._timePause = 50.0
+        self._timePause = 0.0
 
         # Number of trials
         self._n_trials = 1
+
+        # Waiting time before movement execution (milliseconds)
+        self.timeWait = 150.0
 
 
     @property
