@@ -8,6 +8,8 @@ import queue
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+from datetime import datetime
+
 from data_handling import add_entry, collapse_files_bullet
 
 # Just to get the following imports right!
@@ -436,6 +438,7 @@ np.savetxt( pthDat+"inputCmd_tot.csv", inputCmd_tot, delimiter=',' ) # Torques f
 
 
 ########################### PLOTTING ###########################
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 lgd = ['theta','des']
 plt.figure()
 plt.plot(time_tot,inputCmd)
@@ -455,18 +458,23 @@ plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
 plt.legend(['theta','des'])
 if saveFig:
-    plt.savefig(pathFig+"position_joint.png")
+    #plt.savefig(pathFig+"position_joint.png")
     #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
+    plt.savefig(pathFig + f"position_joint_{timestamp}.png")
 
 # End-effector space
 plt.figure()
 trial_delta = int((timeMax+time_wait)/res)
-task_steps = int((timeMax)/res)
+task_steps = int((timeMax+time_wait)/res)
 errors = []
 err_x = []
 for trial in range(n_trial):
     start = trial*trial_delta
+    print('start: ', start)
     end = start + task_steps - 1
+    print('end: ', end)
+
+
     ''''
     if trial < ff_application: # Only cerebellum
         style = 'k'
@@ -492,9 +500,11 @@ for trial in range(n_trial):
     plt.ylabel('position y (m)')
     plt.legend()
     if saveFig:
-        plt.savefig(pathFig+"position_ee.png")
+        #plt.savefig(pathFig+"position_ee.png")
         #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_ee.png")
-
+        plt.savefig(pathFig + f"position_ee_{timestamp}.png")
+    
+    
     plt.figure()
     plt.plot(errors)
     plt.xlabel('Trial')
