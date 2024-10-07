@@ -59,6 +59,10 @@ class Cerebellum:
         adapter.set_settings(simulation_forw)
         adapter.set_settings(simulation_inv)
 
+        simulation_forw_duration = simulation_forw.duration 
+        simulation_inv_duration = simulation_inv.duration 
+        print('sim1, ', simulation_forw_duration)
+        print('sim2, ', simulation_inv_duration)
         adapter.create_neurons(simulation_forw)
         adapter.create_neurons(simulation_inv)
         

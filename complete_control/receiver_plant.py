@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import nest
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
@@ -88,7 +88,8 @@ bullet = BulletArm1Dof()
 # bullet.InitPybullet()
 
 import pybullet as p
-bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+#bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+bullet.InitPybullet(bullet_connect=p.DIRECT)
 bullet_robot = bullet.LoadRobot()
 
 

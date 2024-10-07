@@ -174,7 +174,7 @@ class Simulation():
         self._n_trials = 1
 
         # Waiting time before movement execution (milliseconds)
-        self.timeWait = 150.0
+        self.timeWait = 0.0
 
 
     @property
