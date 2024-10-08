@@ -29,7 +29,7 @@ class Experiment:
         
         # Where to save data
         self._pathData = "./data/"
-        self._pathFig = "./figures_thesis/cloop_nocereb/"
+        self._pathFig = "./figures_thesis/cloop_cereb/"
 
         if not os.path.exists(self._pathData):
             os.mkdir(self._pathData)
@@ -165,7 +165,7 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 500.0
+        self._timeMax = 200.0
 
         # Pause after movement (milliseconds)
         self._timePause = 0.0

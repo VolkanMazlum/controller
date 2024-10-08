@@ -40,12 +40,14 @@ class Planner:
         self.pops_n = []
 
         # Create populations
+        #print('base_rate: ', base_rate)
         for i in range(self.numJoints):
             # Positive population (joint i)
             #tmp_pop_p = nest.Create("tracking_neuron_planner_nestml", n=n, params={"kp": params["kp"], "base_rate": params["base_rate"], "pos": True, "traj": self.trj_j, "simulation_steps": len(self.trj_j)})
             tmp_pop_p = nest.Create("tracking_neuron_nestml", n=n)
             for idx, neuron in enumerate(tmp_pop_p):
                 nest.SetStatus(neuron,{"kp": params["kp"], "base_rate": params["base_rate"], "pos": True, "traj": self.trj_j, "simulation_steps": len(self.trj_j)} )
+            
             self.pops_p.append( PopView(tmp_pop_p, self.time_vect, to_file=True, label="planner_p") )
 
             # Negative population (joint i)

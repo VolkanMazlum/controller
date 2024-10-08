@@ -31,7 +31,7 @@ class Cerebellum:
 
     #def __init__(self, filename_h5, filename_config, numNeurons, time_vect, traj_joint, plant, pathData="./data/", precise=False, **kwargs):
     def __init__(self, filename_h5, filename_config, multi = False, suffix = ''):
-
+        print("init cerebellum")
         # Reconfigure scaffold
         adapter = NestAdapter()
         self.filename_h5 = filename_h5

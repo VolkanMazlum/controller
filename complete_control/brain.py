@@ -114,8 +114,8 @@ n_inv = int(N_mossy_inv/2)
 
 #### Planner
 print("init planner")
-planner = Planner(N, njt, total_time_vect, trj, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
 
+planner = Planner(N, njt, total_time_vect, trj, pathData, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
 
 #### Motor cortex
 print("init mc")
@@ -177,15 +177,19 @@ for j in range(njt):
     ''
     if j == cereb_controlled_joint:
         # Modify variability sensory feedback ("smoothed")
-        fbk_smoothed_p = nest.Create("basic_neuron_nestml", N)
+        '''
+        fbk_smoothed_p = nest.Create("diff_neuron_nestml", N)
         nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(total_time_vect)})
-        fbk_smoothed_n = nest.Create("basic_neuron_nestml", N)
+        fbk_smoothed_n = nest.Create("diff_neuron_nestml", N)
         nest.SetStatus(fbk_smoothed_p, {"kp": pops_params["fbk_smoothed"]["kp"], "pos": True, "buffer_size": pops_params["fbk_smoothed"]["buffer_size"], "base_rate": pops_params["fbk_smoothed"]["base_rate"], "simulation_steps": len(total_time_vect)})
-        
+        '''
+        fbk_smoothed_p = sn_p[j].pop
+        fbk_smoothed_n = sn_n[j].pop
+        '''
         nest.Connect(sn_p[j].pop, fbk_smoothed_p, "all_to_all", syn_spec={"weight": conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
 
         nest.Connect(sn_n[j].pop, fbk_smoothed_n, "all_to_all", syn_spec={"weight": -conn_params["sn_fbk_smoothed"]["weight"], "delay": conn_params["sn_fbk_smoothed"]["delay"]})
-
+	'''
         # Positive neurons
         for i, pre in enumerate(fbk_smoothed_p):
             for k, post in enumerate(stEst.pops_p[j].pop):
@@ -355,11 +359,11 @@ for j in range(njt):
     # Positive neurons
     tmp_p = nest.Create ("basic_neuron_nestml", N)
     nest.SetStatus(tmp_p, {"kp": pops_params["brain_stem"]["kp"], "pos": True, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(total_time_vect)})
-    brain_stem_new_p.append( PopView(tmp_p, time_vect) )
+    brain_stem_new_p.append( PopView(tmp_p, time_vect, to_file=True, label="brainstem_p" ) )
     # Negative neurons
     tmp_n = nest.Create ("basic_neuron_nestml", N)
     nest.SetStatus(tmp_n, {"kp": pops_params["brain_stem"]["kp"], "pos": False, "buffer_size": pops_params["brain_stem"]["buffer_size"], "base_rate": pops_params["brain_stem"]["base_rate"], "simulation_steps": len(total_time_vect)})
-    brain_stem_new_n.append( PopView(tmp_n, time_vect) )
+    brain_stem_new_n.append( PopView(tmp_n, time_vect, to_file=True, label="brainstem_n") )
 
 
 nest.Connect(motor_prediction_p,brain_stem_new_p[cereb_controlled_joint].pop, "all_to_all",  syn_spec={"weight": conn_params["motor_pre_brain_stem"]["weight"], "delay": conn_params["motor_pre_brain_stem"]["delay"]})
@@ -621,17 +625,25 @@ if cerebellum_application_forw != 0:
 ''
 #nest.SetKernelStatus({"data_path": pthDat})
 total_len = int(time_span)
+names = exp.names
+pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, sn_p, sn_n, prediction_p, prediction_n, stEst.pops_p, stEst.pops_n]
+
 for trial in range(n_trials):
+    print('rank: ', mpi4py.MPI.COMM_WORLD.rank)
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
-
+    '''
     if trial == cerebellum_application_inv:
         nest.SetStatus(conns_pos_inv, {"weight": -conn_params["motor_pre_brain_stem"]["weight"]})
         nest.SetStatus(conns_neg_inv, {"weight": conn_params["motor_pre_brain_stem"]["weight"]})
     if trial == cerebellum_application_forw:
         nest.SetStatus(conns_pos_forw, {"weight": conn_params["pred_state"]["weight"]})
         nest.SetStatus(conns_neg_forw, {"weight": -conn_params["pred_state"]["weight"]})
+    ''' 
+    print('sto per simulare')       
     nest.Simulate(total_len)
+    collapse_files(pathData, names, pops, njt)
+    print('finito')
 '''
 #%% SIMULATE ######################
 #nest.SetKernelStatus({"data_path": pthDat})
@@ -644,6 +656,7 @@ for trial in range(n_trial):
 '''
 # Add weights to weigth_recorder
 # Pf-BC
+'''
 weights = np.array(nest.GetStatus(Nest_pf_to_basket, "weight"))
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     weights_pf_bc[:,trial+1] = weights
@@ -657,6 +670,115 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
         weights_pf_pc[:,trial+1] = weights
 '''
 
+#%% PLOTTING
+# Figure per la presentazione
+# Planner + trajectory
+if mpi4py.MPI.COMM_WORLD.rank == 0:
+    lgd = ['theta']
+    #time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
+    time_vect_paused = total_time_vect
+    print('planner')
+    reference =[trj]
+    legend = ['trajectory']
+    styles=['k']
+    time_vecs=[time_vect_paused]
+    for i in range(njt):
+            plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], reference, time_vecs,legend, styles, title=lgd[i],buffer_size=15)
+            plt.suptitle("Planner")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/planner_"+lgd[i]+".png")
+                plt.savefig(pathFig+"planner_"+lgd[i]+".png")
+    reference =[motorCommands]
+    legend = ['motor commands']
+
+    print('mc ffwd')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], reference, time_vecs,legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Mc ffwd")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_ffwd_"+lgd[i]+".png")
+                plt.savefig(pathFig+"mc_ffwd_"+lgd[i]+".png")
+    
+    
+    bins_p,count_p,rate_p = planner.pops_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = planner.pops_n[0].computePSTH(time_vect_paused, 15)
+    bins_stEst_p,count_stEst_p,rate_stEst_p = stEst.pops_p[0].computePSTH(time_vect_paused, 15)
+    bins_stEst_n,count_stEst_n,rate_stEst_n = stEst.pops_n[0].computePSTH(time_vect_paused, 15)
+
+    print('mc fbk')
+    reference =[rate_p-rate_stEst_p, rate_n - rate_stEst_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['diff_p', 'diff_n']
+    styles = ['r--', 'b--']
+    for i in range(njt):
+            plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Mc fbk")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_fbk_"+lgd[i]+".png")
+                plt.savefig(pathFig+"mc_fbk_"+lgd[i]+".png")
+
+    bins_p,count_p,rate_p = mc.ffwd_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = mc.ffwd_n[0].computePSTH(time_vect_paused, 15)
+    bins_fbk_p,count_fbk_p,rate_fbk_p = mc.fbk_p[0].computePSTH(time_vect_paused, 15)
+    bins_fbk_n,count_fbk_n,rate_fbk_n = mc.fbk_n[0].computePSTH(time_vect_paused, 15)
+    print('mc out')
+    reference =[rate_p+rate_fbk_p, rate_n + rate_fbk_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['sum_p', 'sum_n']
+    styles = ['r--', 'b--']
+    for i in range(njt):
+            plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Mc out")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_out_"+lgd[i]+".png")
+                plt.savefig(pathFig+"mc_out_"+lgd[i]+".png")
+
+    bins_p,count_p,rate_p = mc.out_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = mc.out_n[0].computePSTH(time_vect_paused, 15)
+
+    reference =[rate_p, rate_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['out_p', 'out_n']
+    styles = ['r', 'b']
+    print('brainstem')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, brain_stem_new_p[i],brain_stem_new_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("Brainstem")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/brainstem_"+lgd[i]+".png")
+                plt.savefig(pathFig+"brainstem_"+lgd[i]+".png")
+
+    reference =[]
+    time_vecs = []
+    legend = []
+    styles = []
+    print('sensory')
+    print('prova: ', sn_n[i].total_ts)
+    for i in range(njt):
+            plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,buffer_size=15)
+            plt.suptitle("Sensory")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/sensory_"+lgd[i]+".png")
+                plt.savefig(pathFig+"sensory_"+lgd[i]+".png")
+
+    bins_p,count_p,rate_p = sn_p[0].computePSTH(time_vect_paused, 15)
+    bins_n,count_n,rate_n = sn_n[0].computePSTH(time_vect_paused, 15)
+    bins_pred_p,count_pred_p,rate_pred_p = prediction_p[0].computePSTH(time_vect_paused, 15)
+    bins_pred_n,count_pred_n,rate_pred_n = prediction_n[0].computePSTH(time_vect_paused, 15)
+
+    reference =[rate_p-rate_n, rate_pred_p - rate_pred_n]
+    time_vecs = [bins_p[:-1], bins_n[:-1]]
+    legend = ['net_sensory', 'net_prediction']
+    styles = ['g--', 'r--']
+    print('state')
+    for i in range(njt):
+            plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
+            plt.suptitle("State")
+            if saveFig:
+                #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
+                plt.savefig(pathFig+"state_"+lgd[i]+".png")
+
+'''
 
 #%% PLOTTING
 if mpi4py.MPI.COMM_WORLD.rank == 0:

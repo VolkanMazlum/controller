@@ -26,7 +26,14 @@ from mpi4py import MPI
 
 
 import json
-
+print('qui')
+if 'setup' in globals():
+    print('entrato')
+    print("Setup already exists. Reusing the existing setup.")
+else:
+    print('entrato qui')
+    setup = music.Setup()
+    globals()['setup'] = setup  # Store setup globally
 
 exp = Experiment()
 
@@ -140,9 +147,8 @@ trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
 inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
-p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos)
+p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos[0][0])
 ############################ BRAIN ############################
-
 brain = Brain()
 
 # Number of neurons (for each subpopulation positive/negative)
@@ -177,7 +183,15 @@ nlocal  = N*2*njt  # Number of neurons taken care of by this MPI rank
 
 # Creation of MUSIC ports
 # The MUSIC setup object is used to configure the simulation
-setup   = music.Setup()
+rank = MPI.COMM_WORLD.Get_rank()
+# Before creating the Setup object
+print('prima')
+#MPI.COMM_WORLD.Barrier()
+print('dopo')
+print('rank: ', rank)
+if rank == 0:  # Only the root rank creates the Setup
+    setup = music.Setup()
+
 indata  = setup.publishEventInput("mot_cmd_in")
 
 outdata = setup.publishEventOutput("fbk_out")
