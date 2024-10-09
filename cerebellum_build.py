@@ -34,6 +34,7 @@ class Cerebellum:
         print("init cerebellum")
         # Reconfigure scaffold
         adapter = NestAdapter()
+        print("adapter")
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
         self.suffix = suffix
@@ -41,7 +42,9 @@ class Cerebellum:
 
         # Create scaffold_model from HDF5
         self.forward_model = from_storage(filename_h5)
+        print("model 1 created")
         self.inverse_model = from_storage(filename_h5)
+        print('models created')
         simulation_name = "basal_activity"
         simulation_forw = self.forward_model.get_simulation(simulation_name)
         simulation_inv = self.inverse_model.get_simulation(simulation_name)
@@ -61,8 +64,11 @@ class Cerebellum:
 
         simulation_forw_duration = simulation_forw.duration 
         simulation_inv_duration = simulation_inv.duration 
-        print('sim1, ', simulation_forw_duration)
-        print('sim2, ', simulation_inv_duration)
+        
+        simulation_forw_resolution = simulation_forw.resolution
+        simulation_inv_resolution = simulation_inv.resolution 
+        print('duration, ', simulation_forw_duration)
+        print('resolution, ', simulation_inv_duration)
         adapter.create_neurons(simulation_forw)
         adapter.create_neurons(simulation_inv)
         

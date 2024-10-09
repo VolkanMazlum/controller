@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import nest
+#import nest
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
 import music
@@ -95,8 +95,8 @@ bullet = BulletArm1Dof()
 # bullet.InitPybullet()
 
 import pybullet as p
-#bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
-bullet.InitPybullet(bullet_connect=p.DIRECT)
+bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+#bullet.InitPybullet(bullet_connect=p.DIRECT)
 bullet_robot = bullet.LoadRobot()
 
 
@@ -193,9 +193,9 @@ if rank == 0:  # Only the root rank creates the Setup
     setup = music.Setup()
 
 indata  = setup.publishEventInput("mot_cmd_in")
-
+print('published indata')
 outdata = setup.publishEventOutput("fbk_out")
-
+print('published outdata')
 #NOTE: The actual neuron IDs from the sender side are LOST!!!
 # By knowing how many joints and neurons, one should be able to retreive the
 # function of each neuron population.
@@ -244,7 +244,7 @@ for i in range(njt):
     tmp    = SensoryNeuron(N, pos=False, idStart=idSt_n, bas_rate=sensNeur_baseRate, kp=sensNeur_gain)
     tmp.connect(outdata)   # Connect to output port
     sn_n.append(tmp)
-
+print('created sensory neurons')
 
 ######################## SETUP ARRAYS ################################
 
@@ -275,7 +275,7 @@ inputCmd     = np.zeros([n_time,njt]) # Input commands (from motor commands)
 #perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
 inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
-
+print('computed motor commands')
 
 ######################## RUNTIME ##########################
 #names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
@@ -293,7 +293,13 @@ def computeRate(spikes, w, nNeurons, timeSt, timeEnd):
 
 
 # Start the runtime phase
+print('runtime about to be generated')
 runtime = music.Runtime(setup, res)
+'''
+if rank == 0:  # Only the root rank creates the Setup
+    runtime = music.Runtime(setup, res)
+'''
+print('runtime generated')
 step    = 0 # simulation step
 errors = []
 tickt = runtime.time()
@@ -305,7 +311,7 @@ while tickt < exp_duration:
         add_entry(exp)
         save = False
     '''
-
+    print('start bullet simulation')	
     # Get bullet joint states
     bullet_robot.UpdateStats()
 

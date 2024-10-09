@@ -4,7 +4,7 @@ import numpy as np
 import time
 import sys
 import os
-import music
+#import music
 import matplotlib.pyplot as plt
 
 # Just to get the following imports right!
@@ -100,6 +100,7 @@ filename_h5 = brain.filename_h5
 filename_config = brain.filename_config
 tags = ['forw','inv']
 cerebellum = Cerebellum(filename_h5, filename_config, True, tags[0])
+print('finished cerebellum')
 #cerebellum_inv = Cerebellum(filename_h5, filename_config, True, tags[1])
 '''
 nest.SetKernelStatus({"resolution": res})
