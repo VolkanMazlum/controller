@@ -206,10 +206,10 @@ class Brain():
         self._cerebellum_controlled_joint = 0
 
         # HDF5 containing cerebellar scaffold
-        self._filename_h5 = "mouse_cereb_dcn_nest.hdf5"
+        self._filename_h5 = "mouse_cereb_dcn_io_microzones_nest.hdf5"
 
         # JSON configuration file
-        self._filename_config = 'dcn_nest.yaml'
+        self._filename_config = 'dcn_microzones_nest.yaml'
 
         # self.initPlanner()        # Initialize planner settings
         self.initMotorCortex()    # Initialize motor cortex settings
