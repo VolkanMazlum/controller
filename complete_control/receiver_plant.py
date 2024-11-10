@@ -66,9 +66,14 @@ sim = Simulation()
 res          = sim.resolution/1e3            # Resolution (translate into seconds)
 timeMax      = sim.timeMax/1e3               # Maximum time (translate into seconds)
 time         = np.arange(0,timeMax+res,res)  # Time vector
-#time_pause   = sim.timePause/1e3
+
 time_pause = 0
 time_wait = sim.timeWait/1e3     # Pause time (translate into seconds)
+#print('time_wait: ', sim.timeWait)
+
+time_wait_vec = np.arange(0,sim.timeWait,sim.resolution)
+steps_wait = len(time_wait_vec)
+#print('len(time_wait_vec):' , len(time_wait_vec))
 n_trial      = sim.n_trials
 time_trial = time_wait + timeMax
 exp_duration = ((timeMax+time_wait)*n_trial)
@@ -451,9 +456,13 @@ if saveFig:
     
 
 # Joint space
+wait_trj = np.ones(len(time_wait_vec)) * trj[steps_wait]
+print(wait_trj)
+wait_trj = np.concatenate((wait_trj, trj[steps_wait:]))
+print(wait_trj)
 plt.figure()
 plt.plot(time_tot,pos_j)
-plt.plot(time_tot,trj,linestyle=':')
+plt.plot(time_tot,wait_trj,linestyle=':')
 plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
 plt.legend(['theta','des'])

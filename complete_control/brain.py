@@ -33,7 +33,7 @@ nest.Install("cerebmodule")
  
 import json
 
-saveFig = True
+saveFig = False
 ScatterPlot = False
 SHOW=False
 nep_flag = False

@@ -30,7 +30,7 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 import json
 from data_handling import collapse_files, add_entry
 
-saveFig = True
+saveFig = False
 ScatterPlot = False
 
 # Opening JSON file to get parameters
