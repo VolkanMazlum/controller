@@ -45,18 +45,18 @@ class Cerebellum:
         if world.Get_rank() != 3:
             group = world.group.Excl([3])
             comm = world.Create_group(group)
-            self.forward_model = from_storage(filename_h5, comm)
-            self.inverse_model = from_storage(filename_h5, comm)
+            self.forward_model = from_storage("mouse_cereb_microzones_nest.hdf5", comm)
+            self.inverse_model = from_storage("mouse_cereb_microzones_nest2.hdf5", comm)
         
         print("model created")
         
         #self.inverse_model = from_storage(filename_h5)
         
-        simulation_name = "mf_cf_stimulus"
+        simulation_name = "basal_activity"
         simulation_forw = self.forward_model.get_simulation(simulation_name)
-        #simulation_inv = self.inverse_model.get_simulation(simulation_name)
+        simulation_inv = self.inverse_model.get_simulation(simulation_name)
         adapter.simdata[simulation_forw] = SimulationData(simulation_forw, result=NestResult(simulation_forw))
-        #adapter.simdata[simulation_inv] = SimulationData(simulation_inv, result=NestResult(simulation_inv))
+        adapter.simdata[simulation_inv] = SimulationData(simulation_inv, result=NestResult(simulation_inv))
         # At some point in BSB this script the kernel is reset, so we need to load the module and set the parameters before the cerebellar nodes are created
         nest.Install("controller_module") 
         nest.SetKernelStatus({"resolution": res})
@@ -64,34 +64,43 @@ class Cerebellum:
         nest.SetKernelStatus({"data_path": pathData})
         
         adapter.load_modules(simulation_forw)
-        #adapter.load_modules(simulation_inv)
+        adapter.load_modules(simulation_inv)
 
         adapter.set_settings(simulation_forw)
-        #adapter.set_settings(simulation_inv)
+        adapter.set_settings(simulation_inv)
 
         simulation_forw_duration = simulation_forw.duration 
-        #simulation_inv_duration = simulation_inv.duration 
+        simulation_inv_duration = simulation_inv.duration 
         
         simulation_forw_resolution = simulation_forw.resolution
-        #simulation_inv_resolution = simulation_inv.resolution 
+        simulation_inv_resolution = simulation_inv.resolution 
         print('duration, ', simulation_forw_duration)
         print('resolution, ', simulation_forw_resolution)
         adapter.create_neurons(simulation_forw)
-        #adapter.create_neurons(simulation_inv)
+        adapter.create_neurons(simulation_inv)
+        print("created neurons")
         
         
         for neuron_model, gids in adapter.simdata[simulation_forw].populations.items():
             print('forward', neuron_model.name, gids)
-        '''
+        
         for neuron_model, gids in adapter.simdata[simulation_inv].populations.items():
             print('inverse', neuron_model.name, gids)
-        '''
         
+        if world.Get_rank() != 3:
+            group = world.group.Excl([3])
+            comm = world.Create_group(group)
+            adapter.connect_neurons(simulation_forw)
+            adapter.connect_neurons(simulation_inv)
+        '''
         adapter.connect_neurons(simulation_forw)
-        #adapter.connect_neurons(simulation_inv)
+        print("neurons connected")
+        
 
         adapter.create_devices(simulation_forw)
-        #adapter.create_devices(simulation_inv)
+        adapter.create_devices(simulation_inv)
+        '''
+        print("neurons connected")
         '''
         for device_model, device_ids in adapter.simdata[simulation_forw].devices.items():
             print(device_model.name, device_ids)
