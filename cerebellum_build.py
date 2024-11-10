@@ -12,10 +12,12 @@ import matplotlib.pyplot as plt
 
 import trajectories as tj
 from population_view import PopView
-import mpi4py
+import music
+from mpi4py import MPI
+
 
 #from bsb.core import from_storage
-from bsb import ConfigurationError, from_storage, SimulationData
+from bsb import options, ConfigurationError, from_storage, SimulationData
 from bsb_nest import NestAdapter
 from bsb_nest.adapter import NestResult
 from settings import Simulation, Experiment
@@ -32,20 +34,29 @@ class Cerebellum:
         # Reconfigure scaffold
         adapter = NestAdapter()
         print("adapter")
+        options.verbosity = 4
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
         self.suffix = suffix
         self.multi = multi
-
-        # Create scaffold_model from HDF5
-        self.forward_model = from_storage(filename_h5)
-        self.inverse_model = from_storage(filename_h5)
+        self.forward_model = None
         
-        simulation_name = "basal_activity"
+        world = MPI.COMM_WORLD
+        if world.Get_rank() != 3:
+            group = world.group.Excl([3])
+            comm = world.Create_group(group)
+            self.forward_model = from_storage(filename_h5, comm)
+            self.inverse_model = from_storage(filename_h5, comm)
+        
+        print("model created")
+        
+        #self.inverse_model = from_storage(filename_h5)
+        
+        simulation_name = "mf_cf_stimulus"
         simulation_forw = self.forward_model.get_simulation(simulation_name)
-        simulation_inv = self.inverse_model.get_simulation(simulation_name)
+        #simulation_inv = self.inverse_model.get_simulation(simulation_name)
         adapter.simdata[simulation_forw] = SimulationData(simulation_forw, result=NestResult(simulation_forw))
-        adapter.simdata[simulation_inv] = SimulationData(simulation_inv, result=NestResult(simulation_inv))
+        #adapter.simdata[simulation_inv] = SimulationData(simulation_inv, result=NestResult(simulation_inv))
         # At some point in BSB this script the kernel is reset, so we need to load the module and set the parameters before the cerebellar nodes are created
         nest.Install("controller_module") 
         nest.SetKernelStatus({"resolution": res})
@@ -53,20 +64,20 @@ class Cerebellum:
         nest.SetKernelStatus({"data_path": pathData})
         
         adapter.load_modules(simulation_forw)
-        adapter.load_modules(simulation_inv)
+        #adapter.load_modules(simulation_inv)
 
         adapter.set_settings(simulation_forw)
-        adapter.set_settings(simulation_inv)
+        #adapter.set_settings(simulation_inv)
 
         simulation_forw_duration = simulation_forw.duration 
-        simulation_inv_duration = simulation_inv.duration 
+        #simulation_inv_duration = simulation_inv.duration 
         
         simulation_forw_resolution = simulation_forw.resolution
-        simulation_inv_resolution = simulation_inv.resolution 
+        #simulation_inv_resolution = simulation_inv.resolution 
         print('duration, ', simulation_forw_duration)
         print('resolution, ', simulation_forw_resolution)
         adapter.create_neurons(simulation_forw)
-        adapter.create_neurons(simulation_inv)
+        #adapter.create_neurons(simulation_inv)
         
         
         for neuron_model, gids in adapter.simdata[simulation_forw].populations.items():
@@ -77,10 +88,10 @@ class Cerebellum:
         '''
         
         adapter.connect_neurons(simulation_forw)
-        adapter.connect_neurons(simulation_inv)
+        #adapter.connect_neurons(simulation_inv)
 
         adapter.create_devices(simulation_forw)
-        adapter.create_devices(simulation_inv)
+        #adapter.create_devices(simulation_inv)
         '''
         for device_model, device_ids in adapter.simdata[simulation_forw].devices.items():
             print(device_model.name, device_ids)
@@ -103,7 +114,7 @@ class Cerebellum:
         # PC
         self.forw_N_PC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "purkinje_cell"][0]
         self.forw_N_PC_minus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "purkinje_cell_minus"][0]
-        
+        '''
         ### INVERSE MODEL
         # Mossy fibers
         self.inv_Nest_Mf = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "mossy_fibers"][0]
@@ -124,7 +135,7 @@ class Cerebellum:
         self.inv_N_PC_minus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "purkinje_cell_minus"][0]
         # Find ids for each cell type
         #self.find_cells()
-
+	'''
     def find_cells(self):
         '''
         if self.multi:

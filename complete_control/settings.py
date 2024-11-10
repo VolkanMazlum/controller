@@ -43,12 +43,12 @@ class Experiment:
         self._tgt_pos  = np.ndarray([1,2])
         
         ### FULL FLEXION (0 -> 90)
-        self._init_pos[:] = [0.31, 0.0]
-        self._tgt_pos[:]  =[0.0,0.31]
+        #self._init_pos[:] = [0.31, 0.0]
+        #self._tgt_pos[:]  =[0.0,0.31]
         
         ### FULL EXTENSION (90 -> 0)
-        #self._init_pos[:] = [0.0,0.31]
-        #self._tgt_pos[:]  =[0.31,0.0]
+        self._init_pos[:] = [0.0,0.31]
+        self._tgt_pos[:]  =[0.31,0.0]
         
         ### LOWER HALF FLEXION (0 -> 45)
         #self._init_pos[:] = [0.31, 0.0]
@@ -209,7 +209,7 @@ class Brain():
         self._filename_h5 = "mouse_cereb_dcn_io_microzones_nest.hdf5"
 
         # JSON configuration file
-        self._filename_config = 'dcn_microzones_nest.yaml'
+        self._filename_config = 'dcn_io_microzones_nest.yaml'
 
         # self.initPlanner()        # Initialize planner settings
         self.initMotorCortex()    # Initialize motor cortex settings

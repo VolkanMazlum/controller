@@ -20,7 +20,7 @@ from settings import Experiment, Simulation, Brain, MusicCfg
 import mpi4py
 import random
 from data_handling import collapse_files, add_entry
-
+import music
 #from plotting import plot_activity, plot_activity_pos_neg
 
 import ctypes
@@ -169,8 +169,8 @@ prediction_n.append(PopView(tmp_n,total_time_vect, to_file=True, label="pred_n")
 
 nest.Connect(cerebellum.forw_N_DCNi, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
 nest.Connect(cerebellum.forw_N_DCNp, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
-nest.Connect(cerebellum.forw_N_DCNi, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
-nest.Connect(cerebellum.forw_N_DCNp, prediction_p[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum.forw_N_DCNi, prediction_n[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
+nest.Connect(cerebellum.forw_N_DCNp, prediction_n[cereb_controlled_joint].pop, 'all_to_all', syn_spec={"weight": -conn_params["dcn_forw_prediction"]["weight"], "delay": conn_params["dcn_forw_prediction"]["delay"]})
 
 
 wgt_fbk_sm_state = params["connections"]["fbk_smoothed_state"]["weight"]

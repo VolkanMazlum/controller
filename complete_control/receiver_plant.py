@@ -18,24 +18,13 @@ from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
 #from util import plotPopulation
 
 import trajectories as tj
-#import perturbation as pt
+
 
 import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+
 from mpi4py import MPI
 
-
-import json
-print('qui')
-if 'setup' in globals():
-    print('entrato')
-    print("Setup already exists. Reusing the existing setup.")
-else:
-    print('entrato qui')
-    setup = music.Setup()
-    globals()['setup'] = setup  # Store setup globally
-
-exp = Experiment()
 
 #param_file = exp.param_file
 saveFig = True
@@ -114,6 +103,7 @@ z = upperarm[2] -rho*np.cos(1.57)
 y = upperarm[0] +rho*np.sin(1.57)
 _tgt_pos  = [y,z]
 ##################### EXPERIMENT #####################
+exp = Experiment()
 pathFig =exp.pathFig
 # pathFig = params["path"]
 pthDat = exp.pathData + "bullet/"
@@ -183,14 +173,10 @@ nlocal  = N*2*njt  # Number of neurons taken care of by this MPI rank
 
 # Creation of MUSIC ports
 # The MUSIC setup object is used to configure the simulation
-rank = MPI.COMM_WORLD.Get_rank()
-# Before creating the Setup object
-print('prima')
-#MPI.COMM_WORLD.Barrier()
-print('dopo')
-print('rank: ', rank)
-if rank == 0:  # Only the root rank creates the Setup
-    setup = music.Setup()
+
+
+#if MPI.COMM_WORLD.Get_rank() == 0:  # Only the root rank creates the Setup
+setup = music.Setup()
 
 indata  = setup.publishEventInput("mot_cmd_in")
 print('published indata')
