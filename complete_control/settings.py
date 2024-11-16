@@ -47,8 +47,8 @@ class Experiment:
         #self._tgt_pos[:]  =[0.0,0.31]
         
         ### FULL EXTENSION (90 -> 0)
-        self._init_pos[:] = [0.0,0.31]
-        self._tgt_pos[:]  =[0.31,0.0]
+        #self._init_pos[:] = [0.0,0.31]
+        #self._tgt_pos[:]  =[0.31,0.0]
         
         ### LOWER HALF FLEXION (0 -> 45)
         #self._init_pos[:] = [0.31, 0.0]
@@ -63,8 +63,8 @@ class Experiment:
         #self._tgt_pos[:] = [0.31, 0.0]
 
         ### UPPER HALF EXTENSION (90 -> 45)
-        #self._init_pos[:] = [0.0,0.31]
-        #self._tgt_pos[:]  =[0.219,0.219]
+        self._init_pos[:] = [0.0,0.31]
+        self._tgt_pos[:]  =[0.219,0.219]
         
 
         # self._init_pos[:] = [-0.00155569,1.16870009]
@@ -94,7 +94,7 @@ class Experiment:
 
         self._cerebellum_application_inv = 1e6
 
-        self.names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
+        self.names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n", "forw_mf_plus", "forw_mf_minus", "forw_dcnp+", "forw_dcnp-", "forw_io+", "forw_io-", "inv_mf_plus", "inv_mf_minus", "inv_dcnp+", "inv_dcnp-", "inv_io+", "inv_io-", "feedback_p", "feedback_n", "motor_commands_p", "motor_commands_n", "error_p", "error_n", "plan_to_inv_p", "plan_to_inv_n", "motor_prediction_p", "motor_prediction_n", "feedback_inv_p", "feedback_inv_n", "error_inv_p", "error_inv_n", "forw_pc+", "forw_pc-", "inv_pc+", "inv_pc-", "state_to_inv_p", "state_to_inv_n"]
 
     def remove_files(self):
         for f in os.listdir(self._pathData):
@@ -165,7 +165,7 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 200.0
+        self._timeMax = 500.0
 
         # Pause after movement (milliseconds)
         self._timePause = 0.0
@@ -174,7 +174,7 @@ class Simulation():
         self._n_trials = 1
 
         # Waiting time before movement execution (milliseconds)
-        self.timeWait = 0.0
+        self.timeWait = 150.0
 
 
     @property

@@ -63,6 +63,8 @@ time         = np.arange(0,timeMax+res,res)  # Time vector
 #time_pause   = sim.timePause/1e3
 time_pause = 0
 time_wait = sim.timeWait/1e3     # Pause time (translate into seconds)
+time_wait_vec = np.arange(0,sim.timeWait,sim.resolution)
+steps_wait = len(time_wait_vec)
 n_trial      = sim.n_trials
 time_trial = time_wait + timeMax
 exp_duration = ((timeMax+time_wait)*n_trial)
@@ -84,8 +86,8 @@ bullet = BulletArm1Dof()
 # bullet.InitPybullet()
 
 import pybullet as p
-bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
-#bullet.InitPybullet(bullet_connect=p.DIRECT)
+#bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+bullet.InitPybullet(bullet_connect=p.DIRECT)
 bullet_robot = bullet.LoadRobot()
 
 
@@ -291,13 +293,14 @@ errors = []
 tickt = runtime.time()
 save = False
 while tickt < exp_duration:
+    if not (step%200):
+        print(step)
     '''
     if save:
         collapse_files_bullet(exp.pathData+"nest/", exp.names, njt)
         add_entry(exp)
         save = False
-    '''
-    print('start bullet simulation')	
+    '''	
     # Get bullet joint states
     bullet_robot.UpdateStats()
 
@@ -443,26 +446,34 @@ np.savetxt( pthDat+"inputCmd_tot.csv", inputCmd_tot, delimiter=',' ) # Torques f
 
 
 ########################### PLOTTING ###########################
-lgd = ['theta','des']
+lgd = ['actual','desired']
 plt.figure()
 plt.plot(time_tot,inputCmd)
 #plt.plot(time,inputDes,linestyle=':')
 plt.xlabel("time (s)")
 plt.ylabel("motor commands (N)")
-plt.legend(lgd)
+plt.legend(lgd, fontsize = 16)
 if saveFig:
     plt.savefig(pathFig+cond+"motCmd.png")
     
 
 # Joint space
+from datetime import datetime
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+wait_trj = np.ones(len(time_wait_vec)) * trj[steps_wait]
+print(wait_trj)
+wait_trj = np.concatenate((wait_trj, trj[steps_wait:]))
+print(wait_trj)
 plt.figure()
-plt.plot(time_tot,pos_j)
-plt.plot(time_tot,trj,linestyle=':')
+plt.plot(time_tot,pos_j, linewidth= 3)
+plt.plot(time_tot,wait_trj,linestyle=':', linewidth= 3)
 plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
-plt.legend(['theta','des'])
+plt.legend(['actual','desired'])
+plt.ylim((0.0, 1.6))
 if saveFig:
-    plt.savefig(pathFig+"position_joint.png")
+    #plt.savefig(pathFig+"position_joint.png")
+    plt.savefig(f"{pathFig}position_joint_{timestamp}.png")
     #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
 
 # End-effector space

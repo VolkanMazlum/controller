@@ -72,7 +72,7 @@ def plot_spikes(evs, ts, time_vect, pop=None, title='', ax=None):
 
     ax.scatter(ts, evs, marker='.', s=1)
     ax.set(xlim=(t_init, t_end))
-    ax.set_ylabel(title)
+    ax.set_ylabel(title, fontsize = 15)
     if pop:
         ax.set_ylim([min(pop), max(pop)])
 
@@ -86,6 +86,7 @@ def get_rate(spike_detector, pop, trial_len, n_trials=1):
 
 
 def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, styles, title='',buffer_size=15):
+    print(len(time_v))
     if hasattr(pop_pos, 'total_ts') and hasattr(pop_neg, 'total_ts'):
         #print('c e')
         evs_p = pop_pos.total_evs
@@ -105,28 +106,89 @@ def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, style
     
     
     if not reference:
-        fig, ax = plt.subplots(2,1,sharex=True)
+        fig, ax = plt.subplots(2,1,sharex=True, figsize = (10,6))
         ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
         ax[0].scatter(ts_n, y_n, marker='.', s=1)
-        ax[0].set_ylabel("raster")
-        ax[0].legend()
+        ax[0].set_ylabel("raster", fontsize = 15)
+        ax[0].legend(fontsize = 16)
         pop_pos.plot_rate(time_v, buffer_size, ax=ax[1],color="r")
-        pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], title='PSTH (Hz)')
-        ax[0].set_title(title)
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], color = "b", title='PSTH (Hz)')
+        ax[0].set_title(title, fontsize= 16)
         ax[0].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
     else:
-        fig, ax = plt.subplots(3,1,sharex=True)
+        fig, ax = plt.subplots(3,1,sharex=True, figsize = (10,6))
         for i, signal in enumerate(reference):
             ax[0].plot(time_vecs[i], signal, styles[i],label=legend[i])
-            ax[0].legend()
+            ax[0].legend(fontsize = 16)
+            ax[0].set_ylabel("input (Hz)", fontsize = 15)
         ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
         ax[1].scatter(ts_n, y_n, marker='.', s=1, color='b')
-        ax[1].set_ylabel("raster")
-        rate_p = pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
-        rate_n = pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
+        ax[1].set_ylabel("raster",fontsize = 15)
+        pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
         ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
-        print('rate net: ', rate_p[-1]- rate_n[-1])
+        #print('rate net: ', rate_p[-1]- rate_n[-1])
     subplot_labels = ['A', 'B', 'C']
+    for i, axs in enumerate(ax):
+        axs.text(-0.1, 1.1, subplot_labels[i], transform=axs.transAxes,
+            fontsize=16, fontweight='bold', va='top', ha='right')
+        ax[i].spines['top'].set_visible(False)
+        ax[i].spines['right'].set_visible(False)
+        ax[i].spines['bottom'].set_visible(True)
+        ax[i].spines['left'].set_visible(True)
+
+    return fig, ax
+
+def plotPopulation_diff(time_v, pop_pos, pop_neg, reference_plus, reference_minus, reference_diff, time_vecs, legend, styles, title='',buffer_size=15):
+    print(len(time_v))
+    if hasattr(pop_pos, 'total_ts') and hasattr(pop_neg, 'total_ts'):
+        #print('c e')
+        evs_p = pop_pos.total_evs
+        ts_p = pop_pos.total_ts
+
+        evs_n = pop_neg.total_evs
+        ts_n = pop_neg.total_ts
+
+        y_p = [ev - int(pop_pos.pop[0].get('global_id')) + 1 for ev in evs_p]
+        y_n = [-((ev - int(pop_neg.pop[0].get('global_id'))) + 1) for ev in evs_n]
+    else:
+        evs_p, ts_p = pop_pos.get_events()
+        evs_n, ts_n = pop_neg.get_events()
+        y_p =   evs_p - pop_pos.pop[0] + 1
+        y_n = -(evs_n - pop_neg.pop[0] + 1)
+
+    fig, ax = plt.subplots(3,1,sharex=True, figsize = (10,6))
+    # Rates of the positive and negative subpopulations of the "reference" signal
+    '''
+    ax[0].plot(time_vecs[0], reference_plus[0], styles[0],label=legend[0])
+    ax[0].plot(time_vecs[1], reference_plus[1], styles[1], label =legend[1])
+    ax[0].set_ylabel("input (Hz)", fontsize = 15)
+    ax[0].legend(fontsize = 16)
+
+    # Rates of the positive and negative subpopulations of the "real" signal
+    ax[1].plot(time_vecs[2], reference_minus[0], styles[2],label=legend[2])
+    ax[1].plot(time_vecs[3], reference_minus[1], styles[3], label =legend[3])
+    ax[1].legend(fontsize = 16)
+    ax[1].set_ylabel("input (Hz)", fontsize = 15)
+    '''
+    # Differences 
+    ax[0].plot(time_vecs[4], reference_diff[0], styles[4],label=legend[4])
+    ax[0].plot(time_vecs[5], reference_diff[1], styles[5], label =legend[5])
+    ax[0].plot(time_vecs[5],(reference_diff[0]-reference_diff[1]), styles[6])
+    ax[0].legend(fontsize = 16)
+    ax[0].set_ylabel("input (Hz)", fontsize = 15)
+
+    ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
+    ax[1].scatter(ts_n, y_n, marker='.', s=1, c="b")
+    ax[1].set_ylabel("raster", fontsize = 15)
+    ax[1].legend(fontsize = 16)
+    ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
+    
+    pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
+    pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color = "b")
+
+    #print('rate net: ', rate_p[-1]- rate_n[-1])
+    subplot_labels = ['A', 'B', 'C', 'D', 'E']
     for i, axs in enumerate(ax):
         axs.text(-0.1, 1.1, subplot_labels[i], transform=axs.transAxes,
             fontsize=16, fontweight='bold', va='top', ha='right')
@@ -221,7 +283,7 @@ class PopView:
         else:
             ax.plot(bins[:-1],rate_sm,**kwargs)
         ax.set(xlim=(t_init, t_end))
-        ax.set_ylabel(title)
+        ax.set_ylabel(title, fontsize = 15)
         ax.set_xlabel('Time [ms]')
 
         return rate
@@ -265,7 +327,7 @@ class PopView:
             fig, ax = plt.subplots(1)
 
         ax.plot(self.rates_history)
-        ax.set_ylabel(title)
+        ax.set_ylabel(title, fontsize = 15)
 
         if no_ax:
             plt.show()
