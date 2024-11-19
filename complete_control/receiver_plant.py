@@ -291,6 +291,8 @@ errors = []
 tickt = runtime.time()
 save = False
 while tickt < exp_duration:
+    if not (step%200):
+        print(step)
     '''
     if save:
         collapse_files_bullet(exp.pathData+"nest/", exp.names, njt)
@@ -456,20 +458,23 @@ if saveFig:
     
 
 # Joint space
+from datetime import datetime
+timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 wait_trj = np.ones(len(time_wait_vec)) * trj[steps_wait]
 print(wait_trj)
 wait_trj = np.concatenate((wait_trj, trj[steps_wait:]))
 print(wait_trj)
 plt.figure()
-plt.plot(time_tot,pos_j)
-plt.plot(time_tot,wait_trj,linestyle=':')
+plt.plot(time_tot,pos_j, linewidth= 3)
+plt.plot(time_tot,wait_trj,linestyle=':', linewidth= 3)
 plt.xlabel('time (s)')
 plt.ylabel('angle (rad)')
-plt.legend(['theta','des'])
+plt.legend(['actual','desired'])
+plt.ylim((0.0, 1.6))
 if saveFig:
     #plt.savefig(pathFig+"position_joint.png")
+    plt.savefig(f"{pathFig}position_joint_{timestamp}.png")
     #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_joint.png")
-    plt.savefig(pathFig + f"position_joint_{timestamp}.png")
 
 # End-effector space
 plt.figure()
