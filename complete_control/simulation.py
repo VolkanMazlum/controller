@@ -30,7 +30,7 @@ ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 import json
 from data_handling import collapse_files, add_entry
 
-saveFig = False
+saveFig = True
 ScatterPlot = False
 
 # Opening JSON file to get parameters
@@ -402,7 +402,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     time_vecs=[time_vect_paused]
     for i in range(njt):
             plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], reference, time_vecs,legend, styles, title=lgd[i],buffer_size=15)
-            plt.suptitle("Planner")
+            plt.suptitle("Planner", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/planner_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"planner_"+lgd[i]+".png")
@@ -413,7 +413,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     print('mc ffwd')
     for i in range(njt):
             plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], reference, time_vecs,legend, styles,title=lgd[i],buffer_size=15)
-            plt.suptitle("Mc ffwd")
+            plt.suptitle("Mc ffwd", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_ffwd_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"mc_ffwd_"+lgd[i]+".png")
@@ -425,13 +425,13 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     bins_stEst_n,count_stEst_n,rate_stEst_n = stEst.pops_n[0].computePSTH(time_vect_paused, 15)
 
     print('mc fbk')
-    reference =[rate_p-rate_stEst_p, rate_n - rate_stEst_n]
+    reference =[rate_p-rate_n, rate_stEst_p - rate_stEst_n]
     time_vecs = [bins_p[:-1], bins_n[:-1]]
-    legend = ['diff_p', 'diff_n']
-    styles = ['r--', 'b--']
+    legend = ['net_planner', 'net_state']
+    styles = ['orange', 'lightblue']
     for i in range(njt):
             plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-            plt.suptitle("Mc fbk")
+            plt.suptitle("Mc fbk", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_fbk_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"mc_fbk_"+lgd[i]+".png")
@@ -448,7 +448,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     styles = ['r--', 'b--']
     for i in range(njt):
             plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-            plt.suptitle("Mc out")
+            plt.suptitle("Mc out", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/mc_out_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"mc_out_"+lgd[i]+".png")
@@ -464,7 +464,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     print('brainstem')
     for i in range(njt):
             plotPopulation(time_vect_paused, brain_stem_new_p[i],brain_stem_new_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-            plt.suptitle("Brainstem")
+            plt.suptitle("Brainstem", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/brainstem_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"brainstem_"+lgd[i]+".png")
@@ -478,7 +478,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     print('prova: ', sn_n[i].total_ts)
     for i in range(njt):
             plotPopulation(time_vect_paused, sn_p[i],sn_n[i], reference, time_vecs, legend, styles,buffer_size=15)
-            plt.suptitle("Sensory")
+            plt.suptitle("Sensory", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/sensory_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"sensory_"+lgd[i]+".png")
@@ -489,14 +489,14 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     bins_pred_p,count_pred_p,rate_pred_p = prediction_p[0].computePSTH(time_vect_paused, 15)
     bins_pred_n,count_pred_n,rate_pred_n = prediction_n[0].computePSTH(time_vect_paused, 15)
 
-    reference =[rate_p-rate_n, rate_pred_p - rate_pred_n]
-    time_vecs = [bins_p[:-1], bins_n[:-1]]
-    legend = ['net_sensory', 'net_prediction']
-    styles = ['g--', 'r--']
+    reference =[rate_p-rate_n]
+    time_vecs = [bins_p[:-1]]
+    legend = ['net_sensory']
+    styles = ['g--']
     print('state')
     for i in range(njt):
             plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], reference, time_vecs, legend, styles,title=lgd[i],buffer_size=15)
-            plt.suptitle("State")
+            plt.suptitle("State", fontsize = 20)
             if saveFig:
                 #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/state_"+lgd[i]+".png")
                 #plt.savefig(pathFig+"state_"+lgd[i]+".png")
