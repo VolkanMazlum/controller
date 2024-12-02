@@ -309,12 +309,12 @@ plan_to_inv_n.append(PopView(tmp_n,total_time_vect, to_file=True, label="plan_to
 
 state_to_inv_p = []
 tmp_p = nest.Create("basic_neuron_nestml", N_mossy_inv)
-nest.SetStatus(tmp_p, {"kp": pops_params["state_to_inv"]["kp"], "pos": True, "buffer_size": pops_params["state_to_inv"]["buffer_size"],  "base_rate": pops_params["state_to_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
+nest.SetStatus(tmp_p, {"kp": pops_params["plan_to_inv"]["kp"], "pos": True, "buffer_size": pops_params["plan_to_inv"]["buffer_size"],  "base_rate": pops_params["plan_to_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
 state_to_inv_p.append(PopView(tmp_p,total_time_vect, to_file=True, label="state_to_inv_p"))
 
 state_to_inv_n = []
 tmp_n = nest.Create("basic_neuron_nestml", N_mossy_inv)
-nest.SetStatus(tmp_n, {"kp": pops_params["state_to_inv"]["kp"], "pos": False, "buffer_size": pops_params["state_to_inv"]["buffer_size"], "base_rate": pops_params["state_to_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
+nest.SetStatus(tmp_n, {"kp": pops_params["plan_to_inv"]["kp"], "pos": False, "buffer_size": pops_params["plan_to_inv"]["buffer_size"], "base_rate": pops_params["plan_to_inv"]["base_rate"], "simulation_steps":len(total_time_vect)})
 state_to_inv_n.append(PopView(tmp_n,total_time_vect, to_file=True, label="state_to_inv_n"))
 
 
@@ -471,10 +471,10 @@ nest.Connect(stEst.pops_p[j].pop, error_inv_n[0].pop, "all_to_all", syn_spec={"w
 nest.Connect(stEst.pops_n[j].pop, error_inv_n[0].pop, "all_to_all", syn_spec={"weight": -conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
 nest.Connect(stEst.pops_n[j].pop, error_inv_p[0].pop, "all_to_all", syn_spec={"weight": -conn_params["state_error_inv"]["weight"], "delay": conn_params["state_error_inv"]["delay"]})
 '''
-nest.Connect(state_to_inv_p[j].pop, error_inv_p[0].pop, "all_to_all", syn_spec={"weight": conn_params["state_to_inv_error_inv"]["weight"], "delay": conn_params["state_to_inv_error_inv"]["delay"]})
-nest.Connect(state_to_inv_p[j].pop, error_inv_n[0].pop, "all_to_all", syn_spec={"weight": conn_params["state_to_inv_error_inv"]["weight"], "delay": conn_params["state_to_inv_error_inv"]["delay"]})
-nest.Connect(state_to_inv_n[j].pop, error_inv_n[0].pop, "all_to_all", syn_spec={"weight": -conn_params["state_to_inv_error_inv"]["weight"], "delay": conn_params["state_to_inv_error_inv"]["delay"]})
-nest.Connect(state_to_inv_p[j].pop, error_inv_p[0].pop, "all_to_all", syn_spec={"weight": -conn_params["state_to_inv_error_inv"]["weight"], "delay": conn_params["state_to_inv_error_inv"]["delay"]})
+nest.Connect(state_to_inv_p[j].pop, error_inv_p[0].pop, "all_to_all", syn_spec={"weight": conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
+nest.Connect(state_to_inv_p[j].pop, error_inv_n[0].pop, "all_to_all", syn_spec={"weight": conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
+nest.Connect(state_to_inv_n[j].pop, error_inv_n[0].pop, "all_to_all", syn_spec={"weight": -conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
+nest.Connect(state_to_inv_p[j].pop, error_inv_p[0].pop, "all_to_all", syn_spec={"weight": -conn_params["plan_to_inv_error_inv"]["weight"], "delay": conn_params["plan_to_inv_error_inv"]["delay"]})
 
 #%% MUSIC CONFIG
 
