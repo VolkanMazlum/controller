@@ -86,8 +86,8 @@ bullet = BulletArm1Dof()
 # bullet.InitPybullet()
 
 import pybullet as p
-#bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
-bullet.InitPybullet(bullet_connect=p.DIRECT)
+bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
+#bullet.InitPybullet(bullet_connect=p.DIRECT)
 bullet_robot = bullet.LoadRobot()
 
 

@@ -59,12 +59,12 @@ class Experiment:
         #self._tgt_pos[:]  =[0.0,0.31]
 
         ### LOWER HALF EXTENSION (45 -> 0)
-        #self._init_pos[:]  =[0.219,0.219]
-        #self._tgt_pos[:] = [0.31, 0.0]
+        self._init_pos[:]  =[0.219,0.219]
+        self._tgt_pos[:] = [0.31, 0.0]
 
         ### UPPER HALF EXTENSION (90 -> 45)
-        self._init_pos[:] = [0.0,0.31]
-        self._tgt_pos[:]  =[0.219,0.219]
+        #self._init_pos[:] = [0.0,0.31]
+        #self._tgt_pos[:]  =[0.219,0.219]
         
 
         # self._init_pos[:] = [-0.00155569,1.16870009]
@@ -165,7 +165,7 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 500.0
+        self._timeMax = 300.0
 
         # Pause after movement (milliseconds)
         self._timePause = 0.0
