@@ -5,3 +5,9 @@ __pycache__
 /complete_control/error.txt
 /complete_control/variability_neg.txt
 /complete_control/variability_pos.txt
+**/*.png
+**/*.yaml
+**/*.txt
+**/*.hdf5
+/complete_control/demo_human_col
+/nestml/target
