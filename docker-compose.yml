@@ -1,0 +1,40 @@
+services:
+  simulation:
+    image: simulation:latest
+    build:
+      context: .
+      dockerfile: dockerfiles/singlestage.Dockerfile
+      # The entrypoint script handles the runtime matching regardless.
+      args:
+        USER_UID: ${UID:-1001}
+        USER_GID: ${GID:-1001}
+    # Mounts replicate the 'docker run -v' options
+    volumes:
+      # Named volume for the virtual environment persistence
+      - sim_venv:/sim/venv
+      # Named volume for persistent simulation data (compiled network, trajectory.txt...)
+      - sim_shared_data:/sim/shared_data
+      # Named volume for nest modules (so that user-generated ones are persisted)
+      - nest_module_path:/sim/install/nest/lib/nest/
+      # Bind mount the current host directory (.) into /sim/controller
+      - .:/sim/controller
+    stdin_open: true
+    tty: true
+    environment:
+      TZ: ${TZ:-Europe/Rome}
+    # If you want to run a specific script, use 'docker-compose run simulation python your_script.py'
+    command: bash
+
+volumes:
+  sim_venv:
+  sim_shared_data:
+  nest_module_path:
+
+
+# IMPORTANT: Set host UID/GID in your environment first!
+# export UID=$(id -u)
+# export GID=$(id -g)
+# # Build the image using the compose file definition
+# docker-compose build simulation
+# Add your command at the end if you want something other than 'bash'.
+# docker-compose run --rm simulation
