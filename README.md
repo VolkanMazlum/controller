@@ -1,3 +1,8 @@
+# Controller
+
+This project involves multiple codebases interacting. In an attempt to make the results more reproducible, and to enable HPC simulations, we're creating a containerized setup. You can find more information in [INSTALL.md](INSTALL.md).
+
+
 This branch of the repository features all code needed to run simulations of reaching tasks on a virtual robotic arm driven by a closed-loop cerebellar controller.
 
 The file `complete_control/complete.music` defines the two Python scripts containing the two simulations to be synchronized by MUSIC. In this branch, the NEST simulation is run by `complete_control/brain.py` and the PyBullet simulation by `receiver_plant.py`. The file `./complete_control/complete.music` can be modified to allocate the desired number of slots to both the controller script and the plant one. The simulation can be started by running:
