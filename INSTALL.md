@@ -37,6 +37,10 @@ docker compose build
 ```sh
 docker compose run simulation
 ```
+4. All in one:
+```sh
+docker compose run --build --rm simulation
+```
 
 > [!NOTE]
 > The first run will take longer. Optimize startup time by building the image with the user who will be the runner; the bind mounted `controller/` directory is owned by you.

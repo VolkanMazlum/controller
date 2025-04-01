@@ -113,8 +113,8 @@ RUN chown -R $USERNAME:$USERNAME $VIRTUAL_ENV /home/$USERNAME $SHARED_DATA_DIR $
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
-COPY interactive_start.py /usr/local/bin/run_interactive.py
-RUN chmod +x /usr/local/bin/run_interactive.py
+# COPY scripts/interactive_start.py /usr/local/bin/run_interactive.py
+# RUN chmod +x /usr/local/bin/run_interactive.py
 
 # ENV LD_LIBRARY_PATH="$NEST_MODULE_PATH"
 ENV PYTHONPATH="$CONTROLLER_DIR":"$BULLET_MUSCLE_DIR"
