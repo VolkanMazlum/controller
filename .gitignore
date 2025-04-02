@@ -7,9 +7,10 @@ __pycache__
 /complete_control/variability_pos.txt
 **/*.png
 **/*.yaml
-**/*.txt
+# **/*.txt
 **/*.hdf5
 /complete_control/demo_human_col
 /nestml/target
-
+built_custom_stdp
+logs
 

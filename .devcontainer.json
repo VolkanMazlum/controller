@@ -1,0 +1,22 @@
+{
+    "name": "Develop controller",
+    "dockerComposeFile": [
+        "docker-compose.yml"
+    ],
+    "remoteUser": "simuser",
+    // "remoteUser": "${localEnv:USER}",
+    "workspaceFolder": "/sim/controller",
+    "service": "simulation",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-python.black-formatter",
+                "ms-python.python",
+                "ms-python.debugpy",
+                "ms-python.vscode-pylance",
+                "ms-python.isort",
+                "kennylong.kubernetes-yaml-formatter"
+            ]
+        }
+    }
+}
