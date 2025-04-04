@@ -46,8 +46,9 @@ class Cerebellum:
             print("entrato")
             group = world.group.Excl([3])
             comm = world.Create_group(group)
-            self.forward_model = from_storage("mouse_cereb_microzones_nest.hdf5", comm)
-            self.inverse_model = from_storage("mouse_cereb_microzones_nest2.hdf5", comm)
+            # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
+            self.forward_model = from_storage("../cerebellum/mouse_cereb_microzones_complete_nest.hdf5", comm)
+            self.inverse_model = from_storage("../cerebellum/mouse_cereb_microzones_complete_nest.hdf5", comm)
         
         print("model created")
         
