@@ -24,10 +24,9 @@ git clone <controller_repo_url> controller && cd controller && git checkout comp
 ```sh
 git clone <cerebellum_repo_url> cerebellum cerebellum && cd cerebellum && git checkout feature/plasticity && cd ..
 ```
-2. Create variables for your user id and group id.
+2. Create variables for your user id and group id and save them to an env file (so that you don't need to do this again).
 ```sh
-export UID=$(id -u)
-export GID=$(id -g)
+echo -e "UID=$(id -u)\nGID=$(id -g)" > .env
 ```
 2. Build the container image
 ```sh

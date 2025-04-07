@@ -1,29 +1,25 @@
 #!/bin/bash
 
-# export PYTHONPATH="/sim/nest-install/lib/python3.11/site-packages${PYTHONPATH:+:$PYTHONPATH}"
+# this entrypoint script does NOT include defaults. it expects env vars to be set by the container, 
+# and should error out if they aren't
 
-# Make NEST executables available by prepending their path to PATH.
-# python doesn't actually need it, i already include a .pth file in the site-packages 
+# export PYTHONPATH="/sim/nest-install/lib/python3.11/site-packages${PYTHONPATH:+:$PYTHONPATH}"
 # export PATH="/sim/nest-install:/sim/controller:/sim/bullet_muscle_sim:${PATH}"
 echo "Running setup to ensure permissions of mounted volume match with docker user UID/GID"
 
-alias ls='ls --color=auto'
-alias l='ls -alF --color=auto --group-directories-first --time-style=+"%Y-%m-%d %H:%M:%S"'
-
 export PYTHONPATH="$PYTHONPATH:/sim/controller/cerebellum/"
 
-# Directory mounted from host, whose ownership we need to match
-TARGET_DIR="${CONTROLLER_DIR:-/sim/controller}" # Use env var or default
+# --- Configuration ---
+# Directory mounted from host, whose ownership we need to match primarily
+TARGET_DIR="${CONTROLLER_DIR}"
 # Path to the source code inside container
 CEREBELLUM_PATH_IN_CONTAINER="${TARGET_DIR}/cerebellum" # Assumes cerebellum is inside controller mount
-SHARED_DATA_DIR_IN_CONTAINER="${SHARED_DATA_DIR:-/sim/shared_data}"
-
+SHARED_DATA_DIR_IN_CONTAINER="${SHARED_DATA_DIR}"
 # User details in the container
-USERNAME="${USERNAME:-simuser}"
-DEFAULT_UID=1001
-DEFAULT_GID=1001
+USERNAME="${USERNAME}"
 # Venv details
-VENV_PATH="${VIRTUAL_ENV:-/sim/venv}"
+VENV_PATH="${VIRTUAL_ENV}"
+NEST_MODULE_PATH="${NEST_MODULE_PATH}"
 
 PYTHON_MAJOR_MINOR=$(python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
 SITE_PACKAGES_PATH="$VENV_PATH/lib/${PYTHON_MAJOR_MINOR}/site-packages"
@@ -64,7 +60,6 @@ if [ "$CURRENT_UID" != "$DIR_UID" ] || [ "$CURRENT_GID" != "$DIR_GID" ]; then
                  # If target GID exists but belongs to another group, modify our user's group GID
                  groupmod -o -g "$DIR_GID" "$USERNAME"
              fi
-        # else: GID exists and belongs to our user already, no group change needed
         fi
     fi
 
