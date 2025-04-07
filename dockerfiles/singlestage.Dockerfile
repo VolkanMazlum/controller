@@ -96,9 +96,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 RUN echo ${NEST_INSTALL_DIR}/lib/python3.10/site-packages >> ${VIRTUAL_ENV}/lib/python3.10/site-packages/nest.pth
 
-# allows override but mostly handles runtime matching
-ARG USER_UID=1001
-ARG USER_GID=1001
+# no default: this must be handled by builder
+ARG USER_UID
+ARG USER_GID
 ENV USERNAME=simuser
 RUN groupadd --gid $USER_GID $USERNAME && \
     useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME
@@ -108,6 +108,7 @@ ENV SHARED_DATA_DIR=/sim/shared_data
 ENV NEST_MODULE_PATH=/sim/install/nest/lib/nest/
 RUN mkdir -p $CONTROLLER_DIR $SHARED_DATA_DIR $NEST_MODULE_PATH
 
+RUN echo "Setting ownership of shared folders to: >>>>>>>>>>>>>>>>>>> userid:$USER_UID groupid:$USER_GID >>>>>>>>>>>>>>>>>>>"
 RUN chown -R $USERNAME:$USERNAME $VIRTUAL_ENV /home/$USERNAME $SHARED_DATA_DIR $NEST_MODULE_PATH
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
@@ -115,6 +116,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # COPY scripts/interactive_start.py /usr/local/bin/run_interactive.py
 # RUN chmod +x /usr/local/bin/run_interactive.py
+
+COPY scripts/aliases.sh /tmp/aliases.sh
+RUN cat /tmp/aliases.sh >> /etc/bash.bashrc && rm /tmp/aliases.sh
 
 # ENV LD_LIBRARY_PATH="$NEST_MODULE_PATH"
 ENV PYTHONPATH="$CONTROLLER_DIR":"$BULLET_MUSCLE_DIR"
