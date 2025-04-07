@@ -6,8 +6,9 @@ services:
       dockerfile: dockerfiles/singlestage.Dockerfile
       # The entrypoint script handles the runtime matching regardless.
       args:
-        USER_UID: ${UID:-1001}
-        USER_GID: ${GID:-1001}
+        # expect there to be either a .env or suitable env vars
+        USER_UID: ${UID}
+        USER_GID: ${GID}
     volumes:
       # Named volume for the virtual environment persistence
       - sim_venv:/sim/venv

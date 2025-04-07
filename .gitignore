@@ -13,4 +13,5 @@ __pycache__
 /nestml/target
 built_custom_stdp
 logs
+.env
 
