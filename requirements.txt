@@ -1,11 +1,6 @@
-# note: pinned versions are to ensure reproducibility, but are
-# not law. Feel free to update these versions provided you test
-# your changes.
-
 # manually copied from cerebellum deps (cerebellum/pyproject.toml):
-# because i can't include cerebellum in the docker build
+# because can't include cerebellum in the docker build
 # (installing it as pip install -e => not available until volume is mounted at runtime)
-# i don't want to pay its installation cost everytime
 bsb-core[parallel]~=4.5.5
 bsb-hdf5~=4.1.1
 bsb-yaml~=4.2.1
@@ -14,18 +9,11 @@ bsb-neuron~=4.2.1
 bsb-nest~=4.3.1
 nestml~=7.0
 # extras
+# README: if you're editing this file, run `docker compose down -v` to remove all containers
+# read INSTALL.md for more info
 pandas~=2.2.3
 scipy~=1.15.2
 numpy~=1.26.4
 plotly~=6.0.1
 matplotlib~=3.9
-# nestml==8.0.0
-# matplotlib==3.10.1
-# pandas==2.2.3
-# scipy==1.15.2
-# numpy==1.26.4
-# plotly==6.0.1
-# bsb==4.4.2
-# bsb[nest,parallel]
-# is this caching?
-# this is a test
+pybullet==3.2.7

@@ -86,8 +86,8 @@ run_as_user() {
   local shared_data_dir="$SHARED_DATA_DIR_IN_CONTAINER"
 
   echo "Running as user: $(id)"
-  echo "Checking for cerebellum at: $cerebellum_path"
-  echo "Checking site-packages at: $site_packages"
+  echo "Checking for cerebellum source at: $cerebellum_path"
+  echo "Checking site-packages for cerebellum install at: $site_packages"
 
   # CRITICAL CHECK: Ensure the cerebellum source directory exists inside the container mount
   if [ ! -d "$cerebellum_path" ]; then
@@ -95,6 +95,10 @@ run_as_user() {
       echo "Editable install cannot proceed. Ensure it's correctly mounted/placed within $TARGET_DIR." >&2
       exit 1
   fi
+  # Make sure our environment is exactly as we expect it to be
+  echo "Installing requirements specified in $requirements_path..."
+  # to avoid excessive output pip runs in quiet mode!
+  "$venv_path/bin/pip" install --no-cache-dir -qr "$requirements_path"
 
   # check if cerebellum already installed
   local pth_file
