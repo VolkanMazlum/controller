@@ -122,6 +122,8 @@ RUN cat /tmp/aliases.sh >> /etc/bash.bashrc && rm /tmp/aliases.sh
 
 # ENV LD_LIBRARY_PATH="$NEST_MODULE_PATH"
 ENV PYTHONPATH="$CONTROLLER_DIR":"$BULLET_MUSCLE_DIR"
+# music
+ENV PATH="$PATH:$INSTALL_DIR/bin"
 
 WORKDIR /sim
 
