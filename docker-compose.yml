@@ -29,10 +29,3 @@ volumes:
   sim_venv:
   sim_shared_data:
   nest_module_path:
-
-
-# IMPORTANT: Set host UID/GID in your environment first!
-# export UID=$(id -u)
-# export GID=$(id -g)
-# docker-compose build simulation
-# docker-compose run --rm simulation

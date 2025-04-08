@@ -12,12 +12,9 @@ export PYTHONPATH="$PYTHONPATH:/sim/controller/cerebellum/"
 # --- Configuration ---
 # Directory mounted from host, whose ownership we need to match primarily
 TARGET_DIR="${CONTROLLER_DIR}"
-# Path to the source code inside container
-CEREBELLUM_PATH_IN_CONTAINER="${TARGET_DIR}/cerebellum" # Assumes cerebellum is inside controller mount
-SHARED_DATA_DIR_IN_CONTAINER="${SHARED_DATA_DIR}"
-# User details in the container
+CEREBELLUM_PATH="${TARGET_DIR}/cerebellum" # Assumes cerebellum is inside controller mount
+SHARED_DATA_DIR="${SHARED_DATA_DIR}"
 USERNAME="${USERNAME}"
-# Venv details
 VENV_PATH="${VIRTUAL_ENV}"
 NEST_MODULE_PATH="${NEST_MODULE_PATH}"
 
@@ -69,7 +66,7 @@ if [ "$CURRENT_UID" != "$DIR_UID" ] || [ "$CURRENT_GID" != "$DIR_GID" ]; then
 
     # Adjust ownership of internal directories needed by the user
     echo "Adjusting ownership of internal directories ($VENV_PATH, /home/$USERNAME)..."
-    chown -R "$DIR_UID:$DIR_GID" "$VENV_PATH" "/home/$USERNAME" "$SHARED_DATA_DIR_IN_CONTAINER" "$NEST_MODULE_PATH"
+    chown -R "$DIR_UID:$DIR_GID" "$VENV_PATH" "/home/$USERNAME" "$SHARED_DATA_DIR" "$NEST_MODULE_PATH"
 
     echo "$USERNAME user adjusted to UID: $DIR_UID, GID: $DIR_GID"
 else
@@ -80,16 +77,17 @@ fi
 # --- Editable Install Logic (runs AS the target user) ---
 run_as_user() {
   # Variables needed inside this function (re-declared for clarity, but inherited via export)
-  local cerebellum_path="$CEREBELLUM_PATH_IN_CONTAINER"
+  local cerebellum_path="$CEREBELLUM_PATH"
   local site_packages="$SITE_PACKAGES_PATH"
   local venv_path="$VENV_PATH"
-  local shared_data_dir="$SHARED_DATA_DIR_IN_CONTAINER"
+  local shared_data_dir="$SHARED_DATA_DIR"
+  local requirements_path="${CONTROLLER_DIR}/requirements.txt"
 
   echo "Running as user: $(id)"
   echo "Checking for cerebellum source at: $cerebellum_path"
   echo "Checking site-packages for cerebellum install at: $site_packages"
 
-  # CRITICAL CHECK: Ensure the cerebellum source directory exists inside the container mount
+  # Ensure the cerebellum source directory exists inside the container mount
   if [ ! -d "$cerebellum_path" ]; then
       echo "Error: Cerebellum source directory not found at '$cerebellum_path'." >&2
       echo "Editable install cannot proceed. Ensure it's correctly mounted/placed within $TARGET_DIR." >&2
@@ -122,7 +120,7 @@ run_as_user() {
 
 # --- Execution ---
 # Export variables needed by the run_as_user function in the gosu subshell
-export CEREBELLUM_PATH_IN_CONTAINER VENV_PATH SITE_PACKAGES_PATH TARGET_DIR SHARED_DATA_DIR_IN_CONTAINER
+export CEREBELLUM_PATH VENV_PATH SITE_PACKAGES_PATH TARGET_DIR SHARED_DATA_DIR
 
 # Export the function so the subshell run by gosu can find it
 export -f run_as_user

@@ -90,6 +90,7 @@ RUN git clone https://github.com/UM-Projects-MZ/bullet_muscle_sim.git $BULLET_MU
     && cd $SDF_MODELS_DIR \
     && git checkout 226eba6989616c1505bbdf8c7dc8b93505aeeb0a
 
+WORKDIR ${DEPS_DIR}
 COPY requirements.txt . 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
