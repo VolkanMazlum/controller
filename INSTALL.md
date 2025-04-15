@@ -26,7 +26,7 @@ git clone <cerebellum_repo_url> cerebellum cerebellum && cd cerebellum && git ch
 ```
 2. Create variables for your user id and group id and save them to an env file (so that you don't need to do this again).
 ```sh
-echo -e "UID=$(id -u)\nGID=$(id -g)" > .env
+echo -e "UID=$(id -u)\nGID=$(id -g)\nVNC_PASSWORD=somepassword" > .env
 ```
 2. Build the container image
 ```sh

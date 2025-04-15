@@ -1,0 +1,13 @@
+#!/bin/sh
+
+# Unset session manager and dbus environment variables (often helps prevent issues)
+unset SESSION_MANAGER
+unset DBUS_SESSION_BUS_ADDRESS
+
+
+# Start a terminal emulator in the background to show everything works
+xterm -geometry 100x30 &
+
+echo "Executing fluxbox in foreground to keep session alive..."
+exec fluxbox
+# launch application manually from bash for now

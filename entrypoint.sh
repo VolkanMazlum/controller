@@ -3,11 +3,7 @@
 # this entrypoint script does NOT include defaults. it expects env vars to be set by the container, 
 # and should error out if they aren't
 
-# export PYTHONPATH="/sim/nest-install/lib/python3.11/site-packages${PYTHONPATH:+:$PYTHONPATH}"
-# export PATH="/sim/nest-install:/sim/controller:/sim/bullet_muscle_sim:${PATH}"
-echo "Running setup to ensure permissions of mounted volume match with docker user UID/GID"
-
-export PYTHONPATH="$PYTHONPATH:/sim/controller/cerebellum/"
+echo "Running entrypoint..."
 
 # --- Configuration ---
 # Directory mounted from host, whose ownership we need to match primarily
@@ -73,61 +69,37 @@ else
     echo "$USERNAME UID/GID ($CURRENT_UID/$CURRENT_GID) matches target ($DIR_UID/$DIR_GID). No changes needed."
 fi
 
+# --- Prerequisite Scripts ---
+# Run the editable install script
+echo "Running python dependencies script as user '$USERNAME'..."
+export VIRTUAL_ENV CONTROLLER_DIR USERNAME BULLET_MUSCLE_DIR
+gosu "$USERNAME" /usr/local/bin/prepare_python_env.sh
 
-# --- Editable Install Logic (runs AS the target user) ---
-run_as_user() {
-  # Variables needed inside this function (re-declared for clarity, but inherited via export)
-  local cerebellum_path="$CEREBELLUM_PATH"
-  local site_packages="$SITE_PACKAGES_PATH"
-  local venv_path="$VENV_PATH"
-  local shared_data_dir="$SHARED_DATA_DIR"
-  local requirements_path="${CONTROLLER_DIR}/requirements.txt"
 
-  echo "Running as user: $(id)"
-  echo "Checking for cerebellum source at: $cerebellum_path"
-  echo "Checking site-packages for cerebellum install at: $site_packages"
+# Start VNC in the background AS THE USER first using the dedicated script.
+echo "Entrypoint: Launching VNC background process via gosu..."
+# Export variables needed by the background script
+export VNC_DISPLAY VNC_PASSWORD HOME=/home/$USERNAME
+gosu "$USERNAME" /usr/local/bin/start-vnc.sh
 
-  # Ensure the cerebellum source directory exists inside the container mount
-  if [ ! -d "$cerebellum_path" ]; then
-      echo "Error: Cerebellum source directory not found at '$cerebellum_path'." >&2
-      echo "Editable install cannot proceed. Ensure it's correctly mounted/placed within $TARGET_DIR." >&2
-      exit 1
-  fi
-  # Make sure our environment is exactly as we expect it to be
-  echo "Installing requirements specified in $requirements_path..."
-  # to avoid excessive output pip runs in quiet mode!
-  "$venv_path/bin/pip" install --no-cache-dir -qr "$requirements_path"
+echo "Entrypoint: Executing custom command as user '$USERNAME': $@"
 
-  # check if cerebellum already installed
-  local pth_file
-  pth_file=$(find "$site_packages" -maxdepth 1 -name 'cerebellum*' -print -quit)
+echo "----------------------------------------"
+echo "Switching to user $USERNAME (UID: $DIR_UID, GID: $DIR_GID) and executing command: $@"
+echo "----------------------------------------"
 
-  if [ -z "$pth_file" ]; then
-    echo "Editable package link for cerebellum not found in $site_packages. Installing..."
-    # Use the venv pip directly. --no-cache-dir avoids potential cache permission issues.
-    "$venv_path/bin/pip" install --no-cache-dir -e "$cerebellum_path"
-    echo "Editable install of cerebellum complete."
-  else
-    echo "Editable package link for cerebellum found ($pth_file). Skipping install."
-  fi
+# --- Set Environment Variables for Final Command ---
+# Ensure these are set *before* gosu executes the final command
+# so they are inherited by the user's environment.
+# Note: CEREBELLUM_PATH is defined earlier in this script
 
-  # Execute the main container command passed via docker run or CMD
-  echo "----------------------------------------"
-  echo "Executing command as $(id -u -n): $@"
-  echo "----------------------------------------"
-  exec "$@"
-}
+# export PYTHONPATH="/sim/install/nest/lib/python3.10/site-packages${PYTHONPATH:+:$PYTHONPATH}"
 
-# --- Execution ---
-# Export variables needed by the run_as_user function in the gosu subshell
-export CEREBELLUM_PATH VENV_PATH SITE_PACKAGES_PATH TARGET_DIR SHARED_DATA_DIR
+echo "Final LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
+echo "Final PATH: $PATH"
+echo "Final PYTHONPATH: $PYTHONPATH"
 
-# Export the function so the subshell run by gosu can find it
-export -f run_as_user
-
-# Use gosu to drop root privileges and switch to the (potentially modified) USERNAME
-# Execute the run_as_user function defined above, passing along any arguments ($@)
-
-exec gosu "$USERNAME" bash -c 'run_as_user "$@"' bash "$@"
+exec gosu "$USERNAME" "$@"
+# exec gosu "$USERNAME" bash -c 'run_as_user "$@"' bash "$@"
 # python controller/complete_control/brain.py
 # bash --rcfile <(python controller/complete_control/brain.py)
