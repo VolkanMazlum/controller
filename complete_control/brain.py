@@ -108,6 +108,7 @@ N_mossy_inv = int(len(cerebellum.inv_Nest_Mf)/2)
 print(N_mossy_inv)
 
 # Make "external" cerebellar populations into PopView objects
+"""
 forw_Nest_Mf_plus= []
 forw_Nest_Mf_plus.append( PopView(cerebellum.forw_Nest_Mf[-N_mossy_forw:], total_time_vect, to_file=True, label="forw_mf_plus") )
 forw_Nest_Mf_minus= []
@@ -141,6 +142,62 @@ inv_PC_plus = []
 inv_PC_plus.append(PopView(cerebellum.inv_N_PC, total_time_vect, to_file=True, label="inv_pc+") )
 inv_PC_minus = []
 inv_PC_minus.append(PopView(cerebellum.inv_N_PC_minus, total_time_vect, to_file=True, label="inv_pc-") )
+"""
+forw_Nest_Mf_plus= []
+forw_Nest_Mf_plus.append( PopView(cerebellum.forw_Nest_Mf[-N_mossy_forw:], total_time_vect, to_file=True, label="forw_mf_plus") )
+forw_Nest_Mf_minus= []
+forw_Nest_Mf_minus.append( PopView(cerebellum.forw_Nest_Mf[0:N_mossy_forw], total_time_vect, to_file=True, label="forw_mf_minus") )
+forw_DCNp_plus = []
+forw_DCNp_plus.append( PopView(cerebellum.forw_N_DCNp_plus, total_time_vect, to_file=True, label="forw_dcnp+") )
+forw_DCNp_minus = []
+forw_DCNp_minus.append( PopView(cerebellum.forw_N_DCNp_minus, total_time_vect, to_file=True, label="forw_dcnp-") )
+forw_IO_plus = []
+forw_IO_plus.append( PopView(cerebellum.forw_N_IO_plus, total_time_vect, to_file=True, label="forw_io+") )
+forw_IO_minus = []
+forw_IO_minus.append( PopView(cerebellum.forw_N_IO_minus, total_time_vect, to_file=True, label="forw_io-") )
+forw_PC_plus = []
+forw_PC_plus.append(PopView(cerebellum.forw_N_PC, total_time_vect, to_file=True, label="forw_pc+") )
+forw_PC_minus = []
+forw_PC_minus.append(PopView(cerebellum.forw_N_PC_minus, total_time_vect, to_file=True, label="forw_pc-") )
+forw_Glom = []
+forw_Glom.append(PopView(cerebellum.forw_N_Glom, total_time_vect, to_file=True, label="forw_glom") )
+forw_GrC = []
+forw_GrC.append(PopView(cerebellum.forw_N_GrC, total_time_vect, to_file=True, label="forw_grc") )
+forw_GoC = []
+forw_GoC.append(PopView(cerebellum.forw_N_GoC, total_time_vect, to_file=True, label="forw_goc") )
+forw_BC = []
+forw_BC.append(PopView(cerebellum.forw_N_BC, total_time_vect, to_file=True, label="forw_bc") )
+forw_SC = []
+forw_SC.append(PopView(cerebellum.forw_N_SC, total_time_vect, to_file=True, label="forw_sc") )
+
+inv_Nest_Mf_plus= []
+inv_Nest_Mf_plus.append( PopView(cerebellum.inv_Nest_Mf[-N_mossy_inv:], total_time_vect, to_file=True, label="inv_mf_plus") )
+inv_Nest_Mf_minus= []
+inv_Nest_Mf_minus.append( PopView(cerebellum.inv_Nest_Mf[0:N_mossy_inv], total_time_vect, to_file=True, label="inv_mf_minus") )
+inv_DCNp_plus = []
+inv_DCNp_plus.append( PopView(cerebellum.inv_N_DCNp_plus, total_time_vect, to_file=True, label="inv_dcnp+") )
+inv_DCNp_minus = []
+inv_DCNp_minus.append( PopView(cerebellum.inv_N_DCNp_minus, total_time_vect, to_file=True, label="inv_dcnp-") )
+inv_IO_plus = []
+inv_IO_plus.append( PopView(cerebellum.inv_N_IO_plus, total_time_vect, to_file=True, label="inv_io+") )
+inv_IO_minus = []
+inv_IO_minus.append( PopView(cerebellum.inv_N_IO_minus, total_time_vect, to_file=True, label="inv_io-") )
+inv_PC_plus = []
+inv_PC_plus.append(PopView(cerebellum.inv_N_PC, total_time_vect, to_file=True, label="inv_pc+") )
+inv_PC_minus = []
+inv_PC_minus.append(PopView(cerebellum.inv_N_PC_minus, total_time_vect, to_file=True, label="inv_pc-") )
+inv_Glom = []
+inv_Glom.append(PopView(cerebellum.inv_N_Glom, total_time_vect, to_file=True, label="inv_glom") )
+inv_GrC = []
+inv_GrC.append(PopView(cerebellum.inv_N_GrC, total_time_vect, to_file=True, label="inv_grc") )
+inv_GoC = []
+inv_GoC.append(PopView(cerebellum.inv_N_GoC, total_time_vect, to_file=True, label="inv_goc") )
+inv_BC = []
+inv_BC.append(PopView(cerebellum.inv_N_BC, total_time_vect, to_file=True, label="inv_bc") )
+inv_SC = []
+inv_SC.append(PopView(cerebellum.inv_N_SC, total_time_vect, to_file=True, label="inv_sc") )
+
+
 
 #### Planner
 print("init planner")

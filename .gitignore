@@ -6,7 +6,7 @@ __pycache__
 /complete_control/variability_neg.txt
 /complete_control/variability_pos.txt
 **/*.png
-**/*.yaml
+# **/*.yaml
 # **/*.txt
 **/*.hdf5
 /complete_control/demo_human_col

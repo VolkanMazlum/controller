@@ -1,0 +1,25 @@
+name: Purkinje modified
+simulations:
+  basal_activity:
+    cell_models:
+      purkinje_cell_plus:
+        constants:
+          # here I modify some parameters of the purkinje cell (everything else remain the same)
+          lambda_0: 5
+          tau_V: 3.5
+          I_e: 700
+$import:
+  ref: ./microzones_complete_nest.yaml#/
+  values:
+  - packages
+  - storage
+  - network
+  - regions
+  - partitions
+  - morphologies
+  - cell_types
+  - placement
+  - connectivity
+  # - after_connectivity
+  - simulations
+  # - components

@@ -6,6 +6,8 @@ __credits__ = ["Massimo Grillo"]
 __license__ = "GPL"
 __version__ = "1.0.1"
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import music
 import nest
@@ -15,9 +17,11 @@ import numpy as np
 from bsb import (
     ConfigurationError,
     SimulationData,
+    config,
     from_storage,
     get_simulation_adapter,
     options,
+    Scaffold
 )
 from bsb_nest import NestAdapter
 from bsb_nest.adapter import NestResult
@@ -31,6 +35,7 @@ sim = Simulation()
 exp = Experiment()
 res = sim.resolution
 pathData = exp.pathData + "nest/"
+PATH_HDF5 = Path("/sim/controller/cerebellum/mouse_cereb_microzones_complete.hdf5")
 
 class Cerebellum:
 
@@ -49,14 +54,22 @@ class Cerebellum:
 
         world = MPI.COMM_WORLD
         print(f"MY RANK IS {world.Get_rank()}")
-        # if world.Get_rank() != 2:
-        print("entrato")
-        group = world.group.Excl([2])
+        group = world.group.Excl([world.Get_size() - 1])  # last is for receiver_plant
         comm = world.Create_group(group)
         adapter = get_simulation_adapter("nest", comm)
+        simulation_name = "basal_activity"
         # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
-        self.forward_model = from_storage("mouse_cereb_microzones_complete copy.hdf5", comm)
-        self.inverse_model = from_storage("mouse_cereb_microzones_complete copy.hdf5", comm)
+
+        self.forward_model: Scaffold = from_storage(str(PATH_HDF5), comm)
+        conf_forward = config.parse_configuration_file(
+            "/sim/controller/conf/forward.yaml"
+        )
+        self.forward_model.simulations[simulation_name] = conf_forward.simulations[simulation_name]
+        self.inverse_model = from_storage(str(PATH_HDF5), comm)
+        conf_inverse = config.parse_configuration_file(
+            "/sim/controller/conf/inverse.yaml"
+        )
+        self.inverse_model.simulations[simulation_name] = conf_inverse.simulations[simulation_name]
         # if world.Get_rank() != 2:
         #     print("entrato")
         #     group = world.group.Excl([2])
@@ -68,7 +81,6 @@ class Cerebellum:
         
         print("model created")
         
-        simulation_name = "basal_activity"
         simulation_forw = self.forward_model.get_simulation(simulation_name)
         simulation_inv = self.inverse_model.get_simulation(simulation_name)
         adapter.simdata[simulation_forw] = SimulationData(simulation_forw, result=NestResult(simulation_forw))
