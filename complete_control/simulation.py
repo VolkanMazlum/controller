@@ -54,6 +54,7 @@ pops_params = params["pops"]
 conn_params = params["connections"]
 
 #%%  SIMULATION
+from pathlib import Path
 exp = Experiment()
 sim = Simulation()
 pathFig = exp.pathFig
@@ -61,7 +62,8 @@ pathData = exp.pathData + "nest/"
 for root, dirs, files in os.walk(exp.pathData):
     if root != exp.pathData:
         for file in files:
-            os.remove(os.path.join(root, file))
+            print(f"removing {file}")
+            Path(os.path.join(root, file)).unlink(missing_ok=True)
 res = 0.1 #[ms]
 
 trj = np.loadtxt('trajectory.txt')

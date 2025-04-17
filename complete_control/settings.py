@@ -8,15 +8,16 @@ __version__ = "1.0.1"
 
 
 import sys
-import numpy as np
 
+import numpy as np
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-from robot1j import Robot1J
 #import perturbation as pt
 import os
+
+from robot1j import Robot1J
 
 
 ####################################################################
@@ -165,7 +166,7 @@ class Simulation():
         self._resolution = 0.1
 
         # Simulation time (milliseconds)
-        self._timeMax = 300.0
+        self._timeMax = 500.0
 
         # Pause after movement (milliseconds)
         self._timePause = 0.0
