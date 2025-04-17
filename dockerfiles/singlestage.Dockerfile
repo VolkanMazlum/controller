@@ -1,4 +1,10 @@
-FROM python:3.10-slim-bookworm AS runner
+ARG PYTHON_MAJOR=3
+ARG PYTHON_MINOR=10
+
+FROM python:${PYTHON_MAJOR}.${PYTHON_MINOR}-slim-bookworm AS runner
+
+ARG PYTHON_MAJOR
+ARG PYTHON_MINOR
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -18,6 +24,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     gosu \
     vim \
+    # --- VNC Dependencies ---
+    tigervnc-standalone-server \
+    tigervnc-common \
+    tigervnc-tools \
+    fluxbox \
+    xterm \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -49,7 +61,7 @@ RUN git clone https://github.com/INCF/MUSIC \
     && cd MUSIC \
     && git checkout 6d12edf7094e1dbb473dd55f6fcbd0825f30b811 \
     && ./autogen.sh \
-    && ./configure --prefix=$INSTALL_DIR --with-python="$(which python)" \
+    && ./configure --prefix=$MUSIC_INSTALL_DIR --with-python=$VIRTUAL_ENV/bin/python \
     && make -j$(nproc) \
     && make install
 
@@ -67,7 +79,10 @@ RUN mkdir -p nest-build \
     && cd nest-build \
     && cmake -DCMAKE_INSTALL_PREFIX:PATH=$NEST_INSTALL_DIR \
     -Dwith-mpi=ON \
-    -Dwith-music=ON \
+    -Dwith-music=$MUSIC_INSTALL_DIR \
+    -Dwith-python=ON \
+    # just to make extra extra sure
+    -DPYTHON_EXECUTABLE=$VIRTUAL_ENV/bin/python \ 
     -Dwith-openmp=ON \
     -Dwith-ltdl=ON \
     # -Dstatic-libraries=ON \ i tried this, but it didn't work. i don't think it's maintained
@@ -81,21 +96,18 @@ ENV SDF_MODELS_DIR=/sim/embodiment_sdf_models
 RUN mkdir -p $BULLET_MUSCLE_DIR $SDF_MODELS_DIR 
 
 
-# Install bullet muscle simulation - pinned... but not really useful
-RUN git clone https://github.com/UM-Projects-MZ/bullet_muscle_sim.git $BULLET_MUSCLE_DIR \
-    && cd $BULLET_MUSCLE_DIR \
-    && git checkout f20f2564efc859774412c40a4554e3641cbf834c \
-    && cd \
-    && git clone https://github.com/UM-Projects-MZ/embodiment_sdf_models.git $SDF_MODELS_DIR \
-    && cd $SDF_MODELS_DIR \
-    && git checkout 226eba6989616c1505bbdf8c7dc8b93505aeeb0a
+# Install bullet muscle simulation
+RUN git clone https://github.com/near-nes/bullet_muscle_sim.git $BULLET_MUSCLE_DIR \
+    && git clone https://github.com/near-nes/embodiment_sdf_models.git $SDF_MODELS_DIR
 
 WORKDIR ${DEPS_DIR}
 COPY requirements.txt . 
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements.txt
 
-RUN echo ${NEST_INSTALL_DIR}/lib/python3.10/site-packages >> ${VIRTUAL_ENV}/lib/python3.10/site-packages/nest.pth
+ENV PYTHON_MAJOR_MINOR="python${PYTHON_MAJOR}.${PYTHON_MINOR}"
+
+RUN echo ${NEST_INSTALL_DIR}/lib/${PYTHON_MAJOR_MINOR}/site-packages >> ${VIRTUAL_ENV}/lib/${PYTHON_MAJOR_MINOR}/site-packages/nest.pth
 
 # no default: this must be handled by builder
 ARG USER_UID
@@ -106,7 +118,7 @@ RUN groupadd --gid $USER_GID $USERNAME && \
 
 ENV CONTROLLER_DIR=/sim/controller
 ENV SHARED_DATA_DIR=/sim/shared_data
-ENV NEST_MODULE_PATH=/sim/install/nest/lib/nest/
+ENV NEST_MODULE_PATH=/sim/install/nest/lib/nest
 RUN mkdir -p $CONTROLLER_DIR $SHARED_DATA_DIR $NEST_MODULE_PATH
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
