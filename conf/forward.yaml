@@ -1,13 +1,24 @@
-name: Purkinje modified
+name: No plasticity (forward)
 simulations:
   basal_activity:
-    cell_models:
-      purkinje_cell_plus:
-        constants:
-          # here I modify some parameters of the purkinje cell (everything else remain the same)
-          lambda_0: 4
-          tau_V: 3.5
-          I_e: 700
+    connection_models:
+      parallel_fiber_to_purkinje_plus:
+        synapse:
+          Aplus: 0.0002
+          Aminus: -0.0001
+      parallel_fiber_to_stellate:
+        synapse:
+          Aplus: 0.0002
+          Aminus: -0.0001
+      parallel_fiber_to_basket:
+        synapse:
+          Aplus: 0.00005
+          Aminus: -0.00002
+      parallel_fiber_to_purkinje_minus:
+        synapse:
+          Aplus: 0.0002
+          Aminus: -0.0001
+
 $import:
   ref: ./microzones_complete_nest.yaml#/
   values:
