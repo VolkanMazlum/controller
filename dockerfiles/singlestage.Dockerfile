@@ -109,26 +109,45 @@ ENV SHARED_DATA_DIR=/sim/shared_data
 ENV NEST_MODULE_PATH=/sim/install/nest/lib/nest/
 RUN mkdir -p $CONTROLLER_DIR $SHARED_DATA_DIR $NEST_MODULE_PATH
 
-RUN echo "Setting ownership of shared folders to: >>>>>>>>>>>>>>>>>>> userid:$USER_UID groupid:$USER_GID >>>>>>>>>>>>>>>>>>>"
-RUN chown -R $USERNAME:$USERNAME $VIRTUAL_ENV /home/$USERNAME $SHARED_DATA_DIR $NEST_MODULE_PATH
-
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
+
+COPY scripts/prepare_python_env.sh /usr/local/bin/prepare_python_env.sh
+RUN chmod +x /usr/local/bin/prepare_python_env.sh
+
+# >>>>>>>>>> VNC SETUP >>>>>>>>>>>>>>
+ENV VNC_DISPLAY=":1"
+ENV DISPLAY="${VNC_DISPLAY}"
+COPY scripts/start-vnc.sh /usr/local/bin/start-vnc.sh
+RUN chmod +x /usr/local/bin/start-vnc.sh
+
+RUN mkdir -p /home/simuser/.vnc
+COPY scripts/xstartup /home/simuser/.vnc/xstartup
+RUN chmod 700 /home/$USERNAME/.vnc/xstartup
 
 # COPY scripts/interactive_start.py /usr/local/bin/run_interactive.py
 # RUN chmod +x /usr/local/bin/run_interactive.py
 
 COPY scripts/aliases.sh /tmp/aliases.sh
 RUN cat /tmp/aliases.sh >> /etc/bash.bashrc && rm /tmp/aliases.sh
+# Set display for terminals opened in VNC
+RUN echo "export DISPLAY=${VNC_DISPLAY}" >> /etc/bash.bashrc 
 
-# ENV LD_LIBRARY_PATH="$NEST_MODULE_PATH"
-ENV PYTHONPATH="$CONTROLLER_DIR":"$BULLET_MUSCLE_DIR"
-# music
-ENV PATH="$PATH:$INSTALL_DIR/bin"
+ENV CEREBELLUM_PATH="${CONTROLLER_DIR}/cerebellum"
+ENV LD_LIBRARY_PATH="${MUSIC_INSTALL_DIR}/lib"
+ENV PATH="${VIRTUAL_ENV}/bin:${MUSIC_INSTALL_DIR}/bin:${NEST_INSTALL_DIR}/bin:${PATH}"
+
+ENV PYTHONPATH="${CONTROLLER_DIR}:${BULLET_MUSCLE_DIR}:${CEREBELLUM_PATH}${PYTHONPATH:+:${PYTHONPATH}}"
+RUN echo "Constructed PYTHONPATH: ${PYTHONPATH}"
 
 WORKDIR /sim
 
+RUN echo "Setting ownership of shared folders to: >>>>>>>>>>>>>>>>>>> userid:$USER_UID groupid:$USER_GID >>>>>>>>>>>>>>>>>>>"
+RUN chown -R $USERNAME:$USERNAME $VIRTUAL_ENV /home/$USERNAME $SHARED_DATA_DIR $NEST_MODULE_PATH $BULLET_MUSCLE_DIR
 
+
+# Expose VNC port (Display :1 is 5901)
+EXPOSE 5901
 ENTRYPOINT [ "/usr/local/bin/entrypoint.sh" ]
 
 # CMD [ "python", "/usr/local/bin/run_interactive.py" ]

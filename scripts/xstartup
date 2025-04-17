@@ -10,4 +10,5 @@ xterm -geometry 100x30 &
 
 echo "Executing fluxbox in foreground to keep session alive..."
 exec fluxbox
+wait
 # launch application manually from bash for now

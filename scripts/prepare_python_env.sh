@@ -38,9 +38,19 @@ else
     # check if cerebellum already installed as editable
     pth_file=$(find "$SITE_PACKAGES_PATH" -maxdepth 1 -name 'cerebellum*' -print -quit)
 
-    if [ -z "$pth_file" ]; then
-        echo "Editable package link for cerebellum not found in $SITE_PACKAGES_PATH. Installing..."
-        
+    # Check if cerebellum is installed OR if bsb-core version is not 5.1.1
+    bsb_core_check_command="\"$VIRTUAL_ENV/bin/pip\" show bsb-core"
+    # Check if the output of pip show contains the version string "5.1.1"
+    if [ -z "$pth_file" ] || ! $bsb_core_check_command | grep -q "5.1.1"; then
+        if [ -z "$pth_file" ]; then
+            echo "Editable package link for cerebellum not found in $SITE_PACKAGES_PATH."
+        else
+            # Get the actual version for logging purposes
+            actual_version=$($bsb_core_check_command | grep '^Version:' | awk '{print $2}')
+            echo "bsb-core version is not 5.1.1 (found: $actual_version)."
+        fi
+        echo "Running TEMPORARY PATCH to ensure correct dependencies..."
+
 
         # TEMPORARY PATCH START >>>>>>>>>>>>
         echo "Making an absolute mess of the bsb dependencies to get a working environment.."
@@ -54,9 +64,9 @@ else
         # ============================================
         # "$VIRTUAL_ENV/bin/pip" install --no-cache-dir -q -e "$CEREBELLUM_PATH"
         # TEMPORARY PATCH END <<<<<<<<<<<<<<<<<<<<<<<
-        echo "Editable install of cerebellum complete."
+        echo "TEMPORARY PATCH execution complete."
     else
-        echo "Editable package link for cerebellum found ($pth_file). Skipping install."
+        echo "Editable package link for cerebellum found ($pth_file) and bsb-core version appears to be 5.1.1. Skipping patch."
     fi
 fi
 # Environment variables are now set in entrypoint.sh before the final gosu exec
