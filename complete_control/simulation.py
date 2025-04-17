@@ -6,6 +6,13 @@ import os
 import music
 import matplotlib.pyplot as plt
 
+import json
+from timeit import default_timer as timer
+from datetime import timedelta
+
+print(f"starting timer")
+start = timer()
+
 # Adjust env vars to be able to import the NESTML-generated module
 ld_lib_path = os.environ.get('LD_LIBRARY_PATH', '')
 new_path = ld_lib_path + ":"+"../nestml/target"
@@ -360,6 +367,8 @@ if cerebellum_application_forw != 0:
     nest.SetStatus(conns_neg_forw, {"weight": 0.0})
 '''
 
+time_network = timedelta(seconds=timer() - start)
+
 #%% SIMULATE ######################
 #nest.SetKernelStatus({"data_path": pthDat})
 #total_len = int(time_span + time_pause)
@@ -705,3 +714,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
 # #             print('Già fatto')
 # #     print('Collapsing files ended')
 '''
+
+time_brainpy = timedelta(seconds=timer() - start)
+
+print(f"final times:\nnetwork: {time_network}\nbrain.py: {time_brainpy}")

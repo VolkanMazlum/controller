@@ -16,12 +16,12 @@ import numpy as np
 #from bsb.core import from_storage
 from bsb import (
     ConfigurationError,
+    Scaffold,
     SimulationData,
     config,
     from_storage,
     get_simulation_adapter,
     options,
-    Scaffold
 )
 from bsb_nest import NestAdapter
 from bsb_nest.adapter import NestResult
@@ -60,7 +60,7 @@ class Cerebellum:
         simulation_name = "basal_activity"
         # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
 
-        self.forward_model: Scaffold = from_storage(str(PATH_HDF5), comm)
+        self.forward_model = from_storage(str(PATH_HDF5), comm)
         conf_forward = config.parse_configuration_file(
             "/sim/controller/conf/forward.yaml"
         )

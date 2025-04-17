@@ -30,6 +30,11 @@ nest.Install("util_neurons_module")
 nest.Install("cerebmodule")
 '''
 import json
+from datetime import timedelta
+from timeit import default_timer as timer
+
+print(f"starting timer")
+start = timer()
 
 saveFig = True
 ScatterPlot = False
@@ -772,6 +777,7 @@ total_len = int(time_span)
 names = exp.names
 pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, sn_p, sn_n, prediction_p, prediction_n, stEst.pops_p, stEst.pops_n, forw_Nest_Mf_plus, forw_Nest_Mf_minus, forw_DCNp_plus, forw_DCNp_minus, forw_IO_plus, forw_IO_minus, inv_Nest_Mf_plus, inv_Nest_Mf_minus, inv_DCNp_plus, inv_DCNp_minus, inv_IO_plus, inv_IO_minus, feedback_p, feedback_n, motor_commands_p, motor_commands_n, error_p, error_n, plan_to_inv_p, plan_to_inv_n, motor_prediction_p, motor_prediction_n, feedback_inv_p, feedback_inv_n, error_inv_p, error_inv_n, forw_PC_plus, forw_PC_minus, inv_PC_plus, inv_PC_minus, state_to_inv_p, state_to_inv_n]
 
+time_network = timedelta(seconds=timer() - start)
 for trial in range(n_trials):
     print('rank: ', mpi4py.MPI.COMM_WORLD.rank)
     if mpi4py.MPI.COMM_WORLD.rank == 0:
@@ -1538,3 +1544,6 @@ filename = "weights_pf_sc"
 np.savetxt( pthDat+filename, weights_pf_sc )
 np.savetxt( pthDat+filename, weights_pf_pc )
 '''
+time_brainpy = timedelta(seconds=timer() - start)
+
+print(f"final times:\ncerebellum: {time_cerebellum}\nnetwork: {time_network}\nbrain.py: {time_brainpy}")
