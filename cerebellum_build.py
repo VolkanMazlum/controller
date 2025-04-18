@@ -13,7 +13,7 @@ import music
 import nest
 import numpy as np
 
-#from bsb.core import from_storage
+# from bsb.core import from_storage
 from bsb import (
     ConfigurationError,
     Scaffold,
@@ -31,298 +31,305 @@ from settings import Experiment, Simulation
 import trajectories as tj
 from population_view import PopView
 
-sim = Simulation()
-exp = Experiment()
-res = sim.resolution
-pathData = exp.pathData + "nest/"
+# maybe these can be moved in a paths object together with other folders!
+SIMULATION_NAME_IN_YAML = "basal_activity"
 PATH_HDF5 = Path("/sim/controller/cerebellum/mouse_cereb_microzones_complete.hdf5")
+PATH_YAML_FORWARD = Path("/sim/controller/conf/forward.yaml")
+PATH_YAML_INVERSE = Path("/sim/controller/conf/inverse.yaml")
+
 
 class Cerebellum:
 
-    #def __init__(self, filename_h5, filename_config, numNeurons, time_vect, traj_joint, plant, pathData="./data/", precise=False, **kwargs):
-    def __init__(self, filename_h5, filename_config, multi = False, suffix = ''):
+    def __init__(
+        self,
+        sim: Simulation,
+        exp: Experiment,
+        filename_h5,
+        filename_config,
+    ):
         print("init cerebellum")
-        # Reconfigure scaffold
-        # adapter = NestAdapter()
-        print("adapter")
+        pathData = exp.pathData + "nest/"
         options.verbosity = 4
+        print(f"increased bsb verbosity to {options.verbosity}")
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
-        self.suffix = suffix
-        self.multi = multi
         self.forward_model = None
 
         world = MPI.COMM_WORLD
-        print(f"MY RANK IS {world.Get_rank()}")
-        group = world.group.Excl([world.Get_size() - 1])  # last is for receiver_plant
+        group = world.group.Excl([world.Get_size() - 1])
+        # last is for receiver_plant
+
         comm = world.Create_group(group)
+        # this is the group of all simulation processes (VPs in nest language)
         adapter = get_simulation_adapter("nest", comm)
-        simulation_name = "basal_activity"
         # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
 
         self.forward_model = from_storage(str(PATH_HDF5), comm)
-        conf_forward = config.parse_configuration_file(
-            "/sim/controller/conf/forward.yaml"
+        conf_forward = config.parse_configuration_file(str(PATH_YAML_FORWARD))
+        self.forward_model.simulations[SIMULATION_NAME_IN_YAML] = (
+            conf_forward.simulations[SIMULATION_NAME_IN_YAML]
         )
-        self.forward_model.simulations[simulation_name] = conf_forward.simulations[simulation_name]
+        print("loaded forward model and its configuration")
+
         self.inverse_model = from_storage(str(PATH_HDF5), comm)
-        conf_inverse = config.parse_configuration_file(
-            "/sim/controller/conf/inverse.yaml"
+        conf_inverse = config.parse_configuration_file(str(PATH_YAML_INVERSE))
+        self.inverse_model.simulations[SIMULATION_NAME_IN_YAML] = (
+            conf_inverse.simulations[SIMULATION_NAME_IN_YAML]
         )
-        self.inverse_model.simulations[simulation_name] = conf_inverse.simulations[simulation_name]
-        # if world.Get_rank() != 2:
-        #     print("entrato")
-        #     group = world.group.Excl([2])
-        #     comm = world.Create_group(group)
-        #     adapter = get_simulation_adapter("nest", comm)
-        #     # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
-        #     self.forward_model = from_storage("/sim/controller/built_models/without_nest.hdf5", comm)
-        #     self.inverse_model = from_storage("/sim/controller/built_models/without_nest_copy.hdf5", comm)
-        
-        print("model created")
-        
-        simulation_forw = self.forward_model.get_simulation(simulation_name)
-        simulation_inv = self.inverse_model.get_simulation(simulation_name)
-        adapter.simdata[simulation_forw] = SimulationData(simulation_forw, result=NestResult(simulation_forw))
-        adapter.simdata[simulation_inv] = SimulationData(simulation_inv, result=NestResult(simulation_inv))
-        
-        # At some point in BSB this script the kernel is reset, so we need to load the module and set the parameters before the cerebellar nodes are created
-        # nest.Install("controller_module") 
-        nest.SetKernelStatus({"resolution": res})
+        print("loaded inverse model and its configuration")
+
+        simulation_forw = self.forward_model.get_simulation(SIMULATION_NAME_IN_YAML)
+        simulation_inv = self.inverse_model.get_simulation(SIMULATION_NAME_IN_YAML)
+
+        adapter.simdata[simulation_forw] = SimulationData(
+            simulation_forw, result=NestResult(simulation_forw)
+        )
+        adapter.simdata[simulation_inv] = SimulationData(
+            simulation_inv, result=NestResult(simulation_inv)
+        )
+
+        nest.SetKernelStatus({"resolution": sim.resolution})
         nest.SetKernelStatus({"overwrite_files": True})
         nest.SetKernelStatus({"data_path": pathData})
-        
+
         adapter.load_modules(simulation_forw)
         adapter.load_modules(simulation_inv)
 
         adapter.set_settings(simulation_forw)
         adapter.set_settings(simulation_inv)
 
-        simulation_forw_duration = simulation_forw.duration 
-        simulation_inv_duration = simulation_inv.duration 
-        
-        simulation_forw_resolution = simulation_forw.resolution
-        simulation_inv_resolution = simulation_inv.resolution 
-        print('duration, ', simulation_forw_duration)
-        print('resolution, ', simulation_forw_resolution)
+        print(f"duration: FWD:{simulation_forw.duration}; INV{simulation_inv.duration}")
+        print(
+            f"resolution: FWD:{simulation_forw.resolution}; INV{simulation_inv.resolution}"
+        )
+
         adapter.create_neurons(simulation_forw)
         adapter.create_neurons(simulation_inv)
-        print("created neurons")
-        
-        
-        # for neuron_model, gids in adapter.simdata[simulation_forw].populations.items():
-        #     print('forward', neuron_model.name, gids)
-        
-        '''
-        for neuron_model, gids in adapter.simdata[simulation_inv].populations.items():
-            print('inverse', neuron_model.name, gids)
-        '''
+        print("created cerebellum neurons")
 
         adapter.connect_neurons(simulation_forw)
         adapter.connect_neurons(simulation_inv)
-
-        
+        print("connected cerebellum neurons")
 
         adapter.create_devices(simulation_forw)
         adapter.create_devices(simulation_inv)
-        '''
-        print("neurons connected")
-        
-        for device_model, device_ids in adapter.simdata[simulation_forw].devices.items():
-            print(device_model.name, device_ids)
-        '''
+        print("created cerebellum devices")
+
         ### FORWARD MODEL
         # Mossy fibers
-        self.forw_Nest_Mf = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "mossy_fibers"][0]
+        self.forw_Nest_Mf = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "mossy_fibers"
+        )
+
         # Glomerulus
-        self.forw_N_Glom = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "glomerulus"][0]
+        self.forw_N_Glom = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "glomerulus"
+        )
         # Granule cells
-        self.forw_N_GrC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "granule_cell"][0]
+        self.forw_N_GrC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "granule_cell"
+        )
         # Golgi cells
-        self.forw_N_GoC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "golgi_cell"][0]
+        self.forw_N_GoC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "golgi_cell"
+        )
         # Basket cells
-        self.forw_N_BC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "basket_cell"][0]
+        self.forw_N_BC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "basket_cell"
+        )
         # Stellate cells
-        self.forw_N_SC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "stellate_cell"][0]
+        self.forw_N_SC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "stellate_cell"
+        )
         # IO
-        self.forw_N_IO_plus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "io_plus"][0]
-        self.forw_N_IO_minus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "io_minus"][0]
+        self.forw_N_IO_plus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "io_plus"
+        )
+        self.forw_N_IO_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "io_minus"
+        )
         # DCN
-        self.forw_N_DCNp_plus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "dcn_p_plus"][0]
-        self.forw_N_DCNp_minus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "dcn_p_minus"][0]
-        forw_N_DCNi_plus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "dcn_i_plus"][0]
-        forw_N_DCNi_minus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "dcn_i_minus"][0]
+        self.forw_N_DCNp_plus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "dcn_p_plus"
+        )
+        self.forw_N_DCNp_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "dcn_p_minus"
+        )
+        forw_N_DCNi_plus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "dcn_i_plus"
+        )
+        forw_N_DCNi_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "dcn_i_minus"
+        )
         # PC
-        self.forw_N_PC = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "purkinje_cell_plus"][0]
-        self.forw_N_PC_minus = [gids for neuron_model, gids in adapter.simdata[simulation_forw].populations.items() if neuron_model.name == "purkinje_cell_minus"][0]
+        self.forw_N_PC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "purkinje_cell_plus"
+        )
+        self.forw_N_PC_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_forw
+            ].populations.items()
+            if neuron_model.name == "purkinje_cell_minus"
+        )
 
         ### INVERSE MODEL
         # Mossy fibers
-        self.inv_Nest_Mf = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "mossy_fibers"][0]
+        self.inv_Nest_Mf = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "mossy_fibers"
+        )
         # Glomerulus
-        self.inv_N_Glom = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "glomerulus"][0]
+        self.inv_N_Glom = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "glomerulus"
+        )
         # Granule cells
-        self.inv_N_GrC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "granule_cell"][0]
+        self.inv_N_GrC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "granule_cell"
+        )
         # Golgi cells
-        self.inv_N_GoC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "golgi_cell"][0]
+        self.inv_N_GoC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "golgi_cell"
+        )
         # Basket cells
-        self.inv_N_BC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "basket_cell"][0]
+        self.inv_N_BC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "basket_cell"
+        )
         # Stellate cells
-        self.inv_N_SC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "stellate_cell"][0]
+        self.inv_N_SC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "stellate_cell"
+        )
         # IO
-        self.inv_N_IO_plus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "io_plus"][0]
-        self.inv_N_IO_minus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "io_minus"][0]
+        self.inv_N_IO_plus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "io_plus"
+        )
+        self.inv_N_IO_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "io_minus"
+        )
         # DCN
-        self.inv_N_DCNp_plus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "dcn_p_plus"][0]
-        self.inv_N_DCNp_minus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "dcn_p_minus"][0]
-        inv_N_DCNi_plus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "dcn_i_plus"][0]
-        inv_N_DCNi_minus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "dcn_i_minus"][0]
+        self.inv_N_DCNp_plus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "dcn_p_plus"
+        )
+        self.inv_N_DCNp_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "dcn_p_minus"
+        )
+        inv_N_DCNi_plus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "dcn_i_plus"
+        )
+        inv_N_DCNi_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "dcn_i_minus"
+        )
         # PC
-        self.inv_N_PC = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "purkinje_cell_plus"][0]
-        self.inv_N_PC_minus = [gids for neuron_model, gids in adapter.simdata[simulation_inv].populations.items() if neuron_model.name == "purkinje_cell_minus"][0]
-
-
-
-
-
-    def find_cells(self):
-        '''
-        if self.multi:
-            suffix = self.suffix + '_'
-        else:
-            suffix = ''
-        '''
-        # Find bsb ids
-        self.S_GR = self.scaffold_model.get_placement_set("granule_cell")
-        
-        self.S_Go = self.scaffold_model.get_placement_set("golgi_cell")
-        #self.S_DCN = self.scaffold_model.get_placement_set("dcn_cell_glut_large")
-        self.S_PC = self.scaffold_model.get_placement_set("purkinje_cell")
-        self.S_BC = self.scaffold_model.get_placement_set("basket_cell")
-        self.S_SC = self.scaffold_model.get_placement_set("stellate_cell")
-        #self.S_DCN_GABA = self.scaffold_model.get_placement_set("dcn_cell_GABA")
-        self.S_Mf = self.scaffold_model.get_placement_set("mossy_fibers")
-        #print(self.scaffold_model.get_placement_sets())
-        #self.S_IO = self.scaffold_model.get_placement_set("io_cell")
-        '''
-        # Subdivision into microzones
-        uz_pos = self.scaffold_model.labels["microzone-positive"]
-        uz_neg = self.scaffold_model.labels["microzone-negative"]
-        S_IOp = np.intersect1d(self.S_IO, uz_pos)
-        S_IOn = np.intersect1d(self.S_IO, uz_neg)
-        S_DCNp = np.intersect1d(self.S_DCN, uz_pos)
-        S_DCNn = np.intersect1d(self.S_DCN, uz_neg)
-        S_PCp = np.intersect1d(self.S_PC, uz_pos)
-        S_PCn = np.intersect1d(self.S_PC, uz_neg)
-        S_BCp,S_BCn = self.subdivide_bc(S_PCn, S_PCp, S_IOn, S_IOp)
-        S_SCp,S_SCn = self.subdivide_sc(S_PCn, S_PCp)
-
-        # Transform into Nest ids
-        self.Nest_Mf = self.tuning_adapter.get_nest_ids(self.S_Mf)
-        self.io_neurons = self.tuning_adapter.get_nest_ids(self.S_IO)
-        N_BCp = self.tuning_adapter.get_nest_ids(S_BCp)
-        N_BCn = self.tuning_adapter.get_nest_ids(S_BCn)
-        N_SCp = self.tuning_adapter.get_nest_ids(S_SCp)
-        N_SCn = self.tuning_adapter.get_nest_ids(S_SCn)
-        self.N_IOp = self.tuning_adapter.get_nest_ids(S_IOp)
-        self.N_IOn = self.tuning_adapter.get_nest_ids(S_IOn)
-        self.N_DCNp = self.tuning_adapter.get_nest_ids(S_DCNp)
-        self.N_DCNn = self.tuning_adapter.get_nest_ids(S_DCNn)
-        N_PCp = self.tuning_adapter.get_nest_ids(S_PCp)
-        N_PCn = self.tuning_adapter.get_nest_ids(S_PCn)
-
-        self.Nest_ids = {
-            suffix + "dcn_cell_glut_large":{"positive":self.N_DCNp, "negative":self.N_DCNn},
-            suffix + "purkinje_cell":{"positive":N_PCp, "negative":N_PCn},
-            suffix + "basket_cell":{"positive":N_BCp, "negative":N_BCn},
-            suffix + "stellate_cell":{"positive":N_SCp, "negative":N_SCn},
-            suffix + "io_cell":{"positive":self.N_IOp, "negative":self.N_IOn},
-        
-        }
-        '''
-
-    def subdivide_bc(self, S_PCn, S_PCp, S_IOn, S_IOp):
-        basket_to_pc = self.scaffold_model.get_connectivity_set("basket_to_purkinje")
-        basket = np.unique(basket_to_pc.from_identifiers)
-        basket_tot = basket_to_pc.from_identifiers
-        pc_tot = basket_to_pc.to_identifiers
-        S_BCp = []
-        S_BCn = []
-        N_pos = []
-        N_neg = []
-        for bc_id in basket:
-            #simple_spikes = list(ts_pc[np.where(ts_pc < first_element)[0]])
-            pc_ids = [j for i,j in enumerate(pc_tot) if basket_tot[i]==bc_id]
-            count_pos = 0
-            count_neg = 0
-            for pc_id in pc_ids:
-                if pc_id in S_PCp:
-                    count_pos+=1
-                elif pc_id in S_PCn:
-                    count_neg+=1
-                else:
-                    print('strano')
-            N_pos.append(count_pos/ len(pc_ids))
-            N_neg.append(count_neg / len(pc_ids))
-            if count_pos > count_neg:
-                S_BCp.append(bc_id)
-            else:
-                S_BCn.append(bc_id)
-        # Add also BCs not connected to PCs
-        for bc in self.S_BC:
-            if bc not in S_BCp and bc not in S_BCn:
-                S_BCp.append(bc)
-                S_BCn.append(bc)
-
-        io_to_basket = self.scaffold_model.get_connectivity_set("io_to_basket")
-        io = np.unique(io_to_basket.from_identifiers)
-        io_tot = io_to_basket.from_identifiers
-        basket = np.unique(io_to_basket.to_identifiers)
-        basket_tot = io_to_basket.to_identifiers
-        N_pos = []
-        N_neg = []
-        for bc_id in basket:
-            #simple_spikes = list(ts_pc[np.where(ts_pc < first_element)[0]])
-            io_ids = [j for i,j in enumerate(io_tot) if basket_tot[i]==bc_id]
-            count_pos = 0
-            count_neg = 0
-            for io_id in io_ids:
-                if io_id in S_IOp:
-                    count_pos+=1
-                elif io_id in S_IOn:
-                    count_neg+=1
-                else:
-                    print('strano')
-            N_pos.append(count_pos/ len(io_ids))
-            N_neg.append(count_neg / len(io_ids))
-        return S_BCp,S_BCn
-
-
-    def subdivide_sc(self, S_PCn, S_PCp):
-        stellate_to_pc = self.scaffold_model.get_connectivity_set("stellate_to_purkinje")
-        stellate = np.unique(stellate_to_pc.from_identifiers)
-        stellate_tot = stellate_to_pc.from_identifiers
-        pc_tot = stellate_to_pc.to_identifiers
-        S_SCp = []
-        S_SCn = []
-        for sc_id in stellate:
-            pc_ids = [j for i,j in enumerate(pc_tot) if stellate_tot[i]==sc_id]
-            count_pos = 0
-            count_neg = 0
-            for pc_id in pc_ids:
-                if pc_id in S_PCp:
-                    count_pos+=1
-                elif pc_id in S_PCn:
-                    count_neg+=1
-                else:
-                    print('strano')
-            if count_pos > count_neg:
-                S_SCp.append(sc_id)
-            else:
-                S_SCn.append(sc_id)
-        # Add also SCs not connected to PCs
-        for sc in self.S_SC:
-            if sc not in S_SCp and sc not in S_SCn:
-                S_SCp.append(sc)
-                S_SCn.append(sc)
-        return S_SCp,S_SCn
+        self.inv_N_PC = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "purkinje_cell_plus"
+        )
+        self.inv_N_PC_minus = next(
+            gids
+            for neuron_model, gids in adapter.simdata[
+                simulation_inv
+            ].populations.items()
+            if neuron_model.name == "purkinje_cell_minus"
+        )

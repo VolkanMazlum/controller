@@ -7,19 +7,22 @@ __license__ = "GPL"
 __version__ = "1.0.1"
 
 
-import nest
-import numpy as np
 import matplotlib.pyplot as plt
 import mpi4py
+import nest
+import numpy as np
 from settings import Experiment
+
 exp = Experiment()
 pathData = exp.pathData + "nest/"
+
 
 ################ TODO: NOT TESTED
 class Event:
     def __init__(self, n_id, t):
         self.n_id = n_id
         self.t = t
+
 
 ################ TODO: NOT TESTED
 class Events(list):
@@ -47,12 +50,6 @@ class Events(list):
 
 ###################### UTIL ######################
 
-def new_spike_detector(pop,**kwargs):
-    spike_detector = nest.Create("spike_recorder")
-    nest.SetStatus(spike_detector, params=kwargs)
-    nest.Connect(pop, spike_detector)
-    return spike_detector
-
 
 def get_spike_events(spike_detector):
     dSD = nest.GetStatus(spike_detector, keys="events")[0]
@@ -61,18 +58,19 @@ def get_spike_events(spike_detector):
 
     return evs, ts
 
-def plot_spikes(evs, ts, time_vect, pop=None, title='', ax=None):
+
+def plot_spikes(evs, ts, time_vect, pop=None, title="", ax=None):
 
     t_init = time_vect[0]
-    t_end  = time_vect[ len(time_vect)-1 ]
+    t_end = time_vect[len(time_vect) - 1]
 
     no_ax = ax is None
     if no_ax:
         fig, ax = plt.subplots(1)
 
-    ax.scatter(ts, evs, marker='.', s=1)
+    ax.scatter(ts, evs, marker=".", s=1)
     ax.set(xlim=(t_init, t_end))
-    ax.set_ylabel(title, fontsize = 15)
+    ax.set_ylabel(title, fontsize=15)
     if pop:
         ax.set_ylim([min(pop), max(pop)])
 
@@ -80,86 +78,119 @@ def plot_spikes(evs, ts, time_vect, pop=None, title='', ax=None):
 # NOTE: This depends on the protocol (it uses variables like n_trials...)
 # NOTE: this assumes a constant rate across the trial
 def get_rate(spike_detector, pop, trial_len, n_trials=1):
-    rate = nest.GetStatus(spike_detector, keys="n_events")[0] * 1e3 / (trial_len*n_trials)
+    rate = (
+        nest.GetStatus(spike_detector, keys="n_events")[0]
+        * 1e3
+        / (trial_len * n_trials)
+    )
     rate /= len(pop)
     return rate
 
 
-def plotPopulation(time_v, pop_pos, pop_neg, reference, time_vecs, legend, styles, title='',buffer_size=15):
+def plotPopulation(
+    time_v,
+    pop_pos,
+    pop_neg,
+    reference,
+    time_vecs,
+    legend,
+    styles,
+    title="",
+    buffer_size=15,
+):
     print(len(time_v))
-    if hasattr(pop_pos, 'total_ts') and hasattr(pop_neg, 'total_ts'):
-        #print('c e')
+    if hasattr(pop_pos, "total_ts") and hasattr(pop_neg, "total_ts"):
+        # print('c e')
         evs_p = pop_pos.total_evs
         ts_p = pop_pos.total_ts
 
         evs_n = pop_neg.total_evs
         ts_n = pop_neg.total_ts
 
-        y_p = [ev - int(pop_pos.pop[0].get('global_id')) + 1 for ev in evs_p]
-        y_n = [-((ev - int(pop_neg.pop[0].get('global_id'))) + 1) for ev in evs_n]
+        y_p = [ev - int(pop_pos.pop[0].get("global_id")) + 1 for ev in evs_p]
+        y_n = [-((ev - int(pop_neg.pop[0].get("global_id"))) + 1) for ev in evs_n]
     else:
         evs_p, ts_p = pop_pos.get_events()
         evs_n, ts_n = pop_neg.get_events()
-        y_p =   evs_p - pop_pos.pop[0] + 1
+        y_p = evs_p - pop_pos.pop[0] + 1
         y_n = -(evs_n - pop_neg.pop[0] + 1)
 
-    
-    
     if not reference:
-        fig, ax = plt.subplots(2,1,sharex=True, figsize = (10,6))
-        ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
-        ax[0].scatter(ts_n, y_n, marker='.', s=1)
-        ax[0].set_ylabel("raster", fontsize = 15)
-        ax[0].legend(fontsize = 16)
-        pop_pos.plot_rate(time_v, buffer_size, ax=ax[1],color="r")
-        pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], color = "b", title='PSTH (Hz)')
-        ax[0].set_title(title, fontsize= 16)
-        ax[0].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
+        fig, ax = plt.subplots(2, 1, sharex=True, figsize=(10, 6))
+        ax[0].scatter(ts_p, y_p, marker=".", s=1, c="r")
+        ax[0].scatter(ts_n, y_n, marker=".", s=1)
+        ax[0].set_ylabel("raster", fontsize=15)
+        ax[0].legend(fontsize=16)
+        pop_pos.plot_rate(time_v, buffer_size, ax=ax[1], color="r")
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[1], color="b", title="PSTH (Hz)")
+        ax[0].set_title(title, fontsize=16)
+        ax[0].set_ylim(bottom=-(len(pop_neg.pop) + 1), top=len(pop_pos.pop) + 1)
     else:
-        fig, ax = plt.subplots(3,1,sharex=True, figsize = (10,6))
+        fig, ax = plt.subplots(3, 1, sharex=True, figsize=(10, 6))
         for i, signal in enumerate(reference):
-            ax[0].plot(time_vecs[i], signal, styles[i],label=legend[i])
-            ax[0].legend(fontsize = 16)
-            ax[0].set_ylabel("input (Hz)", fontsize = 15)
-        ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
-        ax[1].scatter(ts_n, y_n, marker='.', s=1, color='b')
-        ax[1].set_ylabel("raster",fontsize = 15)
-        pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
-        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color='b')
-        ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
-        #print('rate net: ', rate_p[-1]- rate_n[-1])
-    subplot_labels = ['A', 'B', 'C']
+            ax[0].plot(time_vecs[i], signal, styles[i], label=legend[i])
+            ax[0].legend(fontsize=16)
+            ax[0].set_ylabel("input (Hz)", fontsize=15)
+        ax[1].scatter(ts_p, y_p, marker=".", s=1, c="r")
+        ax[1].scatter(ts_n, y_n, marker=".", s=1, color="b")
+        ax[1].set_ylabel("raster", fontsize=15)
+        pop_pos.plot_rate(time_v, buffer_size, ax=ax[2], color="r")
+        pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title="PSTH (Hz)", color="b")
+        ax[1].set_ylim(bottom=-(len(pop_neg.pop) + 1), top=len(pop_pos.pop) + 1)
+        # print('rate net: ', rate_p[-1]- rate_n[-1])
+    subplot_labels = ["A", "B", "C"]
     for i, axs in enumerate(ax):
-        axs.text(-0.1, 1.1, subplot_labels[i], transform=axs.transAxes,
-            fontsize=16, fontweight='bold', va='top', ha='right')
-        ax[i].spines['top'].set_visible(False)
-        ax[i].spines['right'].set_visible(False)
-        ax[i].spines['bottom'].set_visible(True)
-        ax[i].spines['left'].set_visible(True)
+        axs.text(
+            -0.1,
+            1.1,
+            subplot_labels[i],
+            transform=axs.transAxes,
+            fontsize=16,
+            fontweight="bold",
+            va="top",
+            ha="right",
+        )
+        ax[i].spines["top"].set_visible(False)
+        ax[i].spines["right"].set_visible(False)
+        ax[i].spines["bottom"].set_visible(True)
+        ax[i].spines["left"].set_visible(True)
 
     return fig, ax
 
-def plotPopulation_diff(time_v, pop_pos, pop_neg, reference_plus, reference_minus, reference_diff, time_vecs, legend, styles, title='',buffer_size=15):
+
+def plotPopulation_diff(
+    time_v,
+    pop_pos,
+    pop_neg,
+    reference_plus,
+    reference_minus,
+    reference_diff,
+    time_vecs,
+    legend,
+    styles,
+    title="",
+    buffer_size=15,
+):
     print(len(time_v))
-    if hasattr(pop_pos, 'total_ts') and hasattr(pop_neg, 'total_ts'):
-        #print('c e')
+    if hasattr(pop_pos, "total_ts") and hasattr(pop_neg, "total_ts"):
+        # print('c e')
         evs_p = pop_pos.total_evs
         ts_p = pop_pos.total_ts
 
         evs_n = pop_neg.total_evs
         ts_n = pop_neg.total_ts
 
-        y_p = [ev - int(pop_pos.pop[0].get('global_id')) + 1 for ev in evs_p]
-        y_n = [-((ev - int(pop_neg.pop[0].get('global_id'))) + 1) for ev in evs_n]
+        y_p = [ev - int(pop_pos.pop[0].get("global_id")) + 1 for ev in evs_p]
+        y_n = [-((ev - int(pop_neg.pop[0].get("global_id"))) + 1) for ev in evs_n]
     else:
         evs_p, ts_p = pop_pos.get_events()
         evs_n, ts_n = pop_neg.get_events()
-        y_p =   evs_p - pop_pos.pop[0] + 1
+        y_p = evs_p - pop_pos.pop[0] + 1
         y_n = -(evs_n - pop_neg.pop[0] + 1)
 
-    fig, ax = plt.subplots(3,1,sharex=True, figsize = (10,6))
+    fig, ax = plt.subplots(3, 1, sharex=True, figsize=(10, 6))
     # Rates of the positive and negative subpopulations of the "reference" signal
-    '''
+    """
     ax[0].plot(time_vecs[0], reference_plus[0], styles[0],label=legend[0])
     ax[0].plot(time_vecs[1], reference_plus[1], styles[1], label =legend[1])
     ax[0].set_ylabel("input (Hz)", fontsize = 15)
@@ -170,58 +201,126 @@ def plotPopulation_diff(time_v, pop_pos, pop_neg, reference_plus, reference_minu
     ax[1].plot(time_vecs[3], reference_minus[1], styles[3], label =legend[3])
     ax[1].legend(fontsize = 16)
     ax[1].set_ylabel("input (Hz)", fontsize = 15)
-    '''
-    # Differences 
-    ax[0].plot(time_vecs[4], reference_diff[0], styles[4],label=legend[4])
-    ax[0].plot(time_vecs[5], reference_diff[1], styles[5], label =legend[5])
-    ax[0].plot(time_vecs[5],(reference_diff[0]-reference_diff[1]), styles[6])
-    ax[0].legend(fontsize = 16)
-    ax[0].set_ylabel("input (Hz)", fontsize = 15)
+    """
+    # Differences
+    ax[0].plot(time_vecs[4], reference_diff[0], styles[4], label=legend[4])
+    ax[0].plot(time_vecs[5], reference_diff[1], styles[5], label=legend[5])
+    ax[0].plot(time_vecs[5], (reference_diff[0] - reference_diff[1]), styles[6])
+    ax[0].legend(fontsize=16)
+    ax[0].set_ylabel("input (Hz)", fontsize=15)
 
-    ax[1].scatter(ts_p, y_p, marker='.', s=1,c="r")
-    ax[1].scatter(ts_n, y_n, marker='.', s=1, c="b")
-    ax[1].set_ylabel("raster", fontsize = 15)
-    ax[1].legend(fontsize = 16)
-    ax[1].set_ylim( bottom=-(len(pop_neg.pop)+1), top=len(pop_pos.pop)+1 )
-    
-    pop_pos.plot_rate(time_v, buffer_size, ax=ax[2],color="r")
-    pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title='PSTH (Hz)', color = "b")
+    ax[1].scatter(ts_p, y_p, marker=".", s=1, c="r")
+    ax[1].scatter(ts_n, y_n, marker=".", s=1, c="b")
+    ax[1].set_ylabel("raster", fontsize=15)
+    ax[1].legend(fontsize=16)
+    ax[1].set_ylim(bottom=-(len(pop_neg.pop) + 1), top=len(pop_pos.pop) + 1)
 
-    #print('rate net: ', rate_p[-1]- rate_n[-1])
-    subplot_labels = ['A', 'B', 'C', 'D', 'E']
+    pop_pos.plot_rate(time_v, buffer_size, ax=ax[2], color="r")
+    pop_neg.plot_rate(time_v, buffer_size, ax=ax[2], title="PSTH (Hz)", color="b")
+
+    # print('rate net: ', rate_p[-1]- rate_n[-1])
+    subplot_labels = ["A", "B", "C", "D", "E"]
     for i, axs in enumerate(ax):
-        axs.text(-0.1, 1.1, subplot_labels[i], transform=axs.transAxes,
-            fontsize=16, fontweight='bold', va='top', ha='right')
-        ax[i].spines['top'].set_visible(False)
-        ax[i].spines['right'].set_visible(False)
-        ax[i].spines['bottom'].set_visible(True)
-        ax[i].spines['left'].set_visible(True)
+        axs.text(
+            -0.1,
+            1.1,
+            subplot_labels[i],
+            transform=axs.transAxes,
+            fontsize=16,
+            fontweight="bold",
+            va="top",
+            ha="right",
+        )
+        ax[i].spines["top"].set_visible(False)
+        ax[i].spines["right"].set_visible(False)
+        ax[i].spines["bottom"].set_visible(True)
+        ax[i].spines["left"].set_visible(True)
 
     return fig, ax
 
 
 ############################ POPULATION VIEW #############################
 class PopView:
-    def __init__(self, pop, time_vect, to_file=False, label=''):
+    """
+    Population View Class
+
+    Wrapper around neural populations for visualization and analysis
+
+    Attributes
+    ----------
+    pop : nest.NodeCollection
+        The neural population being monitored
+    detector : nest.NodeCollection
+        Spike detector connected to the population
+    total_n_events : int
+        Counter for total number of spike events
+    rates_history : list
+        History of firing rates across trials
+    time_vect : array-like
+        Time vector for the simulation
+    trial_len : float
+        Length of each trial
+    Methods
+    -------
+    connect(other, rule="one_to_one", w=1.0, d=0.1)
+        Connect this population to another population
+    slice(start, end=None, step=None)
+        Create a new PopView with a slice of the current population
+    get_events()
+        Retrieve spike events from the detector
+    plot_spikes(time, boundaries=None, title="", ax=None)
+        Plot spike raster
+    computePSTH(time, buffer_sz=10)
+        Compute Peri-Stimulus Time Histogram
+    plot_rate(time, buffer_sz=10, title="", ax=None, bar=True, **kwargs)
+        Plot firing rate over time
+    get_rate(n_trials=1)
+        Get average firing rate over trials
+    reset_per_trial_rate()
+        Reset trial-related rate statistics
+    get_per_trial_rate(trial_i=None)
+        Calculate firing rate for a specific trial
+    plot_per_trial_rates(title="", ax=None)
+        Plot firing rates across trials
+    gather_data(senders, times)
+        Store spike data from senders and times
+    """
+
+    def __init__(self, pop, time_vect, to_file=False, label=""):
+        """
+        Initialize PopulationView object to monitor spiking activity.
+        Args:
+            pop: Population to monitor.
+            time_vect: Time vector for simulation.
+            to_file (bool, optional): Flag to save data to file. Defaults to False.
+            label (str, optional): Label for file saving. Required if to_file=True. Defaults to "".
+        Raises:
+            Exception: If to_file=True and no label provided.
+        """
+
         self.pop = pop
-        if to_file==True:
-            if label=='':
+        if to_file == True:
+            if label == "":
                 raise Exception("To save into file, you need to specify a label")
-            #param_file = {"to_file": True, "label":label, "file_extension": "dat"}
-            #param_file={"record_to": label + ".dat"}
-            param_file = {"record_to": 'ascii', "label": label}
-            self.detector = new_spike_detector(pop,**param_file)
+            param_file = {"record_to": "ascii", "label": label}
+            self.detector = self._create_connect_spike_detector(pop, **param_file)
         else:
-            self.detector = new_spike_detector(pop)
+            self.detector = self._create_connect_spike_detector(pop)
 
         self.total_n_events = 0
         self.rates_history = []
 
         self.time_vect = time_vect
-        self.trial_len = time_vect[ len(time_vect)-1 ]
+        self.trial_len = time_vect[len(time_vect) - 1]
 
-    def connect(self, other, rule='one_to_one', w=1.0, d=0.1):
-        nest.Connect(self.pop, other.pop, rule, syn_spec={'weight': w, "delay":d})
+    def _create_connect_spike_detector(self, pop, **kwargs):
+        spike_detector = nest.Create("spike_recorder")
+        nest.SetStatus(spike_detector, params=kwargs)
+        nest.Connect(pop, spike_detector)
+        return spike_detector
+
+    def connect(self, other, rule="one_to_one", w=1.0, d=0.1):
+        nest.Connect(self.pop, other.pop, rule, syn_spec={"weight": w, "delay": d})
 
     def slice(self, start, end=None, step=None):
         return PopView(self.pop[start:end:step])
@@ -229,15 +328,16 @@ class PopView:
     def get_events(self):
         return get_spike_events(self.detector)
 
-    def plot_spikes(self, time, boundaries=None, title='', ax=None):
+    def plot_spikes(self, time, boundaries=None, title="", ax=None):
         evs, ts = self.get_events()
 
         if boundaries is not None:
             i_0, i_1 = boundaries
 
             selected = Events(
-                Event(e.n_id, e.t) for e in Events(evs, ts)
-                if self.trial_len*i_0 <= e.t < self.trial_len*i_1
+                Event(e.n_id, e.t)
+                for e in Events(evs, ts)
+                if self.trial_len * i_0 <= e.t < self.trial_len * i_1
             )
             evs, ts = selected.n_ids, selected.ts
 
@@ -247,44 +347,41 @@ class PopView:
     # NOTE: the time vector is in seconds, therefore buffer_sz needs to be converted
     def computePSTH(self, time, buffer_sz=10):
         t_init = time[0]
-        t_end  = time[ len(time)-1 ]
+        t_end = time[len(time) - 1]
         N = len(self.pop)
-        if hasattr(self, 'total_evs') and hasattr(self, 'total_ts'):
-            evs = self. total_evs
+        if hasattr(self, "total_evs") and hasattr(self, "total_ts"):
+            evs = self.total_evs
             ts = self.total_ts
         else:
             evs, ts = self.get_events()
-        count, bins = np.histogram( ts, bins=np.arange(t_init,t_end+1,buffer_sz) )
-        rate = 1000*count/(N*buffer_sz)
+        count, bins = np.histogram(ts, bins=np.arange(t_init, t_end + 1, buffer_sz))
+        rate = 1000 * count / (N * buffer_sz)
         return bins, count, rate
 
-
-    def plot_rate(self, time, buffer_sz=10, title='', ax=None, bar=True, **kwargs):
+    def plot_rate(self, time, buffer_sz=10, title="", ax=None, bar=True, **kwargs):
 
         t_init = time[0]
-        t_end  = time[ len(time)-1 ]
+        t_end = time[len(time) - 1]
 
-        
-        bins,count,rate = self.computePSTH(time, buffer_sz)
-        '''
+        bins, count, rate = self.computePSTH(time, buffer_sz)
+        """
         rate_sm = np.convolve(rate, np.ones(5)/5,mode='same')
-        '''
-        rate_padded = np.pad(rate, pad_width=2, mode='reflect') 
-        rate_sm = np.convolve(rate_padded, np.ones(5) / 5, mode='valid')
-        
-    
+        """
+        rate_padded = np.pad(rate, pad_width=2, mode="reflect")
+        rate_sm = np.convolve(rate_padded, np.ones(5) / 5, mode="valid")
+
         no_ax = ax is None
         if no_ax:
             fig, ax = plt.subplots(1)
 
         if bar:
-            ax.bar(bins[:-1], rate, width=bins[1]-bins[0],**kwargs)
-            ax.plot(bins[:-1],rate_sm,color='k')
+            ax.bar(bins[:-1], rate, width=bins[1] - bins[0], **kwargs)
+            ax.plot(bins[:-1], rate_sm, color="k")
         else:
-            ax.plot(bins[:-1],rate_sm,**kwargs)
+            ax.plot(bins[:-1], rate_sm, **kwargs)
         ax.set(xlim=(t_init, t_end))
-        ax.set_ylabel(title, fontsize = 15)
-        ax.set_xlabel('Time [ms]')
+        ax.set_ylabel(title, fontsize=15)
+        ax.set_xlabel("Time [ms]")
 
         return rate
 
@@ -304,8 +401,9 @@ class PopView:
             events = Events(n_ids, ts)
 
             trial_events = Events(
-                Event(e.n_id, e.t) for e in events
-                if self.trial_len*trial_i <= e.t < self.trial_len*(trial_i+1)
+                Event(e.n_id, e.t)
+                for e in events
+                if self.trial_len * trial_i <= e.t < self.trial_len * (trial_i + 1)
             )
             n_events = len(trial_events)
         else:
@@ -321,20 +419,17 @@ class PopView:
         self.rates_history.append(rate)
         return rate
 
-    def plot_per_trial_rates(self, title='', ax=None):
+    def plot_per_trial_rates(self, title="", ax=None):
         no_ax = ax is None
         if no_ax:
             fig, ax = plt.subplots(1)
 
         ax.plot(self.rates_history)
-        ax.set_ylabel(title, fontsize = 15)
+        ax.set_ylabel(title, fontsize=15)
 
         if no_ax:
             plt.show()
-    
+
     def gather_data(self, senders, times):
         self.total_evs = senders
         self.total_ts = times
-        
-
-
