@@ -36,7 +36,13 @@ import ctypes
 ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 import json
 from data_handling import collapse_files, add_entry
+import random
+from settings import SEED
 
+nest.ResetKernel()
+nest.rng_seed = SEED
+random.seed = SEED
+np.random.seed(SEED)
 saveFig = True
 ScatterPlot = False
 
@@ -82,7 +88,7 @@ assert len(trj) == len(total_time_vect)
 N = 50 # Number of neurons for each (sub-)population
 nTot = 2*N*njt # Total number of neurons (one positive and one negative population for each DOF)
 
-nest.ResetKernel()
+# nest.ResetKernel()
 nest.SetKernelStatus({"resolution": res})
 nest.SetKernelStatus({"overwrite_files": True})
 nest.SetKernelStatus({"data_path": pathData})

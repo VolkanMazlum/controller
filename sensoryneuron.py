@@ -8,6 +8,10 @@ __version__ = "1.0.1"
 
 import numpy as np
 import music
+from settings import SEED
+
+np.random.seed(SEED)
+
 
 class SensoryNeuron:
 
@@ -28,6 +32,7 @@ class SensoryNeuron:
 
         # Output port over which sending spikes
         self._outPort = []
+        self.rng = np.random.default_rng(SEED)
 
 
     @property
@@ -102,8 +107,8 @@ class SensoryNeuron:
 
         # Transform theoretical rate into lambda coefficient (Poisson)
         lmd = self.rate*resolution    # Lamda of Poisson distribution
-        rng = np.random.default_rng()
-        nEv = rng.poisson(lam=lmd, size=(self.numNeurons))
+        
+        nEv = self.rng.poisson(lam=lmd, size=(self.numNeurons))
 
         for i in range(self.numNeurons):
             if (nEv[i])>0:

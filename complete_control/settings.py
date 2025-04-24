@@ -19,6 +19,7 @@ import os
 
 from robot1j import Robot1J
 
+SEED = 12345
 
 ####################################################################
 class Experiment:
