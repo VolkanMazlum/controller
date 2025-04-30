@@ -50,13 +50,58 @@ class Events(list):
 
 ###################### UTIL ######################
 
+import os
+
+import nest
+import pandas as pd
+
 
 def get_spike_events(spike_detector):
-    dSD = nest.GetStatus(spike_detector, keys="events")[0]
-    evs = dSD["senders"]
-    ts = dSD["times"]
+    # Get metadata about the recorder
+    metadata = spike_detector.get()
 
-    return evs, ts
+    # Case 1: Memory-based recorder (current implementation)
+    if metadata.get("record_to") == "memory":
+        dSD = spike_detector.get("events")
+        evs = dSD["senders"]
+        ts = dSD["times"]
+        return evs, ts
+
+    # Case 2: ASCII-based recorder
+    elif metadata.get("record_to") == "ascii":
+        # Get the filename from the metadata
+        if not metadata.get("filenames"):
+            # No data has been written yet
+            return [], []
+
+        filename = metadata.get("filenames")[0]
+        # TODO fix these god awful paths
+        filepath = filename
+
+        # Check if the file exists
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(
+                f"Recording file not found: {filepath}\nDid you call simulate()?"
+            )
+
+        # Read the file (skip the first two lines which are comments)
+        df = pd.read_csv(filepath, sep="\t", skiprows=2)
+
+        # Extract senders and times (convert ms to ms if time_in_steps is False)
+        evs = df["sender"].values
+
+        # Check if times are in milliseconds or steps
+        if "time_ms" in df.columns:
+            ts = df["time_ms"].values
+        elif "time_step" in df.columns:
+            ts = df["time_step"].values
+        else:
+            raise ValueError("Cannot find time column in the recording file")
+
+        return evs, ts
+
+    else:
+        raise ValueError(f"Unknown recording backend: {metadata.get('record_to')}")
 
 
 def plot_spikes(evs, ts, time_vect, pop=None, title="", ax=None):
@@ -97,8 +142,8 @@ def plotPopulation(
     styles,
     title="",
     buffer_size=15,
+    filepath=None,
 ):
-    print(len(time_v))
     if hasattr(pop_pos, "total_ts") and hasattr(pop_neg, "total_ts"):
         # print('c e')
         evs_p = pop_pos.total_evs
@@ -154,6 +199,11 @@ def plotPopulation(
         ax[i].spines["right"].set_visible(False)
         ax[i].spines["bottom"].set_visible(True)
         ax[i].spines["left"].set_visible(True)
+
+    if filepath:
+        fig.savefig(filepath)
+        print(f"Saved plot at {filepath}")
+        plt.close(fig)
 
     return fig, ax
 

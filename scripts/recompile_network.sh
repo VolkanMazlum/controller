@@ -10,8 +10,8 @@ if [ ! -d "${CEREBELLUM_DIR}" ]; then
 fi
 
 # paths (relative for bsb input, absolute for check/output/log)
-BSB_INPUT_YAML_RELATIVE="configurations/mouse/dcn-io/microzones_complete_nest.yaml"
-TARGET_HDF5_CHECK="${CEREBELLUM_DIR}/mouse_cereb_microzones_complete_nest.hdf5"
+BSB_INPUT_YAML_RELATIVE="configurations/mouse/dcn-io/microzones_complete.yaml"
+TARGET_HDF5_CHECK="${CEREBELLUM_DIR}/mouse_cereb_microzones_complete.hdf5"
 OUTPUT_DIR_BASE="/sim/controller/built_models"
 LOG_DIR_BASE="/sim/controller/logs"
 

@@ -147,7 +147,7 @@ trj_d    = np.gradient(trj,res,axis=0)
 trj_dd   = np.gradient(trj_d,res,axis=0)
 inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
-p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos[0][0])
+p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos)
 ############################ BRAIN ############################
 brain = Brain()
 
@@ -450,7 +450,8 @@ np.savetxt( pthDat+"inputCmd_tot.csv", inputCmd_tot, delimiter=',' ) # Torques f
 
 
 ########################### PLOTTING ###########################
-lgd = ['actual','desired']
+timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+lgd = ['theta','des']
 plt.figure()
 plt.plot(time_tot,inputCmd)
 #plt.plot(time,inputDes,linestyle=':')
@@ -514,9 +515,11 @@ for trial in range(n_trial):
     plt.ylabel('position y (m)')
     plt.legend()
     if saveFig:
-        plt.savefig(pathFig+"position_ee.png")
+        #plt.savefig(pathFig+"position_ee.png")
         #plt.savefig("/home/alphabuntu/workspace/controller/complete_control/figures_thesis/cloop_nocereb/position_ee.png")
-
+        plt.savefig(pathFig + f"position_ee_{timestamp}.png")
+    
+    
     plt.figure()
     plt.plot(errors)
     plt.xlabel('Trial')
