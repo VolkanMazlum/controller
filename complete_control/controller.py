@@ -56,9 +56,6 @@ class SingleDOFController:
         plan_params: Dict[str, Any],
         spine_params: Dict[str, Any],
         state_params: Dict[str, Any],
-        state_se_params: Dict[
-            str, Any
-        ],  # Note: state_se_params wasn't used before, check necessity
         pops_params: Dict[str, Any],
         conn_params: Dict[str, Any],
         sim_params: Dict[str, Any],

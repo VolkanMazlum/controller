@@ -16,10 +16,10 @@ import logging
 import os
 import sys
 from functools import partial
+from pathlib import Path
 
 import structlog
 from mpi4py import MPI
-from paths import LOG_DIR
 from tqdm import tqdm as std_tqdm
 
 rank = MPI.COMM_WORLD.rank
@@ -54,9 +54,15 @@ def add_mpi_rank_processor(_, __, event_dict):
 
 
 # --- Logging Setup Function ---
-def setup_logging(comm: MPI.Comm, log_level="INFO", default_log_all_ranks=False):
+def setup_logging(
+    comm: MPI.Comm,
+    log_dir_path: Path,
+    timestamp_str: str,
+    log_level="INFO",
+    default_log_all_ranks=False,
+):
     """
-    Configures structlog for MPI application logging.
+    Configures structlog for MPI application logging within a specified directory.
 
     Sets up console (rank 0 only, TQDM-friendly), plain text file (rank 0 only),
     and JSONL file handlers (one per rank).
@@ -66,6 +72,8 @@ def setup_logging(comm: MPI.Comm, log_level="INFO", default_log_all_ranks=False)
 
     Args:
         comm: The MPI communicator.
+        log_dir_path: The directory where log files will be created.
+        timestamp_str: Start timestamp. Input so that it is the same across all usages
         log_level: The minimum logging level (e.g., "INFO", "DEBUG").
         default_log_all_ranks: If True, allows logs from all ranks by default,
                                unless overridden by `log_all_ranks=False` in a specific log call.
@@ -91,20 +99,6 @@ def setup_logging(comm: MPI.Comm, log_level="INFO", default_log_all_ranks=False)
         if not log_all and rank != 0:
             raise structlog.DropEvent
         return event_dict
-
-    timestamp_str = None  # Initialize on all ranks
-    # --- Generate Timestamp on Rank 0 and Broadcast ---
-    if rank == 0:
-        # implicit local timezone
-        timestamp_str = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    timestamp_str = comm.bcast(timestamp_str, root=0)
-
-    # --- Create Timestamped Log Directory (only rank 0 needs to create) ---
-    run_log_dir = LOG_DIR / f"run_{timestamp_str}"
-    if rank == 0:
-        os.makedirs(run_log_dir, exist_ok=True)
-
-    comm.Barrier()
 
     # --- Shared Processors ---
     # Processors applied to all log records, regardless of destination
@@ -148,7 +142,7 @@ def setup_logging(comm: MPI.Comm, log_level="INFO", default_log_all_ranks=False)
 
         # 1.b. Plain Text File Handler (Mirrors Console, Rank 0 Only)
         log_file_plain_name = f"log_{timestamp_str}_rank0.log"
-        log_file_plain_path = run_log_dir / log_file_plain_name
+        log_file_plain_path = log_dir_path / log_file_plain_name
         plain_file_handler = logging.FileHandler(log_file_plain_path, mode="w")
         # Create a specific formatter for the plain file, disabling colors
         plain_file_formatter = structlog.stdlib.ProcessorFormatter(
@@ -160,7 +154,7 @@ def setup_logging(comm: MPI.Comm, log_level="INFO", default_log_all_ranks=False)
     # 2. File Handler (JSONL, Rank-Specific File)
     # Each rank writes its own file.
     log_file_name = f"log_{timestamp_str}_rank{rank}.jsonl"
-    log_file_path = run_log_dir / log_file_name
+    log_file_path = log_dir_path / log_file_name
 
     file_handler = logging.FileHandler(log_file_path, mode="w")
 
@@ -187,9 +181,10 @@ def setup_logging(comm: MPI.Comm, log_level="INFO", default_log_all_ranks=False)
     if rank == 0:
         log.info(
             "Logging configured",
+            log_directory=str(log_dir_path),
             console_output=True,
-            jsonl_output_pattern=f"{run_log_dir}/log_{timestamp_str}_rank<N>.jsonl",
-            log_file_output=f"{run_log_dir}/log_{timestamp_str}_rank0.log",
+            jsonl_output_pattern=f"{log_dir_path.name}/log_{timestamp_str}_rank<N>.jsonl",  # Use relative name for pattern clarity
+            log_file_output=f"{log_dir_path.name}/log_{timestamp_str}_rank0.log",  # Use relative name for pattern clarity
         )
     # Barrier to ensure setup is complete everywhere before proceeding
     comm.Barrier()
@@ -203,7 +198,11 @@ if __name__ == "__main__":
     # setup_logging(MPI.COMM_WORLD, log_level="DEBUG", default_log_all_ranks=True)
     # Example: Default behavior (only rank 0, INFO level)
     comm = MPI.COMM_WORLD
-    setup_logging(comm)
+    example_log_dir = Path("./example_run_logs")
+    if comm.rank == 0:
+        example_log_dir.mkdir(parents=True, exist_ok=True)
+    comm.Barrier()
+    setup_logging(comm, log_dir_path=example_log_dir, log_level="DEBUG")
 
     # Get the logger for the main application part
     log: structlog.stdlib.BoundLogger = structlog.get_logger("simulation")

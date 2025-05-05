@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import datetime
 import json
 import os
-import random  # Import random for seed setting
+import random
+import shutil
 import sys
 from collections import defaultdict
 from datetime import timedelta
@@ -11,11 +13,13 @@ from timeit import default_timer as timer
 
 import nest
 import numpy as np
+import paths
 import structlog
 from data_handling import collapse_files
 from log import setup_logging, tqdm
 from mpi4py import MPI
 from mpi4py.MPI import Comm
+from paths import RunPaths, setup_run_paths
 from plot_utils import plot_controller_outputs
 from settings import SEED, Experiment, Simulation
 
@@ -23,7 +27,7 @@ from controller import SingleDOFController
 
 
 # --- Configuration and Setup ---
-def load_config(json_path="new_params.json"):
+def load_config(json_path):
     log = structlog.get_logger("main.config")
     """Loads parameters from JSON file."""
     with open(json_path) as f:
@@ -32,26 +36,25 @@ def load_config(json_path="new_params.json"):
     return params
 
 
-def setup_environment():
+def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
     log = structlog.get_logger("main.env_setup")
     """Sets up environment variables if needed (e.g., for NESTML)."""
     # This is fragile. Better to manage environments or installation paths.
     ld_lib_path = os.environ.get("LD_LIBRARY_PATH", "")
-    nestml_path = (
-        "../nestml/target"  # Consider making this configurable via JSON or env var
-    )
-    if nestml_path not in ld_lib_path:
+    nestml_path_str = str(nestml_build_dir)
+    if nestml_path_str not in ld_lib_path:
         # Check if the path exists before adding
-        if Path(nestml_path).exists():
-            new_path = ld_lib_path + ":" + nestml_path if ld_lib_path else nestml_path
+        if nestml_build_dir.exists():
+            new_path = (
+                ld_lib_path + ":" + nestml_path_str if ld_lib_path else nestml_path_str
+            )
             os.environ["LD_LIBRARY_PATH"] = new_path
-            log.info("Updated LD_LIBRARY_PATH", path_added=nestml_path)
+            log.info("Updated LD_LIBRARY_PATH", path_added=nestml_path_str)
         else:
             log.warning(
                 "NESTML path not found, skipping LD_LIBRARY_PATH update",
-                path=nestml_path,
+                path=nestml_path_str,
             )
-
     # Import NESTML models after path setup
     try:
         # Check if module is already installed to prevent errors on reset
@@ -74,48 +77,7 @@ def setup_environment():
         sys.exit(1)
 
 
-def setup_paths(fig_base_path_str: str):
-    log = structlog.get_logger("main.paths")
-    """Creates output directories based on figure path from config."""
-    fig_base_path = Path(fig_base_path_str)
-    # Define data path relative to figure path or make it configurable
-    # TODO move to paths
-    path_data = Path(".") / "data" / "nest"  # Example: place data dir alongside fig dir
-    path_fig = fig_base_path
-
-    path_data.mkdir(parents=True, exist_ok=True)
-    path_fig.mkdir(parents=True, exist_ok=True)
-    log.info(
-        "Output paths configured", figure_path=str(path_fig), data_path=str(path_data)
-    )
-    return str(path_data), str(path_fig)
-
-
-def clear_old_data(path_data_str: str, comm: Comm):
-    log = structlog.get_logger("main.cleanup")
-    """Removes old simulation files in the specified NEST data path."""
-    path_data = Path(path_data_str)
-    if MPI.COMM_WORLD.rank == 0:
-        if path_data.exists() and path_data.is_dir():
-            print(f"Clearing data in {path_data}...")
-            cleared_files = 0
-            errors = 0
-            # Iterate safely, only removing files directly within the target dir
-            for item in path_data.iterdir():
-                if item.is_file() and item.name.endswith((".gdf", ".dat")):
-                    item.unlink()
-                    cleared_files += 1
-            print(
-                f"Data clearing complete. Removed {cleared_files} files, encountered {errors} errors."
-            )
-        else:
-            log.warning(
-                f"Data path {path_data} does not exist or is not a directory. Skipping clearing."
-            )
-    comm.Barrier()
-
-
-def load_input_data(traj_file="trajectory.txt", cmd_file="motor_commands.txt"):
+def load_input_data(traj_file: Path, cmd_file: Path):
     log = structlog.get_logger("main.input_data")
     """Loads trajectory and motor command data."""
     try:
@@ -161,20 +123,20 @@ def load_input_data(traj_file="trajectory.txt", cmd_file="motor_commands.txt"):
 
 
 # --- NEST Kernel Setup ---
-def setup_nest_kernel(sim_params: dict, seed: int, path_data: str):
+def setup_nest_kernel(sim_params: dict, seed: int, path_data: Path):
     log = structlog.get_logger("main.nest_setup")
     """Configures the NEST kernel."""
 
     kernel_status = {
         "resolution": sim_params["res"],
         "overwrite_files": True,  # Important for multiple trials/runs
-        "data_path": path_data,
+        "data_path": str(path_data),
         # "print_time": True, # Optional: Print simulation progress
     }
     kernel_status["rng_seed"] = seed  # Set seed via kernel status
     nest.SetKernelStatus(kernel_status)
     log.info(
-        f"NEST Kernel: Resolution: {sim_params['res']}ms, Seed: {seed}, Data path: {path_data}"
+        f"NEST Kernel: Resolution: {sim_params['res']}ms, Seed: {seed}, Data path: {str(path_data)}"
     )
     random.seed(seed)
     np.random.seed(seed)
@@ -290,7 +252,7 @@ def connect_controller_to_music(
 def run_simulation(
     sim_params: dict,
     n_trials: int,
-    path_data: str,
+    path_data: Path,
     controllers: list[SingleDOFController],
     comm: Comm,
 ):
@@ -355,8 +317,10 @@ def run_simulation(
         start_collapse_time = timer()
         # Use the dynamically gathered labels and views for collapsing
         if grouped_pop_views:
+            # collapse_files expects a string path ending with "/"
+            data_path_str = str(path_data) + "/"
             collapse_files(
-                path_data + "/",  # TODO use paths not strings
+                data_path_str,
                 unique_labels,
                 grouped_pop_views,
                 len(controllers),
@@ -376,35 +340,61 @@ def run_simulation(
     log.info("--- Simulation Finished ---")
 
 
+def coordinate_paths_with_receiver() -> tuple[str, RunPaths]:
+    shared_data = {
+        "timestamp": None,
+        "paths": None,
+    }
+    run_timestamp_str = None
+    if rank == 0:
+        shared_data["timestamp"] = run_timestamp_str = datetime.datetime.now().strftime(
+            "%Y%m%d_%H%M%S"
+        )
+        shared_data["paths"] = setup_run_paths(run_timestamp_str)
+        print("sending...")
+
+    shared_data = MPI.COMM_WORLD.bcast(shared_data, root=0)
+    run_timestamp_str = shared_data["timestamp"]
+    run_paths: RunPaths = shared_data["paths"]
+
+    return run_timestamp_str, run_paths
+
+
 # --- Main Execution Block ---
 if __name__ == "__main__":
     # --- MPI Setup ---
-    world = MPI.COMM_WORLD
-    world_rank = world.Get_rank()
-    world_size = world.Get_size()
-    # last process is for receiver_plant
-    comm = world.Create_group(MPI.COMM_WORLD.group.Excl([world.Get_size() - 1]))
-
-    # --- Logging Setup ---
-    # Set desired log level (e.g., "INFO", "DEBUG")
-    log_level = os.environ.get("LOG_LEVEL", "DEBUG")
-    setup_logging(comm, log_level=log_level)
-
+    comm = MPI.COMM_WORLD.Create_group(  # last process is for receiver_plant
+        MPI.COMM_WORLD.group.Excl([MPI.COMM_WORLD.Get_size() - 1])
+    )
     rank = comm.rank
+    run_timestamp_str, run_paths = coordinate_paths_with_receiver()
+    setup_logging(
+        comm,
+        log_dir_path=run_paths.logs,
+        timestamp_str=run_timestamp_str,
+        log_level=os.environ.get("LOG_LEVEL", "DEBUG"),
+    )
+
     main_log: structlog.stdlib.BoundLogger = structlog.get_logger("main")
     main_log.info(
+        f"Starting Run: {run_timestamp_str}",
+        run_dir=str(run_paths.run),
+        log_all_ranks=True,
+    )
+    main_log.info(
         "MPI Setup Complete",
-        world_rank=world_rank,
-        world_size=world_size,
+        world_rank=MPI.COMM_WORLD.Get_rank(),
+        world_size=MPI.COMM_WORLD.Get_size(),
         sim_rank=comm.rank,
         sim_size=comm.size,
         log_all_ranks=True,
     )
     start_script_time = timer()
     nest.ResetKernel()
+    config_source = paths.PARAMS
 
     # --- Load Configuration ---
-    params = load_config("new_params.json")
+    params = load_config(config_source)
     sim = Simulation()
     exp = Experiment()
 
@@ -416,8 +406,20 @@ if __name__ == "__main__":
     main_log.debug(
         "Loaded Parameters", params=params, sim_settings=sim, exp_settings=exp
     )
-    # TODO paths pleaseee
-    fig_path_str = params.get("path", "./figures/")
+    # --- Copy Config to Run Directory (Rank 0 only) ---
+    if rank == 0:
+        try:
+            config_dest = run_paths.run / Path(config_source).name
+            shutil.copy2(config_source, config_dest)  # copy2 preserves metadata
+            main_log.info(
+                "Copied config file to run directory",
+                source=config_source,
+                destination=str(config_dest),
+            )
+        except FileNotFoundError:
+            main_log.warning("Config file not found, skipping copy", path=config_source)
+        except Exception as e:
+            main_log.error("Error copying config file", error=str(e), exc_info=True)
 
     # Simulation parameters (provide defaults if not in JSON)
     # TODO: Consider adding a "simulation" section to new_params.json
@@ -451,14 +453,10 @@ if __name__ == "__main__":
     }
     main_log.info("MUSIC Configuration", **music_cfg)
 
-    # --- Environment and Path Setup ---
+    # --- Environment Setup ---
     setup_environment()
-    path_data, path_fig = setup_paths(fig_path_str)
-    if sim_params.get("clear_old_data", False):
-        clear_old_data(path_data, comm)
-
     # --- Load Input Data ---
-    trj, motor_commands = load_input_data()  # Use default filenames
+    trj, motor_commands = load_input_data(paths.TRAJECTORY, paths.MOTOR_COMMANDS)
     njt = trj.shape[1]  # Infer number of DoFs
     main_log.info(f"Inferred {njt} DoF(s) from input data.")
 
@@ -509,7 +507,7 @@ if __name__ == "__main__":
 
     # --- Network Construction ---
     start_network_time = timer()
-    setup_nest_kernel(sim_params, seed, path_data)
+    setup_nest_kernel(sim_params, seed, run_paths.data_nest)
 
     controllers = []
     main_log.info(f"Constructing Network", dof=njt, N=N)
@@ -528,17 +526,15 @@ if __name__ == "__main__":
             total_time_vect=single_trial_time_vect,  # Pass single trial vector
             trajectory_slice=trj[:, j],
             motor_cmd_slice=motor_commands[:, j],
-            # Pass parameter dicts extracted from JSON
             mc_params=mc_p,
             plan_params=plan_p,
             spine_params=spine_p,
             state_params=state_p,
-            state_se_params=state_se_p,  # Pass if needed
-            pops_params=pops_params,  # Pass the whole pops dict
-            conn_params=conn_params,  # Pass the whole connections dict
-            sim_params=sim_params,  # Pass simulation params (res, etc.)
-            path_data=path_data,  # Pass data path (PopView might use internally)
-            label_prefix="",  # No prefix in this example
+            pops_params=pops_params,
+            conn_params=conn_params,
+            sim_params=sim_params,
+            path_data=run_paths.data_nest,
+            label_prefix="",
         )
         controllers.append(controller)
 
@@ -559,14 +555,16 @@ if __name__ == "__main__":
     )
 
     # --- Simulation ---
-    run_simulation(sim_params, n_trials, path_data, controllers, comm)
+    run_simulation(sim_params, n_trials, run_paths.data_nest, controllers, comm)
 
     # --- Plotting (Rank 0 Only) ---
     if rank == 0:
         main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
         try:
-            plot_controller_outputs(controllers, total_time_vect_concat, path_fig)
+            plot_controller_outputs(
+                controllers, total_time_vect_concat, run_paths.figures
+            )
         except Exception as e:
             main_log.error("Error during plotting", error=str(e), exc_info=True)
         end_plot_time = timer()

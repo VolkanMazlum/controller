@@ -1,35 +1,53 @@
 #!/usr/bin/env python3
-#import nest
+
+import json
+import queue
+import sys
+from datetime import datetime
+
+import matplotlib.pyplot as plt
+import music
+import numpy as np
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
-import music
-import sys
-import queue
-import numpy as np
-import matplotlib.pyplot as plt
-import json
 from data_handling import add_entry, collapse_files_bullet
+from mpi4py import MPI
 
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-from sensoryneuron import SensoryNeuron
-from complete_control.settings import Experiment, Simulation, Brain, MusicCfg
-#from util import plotPopulation
 
-import trajectories as tj
-
-
-import ctypes
-ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+# ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 import json
 import random
+import time
 
-from mpi4py import MPI
+from paths import RunPaths
 from settings import SEED
+
+import trajectories as tj
+from complete_control.settings import Brain, Experiment, MusicCfg, Simulation
+from sensoryneuron import SensoryNeuron
+
+#from util import plotPopulation
+
+#import perturbation as pt
+
+
+setup   = music.Setup()
 
 random.seed = SEED
 np.random.seed(SEED)
+print("attempting broadcast")
+shared_data = {
+    "timestamp": None,
+    "paths": None,
+}
+run_timestamp_str, run_paths = None, None
+shared_data = MPI.COMM_WORLD.bcast(shared_data, root=0)
+run_timestamp_str = shared_data["timestamp"]
+run_paths: RunPaths = shared_data["paths"]
+print(f"\n\n\n{run_timestamp_str}\n\n\n")
 
 
 
@@ -69,11 +87,14 @@ sim = Simulation()
 res          = sim.resolution/1e3            # Resolution (translate into seconds)
 timeMax      = sim.timeMax/1e3               # Maximum time (translate into seconds)
 time         = np.arange(0,timeMax+res,res)  # Time vector
-#time_pause   = sim.timePause/1e3
+
 time_pause = 0
 time_wait = sim.timeWait/1e3     # Pause time (translate into seconds)
+#print('time_wait: ', sim.timeWait)
+
 time_wait_vec = np.arange(0,sim.timeWait,sim.resolution)
 steps_wait = len(time_wait_vec)
+#print('len(time_wait_vec):' , len(time_wait_vec))
 n_trial      = sim.n_trials
 time_trial = time_wait + timeMax
 exp_duration = ((timeMax+time_wait)*n_trial)
@@ -95,8 +116,8 @@ bullet = BulletArm1Dof()
 # bullet.InitPybullet()
 
 import pybullet as p
+
 bullet.InitPybullet(bullet_connect=p.GUI)#, g=[0.0, 0.0 , -9.81])
-#bullet.InitPybullet(bullet_connect=p.DIRECT)
 bullet_robot = bullet.LoadRobot()
 
 
@@ -114,9 +135,10 @@ z = upperarm[2] -rho*np.cos(1.57)
 y = upperarm[0] +rho*np.sin(1.57)
 _tgt_pos  = [y,z]
 ##################### EXPERIMENT #####################
-pathFig =exp.pathFig
-# pathFig = params["path"]
-pthDat = exp.pathData + "bullet/"
+# pathFig =exp.pathFig
+pathFig = str(run_paths.figures_receiver.absolute()) + "/"
+pthDat = str(run_paths.data_bullet.absolute()) + "/"
+# pthDat = exp.pathData + "bullet/"
 cond = exp.cond
 
 '''
@@ -149,6 +171,7 @@ inputDes = exp.dynSys.inverseDyn(trj,trj_d,trj_dd)/scale_des
 
 p.resetJointState(bullet_robot._body_id, RobotArm1Dof.ELBOW_JOINT_ID, init_pos)
 ############################ BRAIN ############################
+
 brain = Brain()
 
 # Number of neurons (for each subpopulation positive/negative)
@@ -183,11 +206,11 @@ nlocal  = N*2*njt  # Number of neurons taken care of by this MPI rank
 
 # Creation of MUSIC ports
 # The MUSIC setup object is used to configure the simulation
-setup   = music.Setup()
+
 indata  = setup.publishEventInput("mot_cmd_in")
-print('published indata')
+
 outdata = setup.publishEventOutput("fbk_out")
-print('published outdata')
+
 #NOTE: The actual neuron IDs from the sender side are LOST!!!
 # By knowing how many joints and neurons, one should be able to retreive the
 # function of each neuron population.
@@ -236,7 +259,7 @@ for i in range(njt):
     tmp    = SensoryNeuron(N, pos=False, idStart=idSt_n, bas_rate=sensNeur_baseRate, kp=sensNeur_gain)
     tmp.connect(outdata)   # Connect to output port
     sn_n.append(tmp)
-print('created sensory neurons')
+
 
 ######################## SETUP ARRAYS ################################
 
@@ -267,7 +290,7 @@ inputCmd     = np.zeros([n_time,njt]) # Input commands (from motor commands)
 #perturb_j    = np.zeros([n_time,njt]) # Perturbation (joint)
 inputCmd_tot = np.zeros([n_time,njt]) # Total input to dynamical system
 
-print('computed motor commands')
+
 
 ######################## RUNTIME ##########################
 #names = ["planner_p", "planner_n", "ffwd_p", "ffwd_n", "fbk_p", "fbk_n", "out_p", "out_n", "brainstem_p", "brainstem_n", "sn_p", "sn_n", "pred_p", "pred_n", "state_p", "state_n"]
@@ -285,13 +308,7 @@ def computeRate(spikes, w, nNeurons, timeSt, timeEnd):
 
 
 # Start the runtime phase
-print('runtime about to be generated')
 runtime = music.Runtime(setup, res)
-'''
-if rank == 0:  # Only the root rank creates the Setup
-    runtime = music.Runtime(setup, res)
-'''
-print('runtime generated')
 step    = 0 # simulation step
 errors = []
 tickt = runtime.time()
@@ -304,7 +321,8 @@ while tickt < exp_duration:
         collapse_files_bullet(exp.pathData+"nest/", exp.names, njt)
         add_entry(exp)
         save = False
-    '''	
+    '''
+
     # Get bullet joint states
     bullet_robot.UpdateStats()
 
@@ -457,13 +475,14 @@ plt.plot(time_tot,inputCmd)
 #plt.plot(time,inputDes,linestyle=':')
 plt.xlabel("time (s)")
 plt.ylabel("motor commands (N)")
-plt.legend(lgd, fontsize = 16)
+plt.legend(lgd)
 if saveFig:
     plt.savefig(pathFig+cond+"motCmd.png")
     
 
 # Joint space
 from datetime import datetime
+
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 wait_trj = np.ones(len(time_wait_vec)) * trj[steps_wait]
 print(wait_trj)
@@ -484,12 +503,16 @@ if saveFig:
 # End-effector space
 plt.figure()
 trial_delta = int((timeMax+time_wait)/res)
-task_steps = int((timeMax)/res)
+task_steps = int((timeMax+time_wait)/res)
 errors = []
 err_x = []
 for trial in range(n_trial):
     start = trial*trial_delta
+    print('start: ', start)
     end = start + task_steps - 1
+    print('end: ', end)
+
+
     ''''
     if trial < ff_application: # Only cerebellum
         style = 'k'
