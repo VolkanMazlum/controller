@@ -4,17 +4,18 @@ import json
 import os
 import random  # Import random for seed setting
 import sys
+from collections import defaultdict
 from datetime import timedelta
 from pathlib import Path
 from timeit import default_timer as timer
 
-import matplotlib.pyplot as plt
-
-# NEST and MPI related imports
 import nest
 import numpy as np
+import structlog
 from data_handling import collapse_files
+from log import setup_logging, tqdm
 from mpi4py import MPI
+from mpi4py.MPI import Comm
 from plot_utils import plot_controller_outputs
 from settings import SEED, Experiment, Simulation
 
@@ -23,14 +24,16 @@ from controller import SingleDOFController
 
 # --- Configuration and Setup ---
 def load_config(json_path="new_params.json"):
+    log = structlog.get_logger("main.config")
     """Loads parameters from JSON file."""
     with open(json_path) as f:
         params = json.load(f)
-        print(f"Successfully loaded configuration from '{json_path}'")
+        log.info("Configuration loaded", path=json_path)
     return params
 
 
 def setup_environment():
+    log = structlog.get_logger("main.env_setup")
     """Sets up environment variables if needed (e.g., for NESTML)."""
     # This is fragile. Better to manage environments or installation paths.
     ld_lib_path = os.environ.get("LD_LIBRARY_PATH", "")
@@ -42,10 +45,11 @@ def setup_environment():
         if Path(nestml_path).exists():
             new_path = ld_lib_path + ":" + nestml_path if ld_lib_path else nestml_path
             os.environ["LD_LIBRARY_PATH"] = new_path
-            print(f"Updated LD_LIBRARY_PATH to include: {nestml_path}")
+            log.info("Updated LD_LIBRARY_PATH", path_added=nestml_path)
         else:
-            print(
-                f"Warning: NESTML path '{nestml_path}' not found. Skipping LD_LIBRARY_PATH update."
+            log.warning(
+                "NESTML path not found, skipping LD_LIBRARY_PATH update",
+                path=nestml_path,
             )
 
     # Import NESTML models after path setup
@@ -53,33 +57,42 @@ def setup_environment():
         # Check if module is already installed to prevent errors on reset
         if "controller_module" not in nest.Models(mtype="nodes"):
             nest.Install("controller_module")  # Install custom NESTML modules
-            print("Installed NESTML module: controller_module")
+            log.info("Installed NESTML module", module="controller_module")
         else:
-            print("NESTML module 'controller_module' already installed.")
+            log.debug("NESTML module already installed", module="controller_module")
     except nest.NESTError as e:
         # Handle cases where installation fails even if not previously installed
-        print(f"Error installing NESTML module 'controller_module': {e}")
-        print(
-            "Ensure the module is compiled and accessible (check LD_LIBRARY_PATH and compilation in '../nestml/target')."
+        log.error(
+            "Error installing NESTML module",
+            module="controller_module",
+            error=str(e),
+            exc_info=True,
+        )
+        log.error(
+            "Ensure module is compiled and accessible (check LD_LIBRARY_PATH/compilation)."
         )
         sys.exit(1)
 
 
 def setup_paths(fig_base_path_str: str):
+    log = structlog.get_logger("main.paths")
     """Creates output directories based on figure path from config."""
     fig_base_path = Path(fig_base_path_str)
     # Define data path relative to figure path or make it configurable
+    # TODO move to paths
     path_data = Path(".") / "data" / "nest"  # Example: place data dir alongside fig dir
     path_fig = fig_base_path
 
     path_data.mkdir(parents=True, exist_ok=True)
     path_fig.mkdir(parents=True, exist_ok=True)
-    print(f"Using Figure Path: {path_fig}")
-    print(f"Using Data Path:   {path_data}")
+    log.info(
+        "Output paths configured", figure_path=str(path_fig), data_path=str(path_data)
+    )
     return str(path_data), str(path_fig)
 
 
-def clear_old_data(path_data_str: str):
+def clear_old_data(path_data_str: str, comm: Comm):
+    log = structlog.get_logger("main.cleanup")
     """Removes old simulation files in the specified NEST data path."""
     path_data = Path(path_data_str)
     if MPI.COMM_WORLD.rank == 0:
@@ -96,62 +109,80 @@ def clear_old_data(path_data_str: str):
                 f"Data clearing complete. Removed {cleared_files} files, encountered {errors} errors."
             )
         else:
-            print(
+            log.warning(
                 f"Data path {path_data} does not exist or is not a directory. Skipping clearing."
             )
-    comm.barrier()  # Ensure all ranks wait until rank 0 is done
+    comm.Barrier()
 
 
 def load_input_data(traj_file="trajectory.txt", cmd_file="motor_commands.txt"):
+    log = structlog.get_logger("main.input_data")
     """Loads trajectory and motor command data."""
     try:
         trj = np.loadtxt(traj_file)
         motor_commands = np.loadtxt(cmd_file)
 
         if trj.shape[0] != motor_commands.shape[0]:
+            log.error(
+                "Input data length mismatch",
+                traj_file=traj_file,
+                traj_len=trj.shape[0],
+                cmd_file=cmd_file,
+                cmd_len=motor_commands.shape[0],
+            )
             raise ValueError(
-                f"Trajectory ({traj_file}, length {trj.shape[0]}) and motor command ({cmd_file}, length {motor_commands.shape[0]}) files have different lengths."
+                f"Trajectory ({traj_file}, len {trj.shape[0]}) and motor command ({cmd_file}, len {motor_commands.shape[0]}) files have different lengths."
             )
         # Handle 1D vs 2D data consistently
         if trj.ndim == 1:
             trj = trj.reshape(-1, 1)
         if motor_commands.ndim == 1:
             motor_commands = motor_commands.reshape(-1, 1)
-        print(f"Loaded trajectory data with shape: {trj.shape}")
-        print(f"Loaded motor command data with shape: {motor_commands.shape}")
+        log.info(
+            "Loaded input data",
+            trajectory_shape=trj.shape,
+            motor_cmd_shape=motor_commands.shape,
+        )
         return trj, motor_commands
     except FileNotFoundError as e:
-        print(
+        log.error(
             f"Error loading input data: {e}. Ensure '{traj_file}' and '{cmd_file}' exist."
         )
         sys.exit(1)
     except ValueError as e:
-        print(f"Error processing input data files: {e}")
+        log.error(f"Error processing input data files: {e}", exc_info=True)
         sys.exit(1)
     except Exception as e:
-        print(f"An unexpected error occurred during input data loading: {e}")
+        log.error(
+            f"An unexpected error occurred during input data loading: {e}",
+            exc_info=True,
+        )
         sys.exit(1)
 
 
 # --- NEST Kernel Setup ---
 def setup_nest_kernel(sim_params: dict, seed: int, path_data: str):
-    """Resets and configures the NEST kernel."""
+    log = structlog.get_logger("main.nest_setup")
+    """Configures the NEST kernel."""
 
-    nest.SetKernelStatus(
-        {
-            "resolution": sim_params["res"],
-            "overwrite_files": True,  # Important for multiple trials/runs
-            "data_path": path_data,
-            # "print_time": True, # Optional: Print simulation progress
-        }
-    )
-    print(
+    kernel_status = {
+        "resolution": sim_params["res"],
+        "overwrite_files": True,  # Important for multiple trials/runs
+        "data_path": path_data,
+        # "print_time": True, # Optional: Print simulation progress
+    }
+    kernel_status["rng_seed"] = seed  # Set seed via kernel status
+    nest.SetKernelStatus(kernel_status)
+    log.info(
         f"NEST Kernel: Resolution: {sim_params['res']}ms, Seed: {seed}, Data path: {path_data}"
     )
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 # --- MUSIC Setup ---
 def setup_music_interface(n_dof: int, N: int, msc_params: dict, spine_params: dict):
+    log = structlog.get_logger("main.music_setup")
     """Creates MUSIC proxies for input and output."""
     n_total_neurons = 2 * N * n_dof
 
@@ -160,19 +191,20 @@ def setup_music_interface(n_dof: int, N: int, msc_params: dict, spine_params: di
     latency_const = msc_params["const"]
 
     # Output proxy
-    print(f"Creating MUSIC out proxy: port '{out_port_name}'")
+    log.info("Creating MUSIC out proxy", port=out_port_name)
     proxy_out = nest.Create(
         "music_event_out_proxy", 1, params={"port_name": out_port_name}
     )
-    print(f"Created MUSIC out proxy: port '{out_port_name}'")
+    log.info("Created MUSIC out proxy", port=out_port_name, gids=proxy_out.tolist())
 
     # Input proxy
     proxy_in = nest.Create(
         "music_event_in_proxy", n_total_neurons, params={"port_name": in_port_name}
     )
+    log.info("Creating MUSIC in proxy", port=in_port_name, channels=n_total_neurons)
     for i, n in enumerate(proxy_in):
         nest.SetStatus(n, {"music_channel": i})
-    print(
+    log.info(
         f"Created MUSIC in proxy: port '{in_port_name}' with {n_total_neurons} channels"
     )
 
@@ -189,7 +221,7 @@ def setup_music_interface(n_dof: int, N: int, msc_params: dict, spine_params: di
     #     latency = nest.GetKernelStatus("min_delay")
 
     nest.SetAcceptableLatency(in_port_name, latency)
-    print(f"Set MUSIC acceptable latency for '{in_port_name}' to {latency} ms")
+    log.info("Set MUSIC acceptable latency", port=in_port_name, latency=latency)
 
     return proxy_in, proxy_out
 
@@ -197,14 +229,20 @@ def setup_music_interface(n_dof: int, N: int, msc_params: dict, spine_params: di
 def connect_controller_to_music(
     controller: SingleDOFController, proxy_in, proxy_out, dof_id, N
 ):
+    log = structlog.get_logger(f"main.music_connect.dof_{dof_id}")
     """Connects a single controller's inputs/outputs to MUSIC proxies."""
-    print(f"connecting MUSIC inputs, with dof_id={dof_id} and N={N}")
+    log.debug("Connecting MUSIC interfaces", N=N)  # dof_id is in logger name
     # Get PopView objects
     bs_p_view, bs_n_view = controller.get_brainstem_output_popviews()
     sn_p_view, sn_n_view = controller.get_sensory_input_popviews()
     # Connect Brainstem outputs (access .pop from PopView)
     if bs_p_view and bs_n_view:
         start_channel_out = 2 * N * dof_id
+        log.debug(
+            "Connecting brainstem outputs to MUSIC out proxy",
+            start_channel=start_channel_out,
+            num_neurons=N,
+        )
         for i, neuron in enumerate(bs_p_view.pop):
             nest.Connect(
                 neuron,
@@ -227,6 +265,13 @@ def connect_controller_to_music(
     idx_end_n = idx_start_n + N
     delay = controller.spine_params["fbk_delay"]
     wgt = controller.spine_params["wgt_sensNeur_spine"]
+    log.debug(
+        "Connecting MUSIC in proxy to sensory inputs",
+        start_channel=start_channel_in,
+        num_neurons=N,
+        delay=delay,
+        weight=wgt,
+    )
     nest.Connect(
         proxy_in[idx_start_p:idx_end_p],
         sn_p_view.pop,
@@ -247,72 +292,56 @@ def run_simulation(
     n_trials: int,
     path_data: str,
     controllers: list[SingleDOFController],
+    comm: Comm,
 ):
+    log: structlog.stdlib.BoundLogger = structlog.get_logger("main.simulation_loop")
     """Runs the NEST simulation for the specified number of trials."""
-    total_sim_time_ms = sim_params.get("timeMax", 1000.0) + sim_params.get(
-        "timeWait", 0.0
-    )  # Defaults if missing
-    comm = MPI.COMM_WORLD
+    total_sim_time_ms = sim_params["timeMax"] + sim_params["timeWait"]
 
-    # Define the base names of populations expected (match ControllerPopulations)
-    all_pop_names = [
-        "planner_p",
-        "planner_n",
-        "mc_ffwd_p",
-        "mc_ffwd_n",
-        "mc_fbk_p",
-        "mc_fbk_n",
-        "mc_out_p",
-        "mc_out_n",
-        "brainstem_p",
-        "brainstem_n",
-        "sn_p",
-        "sn_n",
-        "pred_p",
-        "pred_n",
-        "state_p",
-        "state_n",
-        "fbk_smooth_p",
-        "fbk_smooth_n",
-    ]
-    # Filter names based on existing populations in the first controller
-    if controllers:
-        valid_pop_names = [
-            name
-            for name in all_pop_names
-            if getattr(controllers[0].pops, name, None) is not None
-        ]
-        if comm.rank == 0:
-            print(f"Populations found for analysis/collapse: {valid_pop_names}")
+    # --- Prepare for Data Collapsing ---
+    pop_views_to_collapse_by_label = defaultdict(list)
+    for controller in controllers:
+        for view in controller.pops.get_all_views():
+            if view.label is not None:  # Check if label exists (meaning to_file=True)
+                pop_views_to_collapse_by_label[view.label].append(view)
+
+    # Extract unique labels and the grouped PopView lists
+    unique_labels = list(pop_views_to_collapse_by_label.keys())
+    grouped_pop_views = list(pop_views_to_collapse_by_label.values())
+
+    if unique_labels:
+        log.info(
+            f"Found {len(unique_labels)} population types for data collapsing based on labels: {unique_labels}"
+        )
     else:
-        valid_pop_names = []
-        if comm.rank == 0:
-            print("No controllers found, skipping simulation loop.")
-        return  # Exit if no controllers
+        log.info(
+            "No populations configured for file output (to_file=True with a label)."
+        )
 
     for trial in range(n_trials):
-        current_sim_start_time = nest.GetKernelStatus(
-            "biological_time"
-        )  # Get time before sim
-        if comm.rank == 0:
-            print(
-                f"--- Simulating Trial {trial + 1}/{n_trials} ({total_sim_time_ms} ms) ---"
-            )
-            print(f"Current simulation time: {current_sim_start_time} ms")
+        current_sim_start_time = nest.GetKernelStatus("biological_time")
+        log.info(
+            f"Starting Trial {trial + 1}/{n_trials}",
+            duration_ms=total_sim_time_ms,
+            current_sim_time_ms=current_sim_start_time,
+        )
+        print(f"Current simulation time: {current_sim_start_time} ms")
         start_trial_time = timer()
 
         nest.Simulate(total_sim_time_ms)
 
         end_trial_time = timer()
-        if comm.rank == 0:
-            print(
-                f"Trial {trial + 1} simulation finished at {nest.GetKernelStatus('biological_time')} ms. Wall clock time: {timedelta(seconds=end_trial_time - start_trial_time)}"
-            )
+        trial_wall_time = timedelta(seconds=end_trial_time - start_trial_time)
+        log.info(
+            f"Finished Trial {trial + 1}/{n_trials}",
+            sim_time_end_ms=nest.GetKernelStatus("biological_time"),
+            wall_time=str(trial_wall_time),
+        )
 
-        print("getting spike events from feedback smooth...")
+        log.debug("Checking spike events", population="fbk_smooth_p")
         senders_refactored, times_refactored = controller.pops.fbk_smooth_p.get_events()
-        print(f"--- Refactored fbk_smooth_p spikes ---")
-        print(f"Num spikes: {len(times_refactored)}")
+        log.debug(f"--- Refactored fbk_smooth_p spikes ---")
+        log.debug(f"Num spikes: {len(times_refactored)}")
         if len(times_refactored) > 0:
             print(
                 f"First spike time: {times_refactored[0]}, sender: {senders_refactored[0]}"
@@ -322,89 +351,57 @@ def run_simulation(
             )
 
         # --- Data Collapsing ---
-        # Assumes PopView was initialized with to_file=True and collapse_files works
-        if comm.rank == 0:
-            print("Attempting data collapsing...")
+        log.info("Attempting data collapsing...")
         start_collapse_time = timer()
-        pops_for_collapse = []
-        for name in valid_pop_names:
-            dof_pop_views = [
-                getattr(c.pops, name)
-                for c in controllers
-                if getattr(c.pops, name, None) is not None
-            ]
-            if dof_pop_views:
-                pops_for_collapse.append(dof_pop_views)
-
-        if pops_for_collapse:
+        # Use the dynamically gathered labels and views for collapsing
+        if grouped_pop_views:
             collapse_files(
                 path_data + "/",  # TODO use paths not strings
-                valid_pop_names,
-                pops_for_collapse,
+                unique_labels,
+                grouped_pop_views,
                 len(controllers),
+                comm,
             )
-            if comm.rank == 0:
-                print("Data collapsing function executed.")
+            log.info("Data collapsing function executed.")
         else:
-            if comm.rank == 0:
-                print("No valid populations found to collapse.")
+            log.info("No populations configured for file output found to collapse.")
 
         end_collapse_time = timer()
-        if comm.rank == 0:
-            print(
-                f"Trial {trial + 1} data collapsing took: {timedelta(seconds=end_collapse_time - start_collapse_time)}"
-            )
-            # --- Data Gathering (Optional - if collapse_files doesn't populate PopView) ---
-            # print("Attempting to gather collapsed data into PopView objects...")
-            # for name_idx, name in enumerate(valid_pop_names):
-            #     try:
-            #         # Construct expected filename based on PopView label convention
-            #         # Assumes label passed to PopView was like 'dofX_popname'
-            #         # and collapse_files creates 'dofX_popname.gdf'
-            #         # This needs verification based on actual collapse_files behavior!
-            #         for dof_idx, pop_view in enumerate(pops_for_collapse[name_idx]):
-            #             base_label = pop_view.label # Get label used at creation
-            #             if base_label: # Check if label exists (was to_file=True?)
-            #                  collapsed_file_path = Path(path_data) / f"{base_label}.gdf"
-            #                  if collapsed_file_path.exists():
-            #                      data = np.loadtxt(collapsed_file_path)
-            #                      if data.ndim == 2 and data.shape[1] == 2: # Check format
-            #                          # Filter based on GIDs associated with this specific PopView
-            #                          min_gid = pop_view.pop[0].global_id
-            #                          max_gid = pop_view.pop[-1].global_id
-            #                          mask = (data[:,0] >= min_gid) & (data[:,0] <= max_gid)
-            #                          pop_view.gather_data(data[mask, 0], data[mask, 1])
-            #                          # print(f"Gathered {np.sum(mask)} spikes for {base_label}")
-            #                      else:
-            #                          print(f"Warning: Data format incorrect or empty in {collapsed_file_path}")
-            #                  else:
-            #                      print(f"Warning: Collapsed file {collapsed_file_path} not found for gathering.")
-            #     except Exception as e:
-            #         print(f"Error gathering data for population type {name}: {e}")
+        collapse_wall_time = timedelta(seconds=end_collapse_time - start_collapse_time)
+        log.info(
+            f"Trial {trial + 1} data collapsing finished",
+            wall_time=str(collapse_wall_time),
+        )
 
-    if comm.rank == 0:
-        print("--- Simulation Finished ---")
+    log.info("--- Simulation Finished ---")
 
 
 # --- Main Execution Block ---
 if __name__ == "__main__":
-    start_script_time = timer()
-
-    nest.ResetKernel()
-    # Set seed before setting other statuses that might depend on RNG
-    nest.rng_seed = SEED
-    random.seed(SEED)
-    np.random.seed(SEED)
-
+    # --- MPI Setup ---
     world = MPI.COMM_WORLD
+    world_rank = world.Get_rank()
+    world_size = world.Get_size()
     # last process is for receiver_plant
-    group = world.group.Excl([world.Get_size() - 1])
+    comm = world.Create_group(MPI.COMM_WORLD.group.Excl([world.Get_size() - 1]))
 
-    comm = world.Create_group(group)
+    # --- Logging Setup ---
+    # Set desired log level (e.g., "INFO", "DEBUG")
+    log_level = os.environ.get("LOG_LEVEL", "DEBUG")
+    setup_logging(comm, log_level=log_level)
+
     rank = comm.rank
-    size = comm.size
-    if rank == 0:
-        print(f"--- Starting main script on {size} MPI rank(s) ---")
+    main_log: structlog.stdlib.BoundLogger = structlog.get_logger("main")
+    main_log.info(
+        "MPI Setup Complete",
+        world_rank=world_rank,
+        world_size=world_size,
+        sim_rank=comm.rank,
+        sim_size=comm.size,
+        log_all_ranks=True,
+    )
+    start_script_time = timer()
+    nest.ResetKernel()
 
     # --- Load Configuration ---
     params = load_config("new_params.json")
@@ -416,60 +413,56 @@ if __name__ == "__main__":
     module_params = params.get("modules", {})
     pops_params = params.get("pops", {})
     conn_params = params.get("connections", {})
-    fig_path_str = params.get(
-        "path", "./figures/"
-    )  # Use path from JSON, provide default
+    main_log.debug(
+        "Loaded Parameters", params=params, sim_settings=sim, exp_settings=exp
+    )
+    # TODO paths pleaseee
+    fig_path_str = params.get("path", "./figures/")
 
     # Simulation parameters (provide defaults if not in JSON)
     # TODO: Consider adding a "simulation" section to new_params.json
-
-    sim_params = params.get(
-        "simulation",
-        {
-            "res": sim.resolution,  # ms - Simulation resolution
-            "timeMax": sim.timeMax,  # ms - Duration of one trial segment
-            "timeWait": sim.timeWait,  # ms - Pause/wait time after trial segment
-            "n_trials": sim.n_trials,  # Number of trials to run
-            "clear_old_data": True,  # Option to clear previous data
-        },
-    )
+    sim_params = {
+        "res": sim.resolution,  # ms - Simulation resolution
+        "timeMax": sim.timeMax,  # ms - Duration of one trial segment
+        "timeWait": sim.timeWait,  # ms - Pause/wait time after trial segment
+        "n_trials": sim.n_trials,  # Number of trials to run
+        "clear_old_data": True,  # Option to clear previous data
+    }
 
     # Experiment parameters (provide defaults if not in JSON)
     # TODO: Consider adding an "experiment" section to new_params.json
-    exp_params = params.get(
-        "experiment",
-        {
-            "seed": SEED,  # Generate random seed if not provided
-            "N": 50,  # Default number of neurons per sub-population
-            # Add other experiment-level info if needed
-        },
-    )
+    exp_params = {
+        "seed": SEED,  # Generate random seed if not provided
+        "N": 50,  # Default number of neurons per sub-population
+        # Add other experiment-level info if needed
+    }
     seed = exp_params["seed"]
     N = exp_params["N"]
 
+    main_log.info("Simulation Parameters", **sim_params)
+    main_log.info("Experiment Parameters", **exp_params)
+
     # MUSIC configuration (provide defaults if not in JSON)
     # TODO: Consider adding a "music" section to new_params.json
-    music_cfg = params.get(
-        "music",
-        {
-            "out_port": "mot_cmd_out",
-            "in_port": "fbk_in",
-            "const": 1e-6,  # Latency constant
-        },
-    )
+    music_cfg = {
+        "out_port": "mot_cmd_out",
+        "in_port": "fbk_in",
+        "const": 1e-6,  # Latency constant
+    }
+    main_log.info("MUSIC Configuration", **music_cfg)
 
     # --- Environment and Path Setup ---
-    setup_environment()  # Setup LD_LIBRARY_PATH, install modules
+    setup_environment()
     path_data, path_fig = setup_paths(fig_path_str)
     if sim_params.get("clear_old_data", False):
-        clear_old_data(path_data)
+        clear_old_data(path_data, comm)
 
     # --- Load Input Data ---
     trj, motor_commands = load_input_data()  # Use default filenames
     njt = trj.shape[1]  # Infer number of DoFs
-    if rank == 0:
-        print(f"Inferred {njt} DoF(s) from input data.")
+    main_log.info(f"Inferred {njt} DoF(s) from input data.")
 
+    main_log.info("Input data loaded", dof=njt)
     # --- Time Vectors ---
     res = sim_params["res"]
     time_span_per_trial = sim_params["timeMax"] + sim_params["timeWait"]
@@ -491,10 +484,17 @@ if __name__ == "__main__":
         endpoint=True,
     )
 
+    main_log.debug(
+        "Time vectors calculated",
+        total_duration=total_sim_duration,
+        single_trial_duration=time_span_per_trial,
+        num_steps_total=len(total_time_vect_concat),
+        num_steps_trial=len(single_trial_time_vect),
+    )
     # Verify data length against single trial time vector
     if len(trj) != len(single_trial_time_vect):
-        print(
-            f"Warning: Input data length ({len(trj)}) does not match single trial time vector length ({len(single_trial_time_vect)} based on timeMax={sim_params['timeMax']}, timeWait={sim_params['timeWait']}, res={res})."
+        main_log.warning(
+            f"Input data length ({len(trj)}) does not match single trial time vector length ({len(single_trial_time_vect)} based on timeMax={sim_params['timeMax']}, timeWait={sim_params['timeWait']}, res={res})."
         )
         # Option 1: Truncate data (might lose information)
         # if len(trj) > len(single_trial_time_vect):
@@ -503,20 +503,18 @@ if __name__ == "__main__":
         #     print("Truncated input data to match single trial duration.")
         # Option 2: Adjust simulation times (might not be desired)
         # Option 3: Assume data spans *all* trials (requires different handling in Controller) - Less likely based on original code
-        print(
+        main_log.warning(
             "Proceeding with potentially mismatched data/time vector length. Check parameters."
         )
 
     # --- Network Construction ---
     start_network_time = timer()
-    setup_nest_kernel(sim_params, seed, path_data)  # Reset kernel before building
+    setup_nest_kernel(sim_params, seed, path_data)
 
     controllers = []
-    if rank == 0:
-        print(f"--- Constructing Network ({njt} DoF(s), N={N}) ---")
+    main_log.info(f"Constructing Network", dof=njt, N=N)
     for j in range(njt):
-        if rank == 0:
-            print(f"Creating controller for DoF {j}...")
+        main_log.info(f"Creating controller", dof=j)
         # Safely get module params using .get with empty dict as default
         mc_p = module_params.get("motor_cortex", {})
         plan_p = module_params.get("planner", {})
@@ -548,38 +546,36 @@ if __name__ == "__main__":
     spine_params = module_params["spine"]  # Get spine params again for MUSIC setup
     proxy_in, proxy_out = setup_music_interface(njt, N, music_cfg, spine_params)
     for j, controller in enumerate(controllers):
-        if rank == 0:
-            print(f"Connecting controller {j} to MUSIC...")
+        main_log.info(f"Connecting controller to MUSIC", dof=j)
         connect_controller_to_music(controller, proxy_in, proxy_out, j, N)
 
     # --- Inter-Controller Connections (if any) ---
     # Add code here if controllers need to be connected to each other
 
     end_network_time = timer()
-    if rank == 0:
-        print(f"--- Network Construction Finished ---")
-        print(
-            f"Network construction wall clock time: {timedelta(seconds=end_network_time - start_network_time)}"
-        )
+    main_log.info(
+        f"Network Construction Finished",
+        wall_time=str(timedelta(seconds=end_network_time - start_network_time)),
+    )
 
     # --- Simulation ---
-    run_simulation(sim_params, n_trials, path_data, controllers)
+    run_simulation(sim_params, n_trials, path_data, controllers, comm)
 
     # --- Plotting (Rank 0 Only) ---
     if rank == 0:
-        print("--- Generating Plots ---")
+        main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
-        plot_controller_outputs(
-            controllers, total_time_vect_concat, path_fig, save_fig=True
-        )
+        try:
+            plot_controller_outputs(controllers, total_time_vect_concat, path_fig)
+        except Exception as e:
+            main_log.error("Error during plotting", error=str(e), exc_info=True)
         end_plot_time = timer()
-        print(
-            f"Plotting wall clock time: {timedelta(seconds=end_plot_time - start_plot_time)}"
-        )
+        plot_wall_time = timedelta(seconds=end_plot_time - start_plot_time)
+        main_log.info(f"Plotting Finished", wall_time=str(plot_wall_time))
 
     # --- Final Timing ---
     end_script_time = timer()
-    if rank == 0:
-        total_duration = timedelta(seconds=end_script_time - start_script_time)
-        print(f"--- Script Finished ---")
-        print(f"Total wall clock time: {total_duration}")
+    main_log.info(f"--- Script Finished ---")
+    main_log.info(
+        f"Total wall clock time: {timedelta(seconds=end_script_time - start_script_time)}"
+    )

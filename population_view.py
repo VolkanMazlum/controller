@@ -349,9 +349,11 @@ class PopView:
         """
 
         self.pop = pop
+        self.label = None
         if to_file == True:
             if label == "":
                 raise Exception("To save into file, you need to specify a label")
+            self.label = label
             param_file = {"record_to": "ascii", "label": label}
             self.detector = self._create_connect_spike_detector(pop, **param_file)
         else:
