@@ -258,7 +258,7 @@ class SingleDOFController:
         self.pops.fbk_smooth_p = self._create_pop_view(pop_p, "fbk_smooth_p", to_file)
 
         pop_n = nest.Create("basic_neuron_nestml", self.N)
-        nest.SetStatus(pop_n, {**pop_params, "pos": True})
+        nest.SetStatus(pop_n, {**pop_params, "pos": False})
         self.pops.fbk_smooth_n = self._create_pop_view(pop_n, "fbk_smooth_n", to_file)
 
     def _build_brainstem(self, to_file=False):
