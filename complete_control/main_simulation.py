@@ -59,7 +59,9 @@ def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
     try:
         # Check if module is already installed to prevent errors on reset
         if "controller_module" not in nest.Models(mtype="nodes"):
-            nest.Install("controller_module")  # Install custom NESTML modules
+            # TODO we should only install it if we are running without cerebellum, otherwise
+            # cerebellum tries installing it again (or remove it from configuration)
+            # nest.Install("controller_module")  # Install custom NESTML modules
             log.info("Installed NESTML module", module="controller_module")
         else:
             log.debug("NESTML module already installed", module="controller_module")
@@ -513,12 +515,10 @@ if __name__ == "__main__":
     main_log.info(f"Constructing Network", dof=njt, N=N)
     for j in range(njt):
         main_log.info(f"Creating controller", dof=j)
-        # Safely get module params using .get with empty dict as default
-        mc_p = module_params.get("motor_cortex", {})
-        plan_p = module_params.get("planner", {})
-        spine_p = module_params.get("spine", {})
-        state_p = module_params.get("state", {})
-        state_se_p = module_params.get("state_se", {})  # Check if used by Controller
+        mc_p = module_params["motor_cortex"]
+        plan_p = module_params["planner"]
+        spine_p = module_params["spine"]
+        state_p = module_params["state"]
 
         controller = SingleDOFController(
             dof_id=j,
@@ -535,6 +535,9 @@ if __name__ == "__main__":
             sim_params=sim_params,
             path_data=run_paths.data_nest,
             label_prefix="",
+            use_cerebellum=True,
+            cerebellum_config={},  # TODO
+            comm=comm,
         )
         controllers.append(controller)
 

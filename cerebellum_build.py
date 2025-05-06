@@ -42,26 +42,18 @@ class Cerebellum:
 
     def __init__(
         self,
-        sim: Simulation,
-        exp: Experiment,
+        comm: MPI.Comm,
         filename_h5,
         filename_config,
     ):
         print("init cerebellum")
-        pathData = exp.pathData + "nest/"
         options.verbosity = 4
         print(f"increased bsb verbosity to {options.verbosity}")
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
         self.forward_model = None
 
-        world = MPI.COMM_WORLD
-        group = world.group.Excl([world.Get_size() - 1])
-        # last is for receiver_plant
-
-        comm = world.Create_group(group)
-        # this is the group of all simulation processes (VPs in nest language)
-        adapter = get_simulation_adapter("nest", comm)
+        adapter: NestAdapter = get_simulation_adapter("nest", comm)
         # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
 
         self.forward_model = from_storage(str(PATH_HDF5), comm)
@@ -87,10 +79,6 @@ class Cerebellum:
         adapter.simdata[simulation_inv] = SimulationData(
             simulation_inv, result=NestResult(simulation_inv)
         )
-
-        nest.SetKernelStatus({"resolution": sim.resolution})
-        nest.SetKernelStatus({"overwrite_files": True})
-        nest.SetKernelStatus({"data_path": pathData})
 
         adapter.load_modules(simulation_forw)
         adapter.load_modules(simulation_inv)
