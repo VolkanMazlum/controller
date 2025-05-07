@@ -7,6 +7,7 @@ import structlog
 from CerebellumInterfacePopulations import (
     CerebellumInterfacePopulations,  # Added import
 )
+from ControllerPopulations import ControllerPopulations
 from mpi4py.MPI import Comm
 
 from cerebellum_build import Cerebellum
@@ -29,7 +30,8 @@ class CerebellumController:
         cerebellum_config: Dict[str, Any],  # Params for Cerebellum object (paths etc)
         path_data: str,
         comm: Comm,
-        label_prefix: str = "cereb_",  # Specific prefix for cerebellum pops
+        controller_pops: Optional[ControllerPopulations],
+        label_prefix: str = "cereb_",
         dof_id: int = 0,
     ):
         """
@@ -45,6 +47,7 @@ class CerebellumController:
             path_data (str): Path for NEST data output.
             label_prefix (str): Prefix for PopView labels.
             dof_id (int): Degree of freedom identifier (currently unused internally).
+            controller_pops (Optional[ControllerPopulations]): Populations from the main controller.
         """
         self.log = structlog.get_logger(f"cerebellum_controller.dof_{dof_id}")
         self.log.info("Initializing CerebellumController")
@@ -59,6 +62,7 @@ class CerebellumController:
         self.comm = comm
         self.label_prefix = label_prefix
         self.res = sim_params.get("res", 0.1)  # Get resolution
+        self.controller_pops = controller_pops
 
         # --- Initialize Interface Populations Dataclass ---
         self.interface_pops = CerebellumInterfacePopulations()
@@ -511,6 +515,191 @@ class CerebellumController:
         # # Placeholder:
         # # nest.Connect(sn_p, self.feedback_inv_p.pop, "all_to_all", syn_spec={"weight": w_sn_finv, "delay": d_sn_finv})
         # # nest.Connect(sn_n, self.feedback_inv_n.pop, "all_to_all", syn_spec={"weight": -w_sn_finv, "delay": d_sn_finv})
+
+    def connect_to_main_controller_populations(self):
+        if not self.controller_pops:
+            self.log.error(
+                "ControllerPopulations not provided, cannot connect to main controller."
+            )
+            raise ValueError(
+                "ControllerPopulations not provided, cannot connect to main controller."
+            )
+
+        self.log.info("Connecting CerebellumController to main controller populations")
+
+        # --- Connections FROM Cerebellum Controller (Fwd DCN) TO controller_pops.pred_p/n ---
+        conn_spec_dcn_pred = self.conn_params["dcn_forw_prediction"]
+        w_dcn_pred = conn_spec_dcn_pred["weight"]
+        d_dcn_pred = conn_spec_dcn_pred["delay"]
+        self.log.debug(
+            "Connecting Cerebellum Fwd DCN -> Controller's pred_p/n",
+            weight=w_dcn_pred,
+            delay=d_dcn_pred,
+        )
+        nest.Connect(
+            self.cerebellum.populations.forw_dcnp_p_view.pop,
+            self.controller_pops.pred_p.pop,
+            "all_to_all",
+            syn_spec={"weight": w_dcn_pred, "delay": d_dcn_pred},
+        )
+        # DCN minus inhibits Positive Prediction
+        nest.Connect(
+            self.cerebellum.populations.forw_dcnp_n_view.pop,
+            self.controller_pops.pred_p.pop,
+            "all_to_all",
+            syn_spec={"weight": -w_dcn_pred, "delay": d_dcn_pred},
+        )
+        # DCN minus drives Negative Prediction
+        nest.Connect(
+            self.cerebellum.populations.forw_dcnp_n_view.pop,
+            self.controller_pops.pred_n.pop,
+            "all_to_all",
+            syn_spec={"weight": w_dcn_pred, "delay": d_dcn_pred},
+        )
+        # DCN plus inhibits Negative Prediction
+        nest.Connect(
+            self.cerebellum.populations.forw_dcnp_p_view.pop,
+            self.controller_pops.pred_n.pop,
+            "all_to_all",
+            syn_spec={"weight": -w_dcn_pred, "delay": d_dcn_pred},
+        )
+
+        # --- Connections TO Cerebellum Controller Interfaces (FROM controller_pops) ---
+        # MC Out -> Cereb Motor Commands Input
+        conn_spec_mc_motor = self.conn_params["mc_out_motor_commands"]
+        w_mc_motor = conn_spec_mc_motor["weight"]
+        d_mc_motor = conn_spec_mc_motor["delay"]
+        self.log.debug(
+            "Connecting Controller MC Out -> Cereb Motor Cmds",
+            weight=w_mc_motor,
+            delay=d_mc_motor,
+        )
+        nest.Connect(
+            self.controller_pops.mc_out_p.pop,
+            self.interface_pops.motor_commands_p.pop,
+            "all_to_all",
+            syn_spec={"weight": w_mc_motor, "delay": d_mc_motor},
+        )
+        nest.Connect(
+            self.controller_pops.mc_out_n.pop,
+            self.interface_pops.motor_commands_n.pop,
+            "all_to_all",
+            syn_spec={"weight": -w_mc_motor, "delay": d_mc_motor},
+        )
+
+        # Planner -> Cereb Plan To Inv Input
+        conn_spec_plan_inv = self.conn_params["planner_plan_to_inv"]
+        w_plan_inv = conn_spec_plan_inv["weight"]
+        d_plan_inv = conn_spec_plan_inv["delay"]
+        self.log.debug(
+            "Connecting Controller Planner -> Cereb PlanToInv",
+            weight=w_plan_inv,
+            delay=d_plan_inv,
+        )
+        nest.Connect(
+            self.controller_pops.planner_p.pop,
+            self.interface_pops.plan_to_inv_p.pop,
+            "all_to_all",
+            syn_spec={"weight": w_plan_inv, "delay": d_plan_inv},
+        )
+        nest.Connect(
+            self.controller_pops.planner_n.pop,
+            self.interface_pops.plan_to_inv_n.pop,
+            "all_to_all",
+            syn_spec={"weight": -w_plan_inv, "delay": d_plan_inv},
+        )
+
+        # Sensory -> Cereb Feedback Input
+        conn_spec_sn_fbk = self.conn_params["sn_fbk_smoothed"]
+        w_sn_fbk = conn_spec_sn_fbk["weight"]
+        d_sn_fbk = conn_spec_sn_fbk["delay"]
+        self.log.debug(
+            "Connecting Controller Sensory -> Cereb Feedback",
+            weight=w_sn_fbk,
+            delay=d_sn_fbk,
+        )
+        nest.Connect(
+            self.controller_pops.sn_p.pop,
+            self.interface_pops.feedback_p.pop,
+            "all_to_all",
+            syn_spec={"weight": w_sn_fbk, "delay": d_sn_fbk},
+        )
+        nest.Connect(
+            self.controller_pops.sn_n.pop,
+            self.interface_pops.feedback_n.pop,
+            "all_to_all",
+            syn_spec={"weight": -w_sn_fbk, "delay": d_sn_fbk},
+        )
+
+        # Sensory -> Cereb Feedback Inv Input
+        conn_spec_sn_finv = self.conn_params["sn_feedback_inv"]
+        w_sn_finv = conn_spec_sn_finv["weight"]
+        d_sn_finv = conn_spec_sn_finv["delay"]
+        self.log.debug(
+            "Connecting Controller Sensory -> Cereb FeedbackInv",
+            weight=w_sn_finv,
+            delay=d_sn_finv,
+        )
+        nest.Connect(
+            self.controller_pops.sn_p.pop,
+            self.interface_pops.feedback_inv_p.pop,
+            "all_to_all",
+            syn_spec={"weight": w_sn_finv, "delay": d_sn_finv},
+        )
+        nest.Connect(
+            self.controller_pops.sn_n.pop,
+            self.interface_pops.feedback_inv_n.pop,
+            "all_to_all",
+            syn_spec={"weight": -w_sn_finv, "delay": d_sn_finv},
+        )
+
+        # StateEst -> Cereb State To Inv Input
+        # TODO: Check if "planner_plan_to_inv" is the correct conn_spec or if a dedicated one like "state_state_to_inv" is needed.
+        conn_spec_state_inv = self.conn_params["planner_plan_to_inv"]
+        w_state_inv = conn_spec_state_inv["weight"]
+        d_state_inv = conn_spec_state_inv["delay"]
+
+        self.log.debug(
+            "Connecting Controller StateEst -> Cereb StateToInv",
+            weight=w_state_inv,
+            delay=d_state_inv,
+        )
+        if self.controller_pops.state_p and self.interface_pops.state_to_inv_p:
+            nest.Connect(
+                self.controller_pops.state_p.pop,
+                self.interface_pops.state_to_inv_p.pop,
+                "all_to_all",
+                syn_spec={"weight": w_state_inv, "delay": d_state_inv},
+            )
+        if self.controller_pops.state_n and self.interface_pops.state_to_inv_n:
+            nest.Connect(
+                self.controller_pops.state_n.pop,
+                self.interface_pops.state_to_inv_n.pop,
+                "all_to_all",
+                syn_spec={"weight": -w_state_inv, "delay": d_state_inv},
+            )
+
+        # --- Connections FROM Cerebellum Controller Interfaces (motor_prediction) TO controller_pops.brainstem ---
+        conn_spec_cereb_bs = self.conn_params["motor_pre_brain_stem"]
+        conn_spec_p_bs = conn_spec_cereb_bs.copy()
+        self.log.debug(
+            "Connecting Cerebellum motor prediction to Controller brainstem",
+            conn_spec=conn_spec_p_bs,
+        )
+        nest.Connect(
+            self.interface_pops.motor_prediction_p.pop,
+            self.controller_pops.brainstem_p.pop,
+            "all_to_all",
+            syn_spec=conn_spec_p_bs,
+        )
+        conn_spec_n_bs = conn_spec_cereb_bs.copy()
+        conn_spec_n_bs["weight"] = -conn_spec_n_bs["weight"]
+        nest.Connect(
+            self.interface_pops.motor_prediction_n.pop,
+            self.controller_pops.brainstem_n.pop,
+            "all_to_all",
+            syn_spec=conn_spec_n_bs,
+        )
 
     # --- Methods to get interface populations (optional, for clarity) ---
     # def get_forward_prediction_outputs( # Obsolete as prediction_p/n are now in SingleDOFController

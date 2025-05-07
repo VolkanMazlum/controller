@@ -11,7 +11,16 @@ from population_view import PopView
 
 @dataclass
 class ControllerPopulations:
-    """Holds the PopView instances for various populations in the controller."""
+    """
+    Holds the PopView instances for various populations in the controller.
+    If CerebellumController is used, it will connect to the following populations from this dataclass:
+    - mc_out_p, mc_out_n (Motor Cortex outputs)
+    - planner_p, planner_n (Planner outputs)
+    - sn_p, sn_n (Sensory inputs)
+    - state_p, state_n (State Estimator outputs)
+    - pred_p, pred_n (Prediction scaling neuron inputs, target for Fwd DCN)
+    - brainstem_p, brainstem_n (Brainstem inputs, target for Inv DCN motor prediction)
+    """
 
     # Planner
     planner_p: Optional[PopView] = None

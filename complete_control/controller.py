@@ -121,37 +121,39 @@ class SingleDOFController:
 
         # Instantiate the populations dataclass
         self.pops = ControllerPopulations()
-        self.cerebellum_controller: Optional[CerebellumController] = (
-            None  # Initialize attribute
-        )
+        self.cerebellum_controller: Optional[CerebellumController] = None
 
-        # --- Instantiate Cerebellum Controller (if enabled) ---
-        if self.use_cerebellum:
-            self._instantiate_cerebellum_controller()
+        if use_cerebellum:
+            self.cerebellum_controller = self._instantiate_cerebellum_controller(
+                self.pops
+            )
+        # this order has a reason to it: beside the obvious dependency connect -> create, there is a more insidious one:
+        # Cerebellum ALWAYS tries to import custom_stdp, but if it had been imported already NEST will error out
+        # (tracking_neuron_nestml already exists, choose a different model name); this means that Cerebellum must be
+        # created first, so that its modules are imported -> custom_stdp exists already and does not need to be loaded again
 
         # --- Build and Connect ---
-        # Pass `to_file=True` to PopView constructor where needed
         self.log.info("Creating controller blocks...")
         self._create_blocks()
-        self.log.info("Connecting controller blocks...")
+        self.log.info("Connecting internal controller blocks...")
         self._connect_blocks_controller()
-        self._connect_controller_to_cerebellum()
+
+        # --- Connect Cerebellum and Controller (needs to be here... >:( )
+        if use_cerebellum:
+            self.cerebellum_controller.connect_to_main_controller_populations()
+
         self.log.info("Controller initialization complete.")
 
-    def _instantiate_cerebellum_controller(self):
+    def _instantiate_cerebellum_controller(
+        self, controller_pops: ControllerPopulations
+    ):
         """Instantiates the internal CerebellumController."""
         self.log.info("Instantiating internal CerebellumController")
         if self.cerebellum_config is None:
-            self.log.error(
-                "Cerebellum config must be provided when use_cerebellum is True"
-            )
             raise ValueError(
                 "Cerebellum config must be provided when use_cerebellum is True"
             )
 
-        # Extract parameters needed specifically for CerebellumController interfaces
-        # This requires knowing which keys from pops_params/conn_params are used by CerebellumController
-        # Based on cerebellum_controller.py and brain.py:
         cereb_pop_keys = [
             "prediction",
             "feedback",
@@ -177,18 +179,14 @@ class SingleDOFController:
             # Connections *from* CerebController *to* SDC interfaces are handled in SDC._connect_blocks
         ]
 
-        cereb_pops_params = {k: self.pops_params.get(k, {}) for k in cereb_pop_keys}
-        cereb_conn_params = {k: self.conn_params.get(k, {}) for k in cereb_conn_keys}
-
-        # Handle potential missing keys with defaults if necessary, or raise errors
-        if not cereb_pops_params["prediction"]:
-            self.log.warning("Missing 'prediction' params for cerebellum")
-        if not cereb_conn_params["dcn_forw_prediction"]:
-            self.log.warning("Missing 'dcn_forw_prediction' params for cerebellum")
-        # Add more checks as needed based on CerebellumController requirements
+        # cereb_pops_params = {k: self.pops_params[k] for k in cereb_pop_keys}
+        # cereb_conn_params = {k: self.conn_params[k] for k in cereb_conn_keys}
+        # TODO different parameter sets could be nice :)
+        cereb_pops_params = self.pops_params
+        cereb_conn_params = self.conn_params
 
         try:
-            self.cerebellum_controller = CerebellumController(
+            cerebellum_controller = CerebellumController(
                 N=self.N,
                 total_time_vect=self.total_time_vect,
                 sim_params=self.sim_params,
@@ -199,8 +197,10 @@ class SingleDOFController:
                 label_prefix=f"{self.label}cereb_",
                 dof_id=self.dof_id,
                 comm=self.comm,
+                controller_pops=controller_pops,
             )
             self.log.info("Internal CerebellumController instantiated successfully.")
+            return cerebellum_controller
         except Exception as e:
             self.log.error(
                 "Failed to instantiate internal CerebellumController",
@@ -524,169 +524,6 @@ class SingleDOFController:
                 syn_spec={"weight": weight, "receptor_type": i + offset},
             )
         # Note: The MC Output -> Brainstem connection happens in both cases and is handled above
-
-    def _connect_controller_to_cerebellum(self):
-        # --- Connections Dependent on Cerebellum ---
-        self.log.info("Connecting blocks WITH cerebellum")
-
-        # --- Connections FROM Cerebellum Controller (Fwd DCN) TO self.pops.pred_p/n ---
-        conn_spec_dcn_pred = self.conn_params["dcn_forw_prediction"]
-        w_dcn_pred = conn_spec_dcn_pred["weight"]
-        d_dcn_pred = conn_spec_dcn_pred["delay"]
-        self.log.debug(
-            "Connecting Cerebellum Fwd DCN -> self.pops.pred_p/n",
-            weight=w_dcn_pred,
-            delay=d_dcn_pred,
-        )
-        # Connections from Cerebellum's DCN to the controller's prediction scaling neurons
-        nest.Connect(
-            self.cerebellum_controller.cerebellum.populations.forw_dcnp_p_view.pop,
-            self.pops.pred_p.pop,
-            "all_to_all",
-            syn_spec={"weight": w_dcn_pred, "delay": d_dcn_pred},
-        )
-        nest.Connect(
-            self.cerebellum_controller.cerebellum.populations.forw_dcnp_n_view.pop,
-            self.pops.pred_p.pop,
-            "all_to_all",
-            syn_spec={
-                "weight": -w_dcn_pred,  # DCN minus inhibits Positive Prediction
-                "delay": d_dcn_pred,
-            },
-        )
-        nest.Connect(
-            self.cerebellum_controller.cerebellum.populations.forw_dcnp_n_view.pop,
-            self.pops.pred_n.pop,
-            "all_to_all",
-            syn_spec={
-                "weight": w_dcn_pred,  # DCN minus drives Negative Prediction
-                "delay": d_dcn_pred,
-            },
-        )
-        nest.Connect(
-            self.cerebellum_controller.cerebellum.populations.forw_dcnp_p_view.pop,
-            self.pops.pred_n.pop,
-            "all_to_all",
-            syn_spec={
-                "weight": -w_dcn_pred,  # DCN plus inhibits Negative Prediction
-                "delay": d_dcn_pred,
-            },
-        )
-        # --- Connections TO Cerebellum Controller Interfaces ---
-        # MC Out -> Cereb Motor Commands Input
-        conn_spec = self.conn_params["mc_out_motor_commands"]
-        w = conn_spec["weight"]
-        d = conn_spec["delay"]
-        self.log.debug("Connecting MC Out -> Cereb Motor Cmds", weight=w, delay=d)
-        nest.Connect(
-            self.pops.mc_out_p.pop,
-            self.cerebellum_controller.interface_pops.motor_commands_p.pop,
-            "all_to_all",
-            syn_spec={"weight": w, "delay": d},
-        )
-        nest.Connect(
-            self.pops.mc_out_n.pop,
-            self.cerebellum_controller.interface_pops.motor_commands_n.pop,
-            "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
-        )
-        # Planner -> Cereb Plan To Inv Input
-        conn_spec = self.conn_params["planner_plan_to_inv"]
-        w = conn_spec["weight"]
-        d = conn_spec["delay"]
-        self.log.debug("Connecting Planner -> Cereb PlanToInv", weight=w, delay=d)
-        nest.Connect(
-            self.pops.planner_p.pop,
-            self.cerebellum_controller.interface_pops.plan_to_inv_p.pop,
-            "all_to_all",
-            syn_spec={"weight": w, "delay": d},
-        )
-        nest.Connect(
-            self.pops.planner_n.pop,
-            self.cerebellum_controller.interface_pops.plan_to_inv_n.pop,
-            "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
-        )
-
-        # Sensory -> Cereb Feedback Input
-        conn_spec = self.conn_params[
-            "sn_fbk_smoothed"
-        ]  # Reusing spec from sensory->smoothing based on brain.py L944
-        w = conn_spec["weight"]
-        d = conn_spec["delay"]
-        self.log.debug("Connecting Sensory -> Cereb Feedback", weight=w, delay=d)
-        nest.Connect(
-            self.pops.sn_p.pop,
-            self.cerebellum_controller.interface_pops.feedback_p.pop,
-            "all_to_all",
-            syn_spec={"weight": w, "delay": d},
-        )
-        nest.Connect(
-            self.pops.sn_n.pop,
-            self.cerebellum_controller.interface_pops.feedback_n.pop,
-            "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
-        )  # Sign based on brain.py L955
-
-        # Sensory -> Cereb Feedback Inv Input (if used by CerebController)
-        conn_spec = self.conn_params["sn_feedback_inv"]
-        w = conn_spec["weight"]
-        d = conn_spec["delay"]
-        self.log.debug("Connecting Sensory -> Cereb FeedbackInv", weight=w, delay=d)
-        nest.Connect(
-            self.pops.sn_p.pop,
-            self.cerebellum_controller.interface_pops.feedback_inv_p.pop,
-            "all_to_all",
-            syn_spec={"weight": w, "delay": d},
-        )
-        nest.Connect(
-            self.pops.sn_n.pop,
-            self.cerebellum_controller.interface_pops.feedback_inv_n.pop,
-            "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
-        )  # Sign based on brain.py L1170
-
-        # StateEst -> Cereb State To Inv Input
-        conn_spec = self.conn_params["planner_plan_to_inv"]
-        w = conn_spec["weight"]
-        d = conn_spec["delay"]
-        self.log.debug("Connecting StateEst -> Cereb StateToInv", weight=w, delay=d)
-        nest.Connect(
-            self.pops.state_p.pop,
-            self.cerebellum_controller.interface_pops.state_to_inv_p.pop,
-            "all_to_all",
-            syn_spec={"weight": w, "delay": d},
-        )
-        nest.Connect(
-            self.pops.state_n.pop,
-            self.cerebellum_controller.interface_pops.state_to_inv_n.pop,
-            "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
-        )
-
-        # --- Connections FROM Cerebellum Controller Interfaces (excluding Fwd DCN which is handled above) ---
-        # Cereb Motor Prediction -> Brainstem (Additive)
-        conn_spec_cereb_bs = self.conn_params["motor_pre_brain_stem"]
-        conn_spec_p = conn_spec_cereb_bs.copy()
-
-        self.log.debug(
-            "Connecting Cerebellum motor prediction to brainstem",
-            conn_spec=conn_spec_p,
-        )
-        nest.Connect(
-            self.cerebellum_controller.interface_pops.motor_prediction_p.pop,
-            self.pops.brainstem_p.pop,
-            "all_to_all",
-            syn_spec=conn_spec_p,
-        )
-        conn_spec_n = conn_spec_cereb_bs.copy()
-        conn_spec_n["weight"] = -conn_spec_n["weight"]
-        nest.Connect(
-            self.cerebellum_controller.interface_pops.motor_prediction_n.pop,
-            self.pops.brainstem_n.pop,
-            "all_to_all",
-            syn_spec=conn_spec_n,
-        )
 
     # --- 3. Input/Output Access ---
     # These return PopView objects now, callers can access .pop if needed
