@@ -76,11 +76,13 @@ class CerebellumController:
             comm=comm,
             filename_h5=cerebellum_config.get("filename_h5"),
             filename_config=cerebellum_config.get("filename_config"),
+            total_time_vect=self.total_time_vect,
+            label_prefix=f"{self.label_prefix}core_",
         )
         self.log.info("Core Cerebellum object instantiated.")
-        # Get N_mossy counts after instantiation
-        self.N_mossy_forw = int(len(self.cerebellum.forw_Nest_Mf) / 2)
-        self.N_mossy_inv = int(len(self.cerebellum.inv_Nest_Mf) / 2)
+        # Get N_mossy counts from the Cerebellum object
+        self.N_mossy_forw = self.cerebellum.N_mossy_forw
+        self.N_mossy_inv = self.cerebellum.N_mossy_inv
         self.log.info(
             "Mossy fiber counts", N_forw=self.N_mossy_forw, N_inv=self.N_mossy_inv
         )
@@ -260,87 +262,6 @@ class CerebellumController:
             feedback_inv_n, "feedback_inv_n"
         )
 
-        # Also create PopViews for core cerebellum outputs if needed for external access/plotting
-        # These reference populations created within self.cerebellum
-        # NOTE: These are NOT part of the interface_pops dataclass, they are direct views
-        # into the core cerebellum model's populations. Keep them as direct attributes.
-        # TODO i don't like that the PopView is owned by cerebellum_controller while the actual
-        # population is in Cerebellum. can't we put the PopView inside Cerebellum directly?
-        self.forw_DCNp_plus = self._create_pop_view(
-            self.cerebellum.forw_N_DCNp_plus, "forw_dcnp_p"
-        )
-        self.forw_DCNp_minus = self._create_pop_view(
-            self.cerebellum.forw_N_DCNp_minus, "forw_dcnp_n"
-        )
-        self.inv_DCNp_plus = self._create_pop_view(
-            self.cerebellum.inv_N_DCNp_plus, "inv_dcnp_p"
-        )
-        self.inv_DCNp_minus = self._create_pop_view(
-            self.cerebellum.inv_N_DCNp_minus, "inv_dcnp_n"
-        )
-        # Add others (IO, PC, etc.) if required by the plan or for debugging/analysis
-
-        # Additional PopViews for core cerebellum populations (mirroring brain.py for recording)
-        self.log.debug("Creating PopViews for internal core cerebellum populations")
-
-        # Forward Model Internal Populations
-        self.forw_mf_plus_view = self._create_pop_view(
-            self.cerebellum.forw_Nest_Mf[self.N_mossy_forw :], "forw_mf_p"
-        )
-        self.forw_mf_minus_view = self._create_pop_view(
-            self.cerebellum.forw_Nest_Mf[0 : self.N_mossy_forw], "forw_mf_n"
-        )
-        self.forw_io_plus_view = self._create_pop_view(
-            self.cerebellum.forw_N_IO_plus, "forw_io_p"
-        )  # yeah as mentioned before, now when connecting error to this it uses cerebellum pop directly... confusing!
-        self.forw_io_minus_view = self._create_pop_view(
-            self.cerebellum.forw_N_IO_minus, "forw_io_n"
-        )
-        self.forw_pc_plus_view = self._create_pop_view(
-            self.cerebellum.forw_N_PC, "forw_pc_p"
-        )
-        self.forw_pc_minus_view = self._create_pop_view(
-            self.cerebellum.forw_N_PC_minus, "forw_pc_n"
-        )
-        self.forw_glom_view = self._create_pop_view(
-            self.cerebellum.forw_N_Glom, "forw_glom"
-        )
-        self.forw_grc_view = self._create_pop_view(
-            self.cerebellum.forw_N_GrC, "forw_grc"
-        )
-        self.forw_goc_view = self._create_pop_view(
-            self.cerebellum.forw_N_GoC, "forw_goc"
-        )
-        self.forw_bc_view = self._create_pop_view(self.cerebellum.forw_N_BC, "forw_bc")
-        self.forw_sc_view = self._create_pop_view(self.cerebellum.forw_N_SC, "forw_sc")
-
-        # Inverse Model Internal Populations
-        self.inv_mf_plus_view = self._create_pop_view(
-            self.cerebellum.inv_Nest_Mf[self.N_mossy_inv :], "inv_mf_p"
-        )
-        self.inv_mf_minus_view = self._create_pop_view(
-            self.cerebellum.inv_Nest_Mf[0 : self.N_mossy_inv], "inv_mf_n"
-        )
-        self.inv_io_plus_view = self._create_pop_view(
-            self.cerebellum.inv_N_IO_plus, "inv_io_p"
-        )
-        self.inv_io_minus_view = self._create_pop_view(
-            self.cerebellum.inv_N_IO_minus, "inv_io_n"
-        )
-        self.inv_pc_plus_view = self._create_pop_view(
-            self.cerebellum.inv_N_PC, "inv_pc_p"
-        )
-        self.inv_pc_minus_view = self._create_pop_view(
-            self.cerebellum.inv_N_PC_minus, "inv_pc_n"
-        )
-        self.inv_glom_view = self._create_pop_view(
-            self.cerebellum.inv_N_Glom, "inv_glom"
-        )
-        self.inv_grc_view = self._create_pop_view(self.cerebellum.inv_N_GrC, "inv_grc")
-        self.inv_goc_view = self._create_pop_view(self.cerebellum.inv_N_GoC, "inv_goc")
-        self.inv_bc_view = self._create_pop_view(self.cerebellum.inv_N_BC, "inv_bc")
-        self.inv_sc_view = self._create_pop_view(self.cerebellum.inv_N_SC, "inv_sc")
-
     def _connect_interfaces_to_core(self):
         """Connects interface populations to the core cerebellum model."""
         self.log.debug("Connecting interfaces to core cerebellum")
@@ -350,16 +271,14 @@ class CerebellumController:
         self.log.debug("Connecting motor_commands -> fwd_mf")
         nest.Connect(
             self.interface_pops.motor_commands_p.pop,
-            # TODO let's fix this manual indexing
-            self.cerebellum.forw_Nest_Mf[-self.N_mossy_forw :],
+            self.cerebellum.populations.forw_mf_p_view.pop,
             "one_to_one",
             # TODO no weight given
             # syn_spec={"weight": 1.0},
         )
         nest.Connect(
             self.interface_pops.motor_commands_n.pop,
-            # TODO let's fix this manual indexing
-            self.cerebellum.forw_Nest_Mf[0 : self.N_mossy_forw],
+            self.cerebellum.populations.forw_mf_n_view.pop,
             "one_to_one",
             # TODO no weight given
             # syn_spec={"weight": 1.0},
@@ -370,69 +289,33 @@ class CerebellumController:
         self.log.debug("Connecting error -> fwd_io", conn_spec=conn_spec)
         nest.Connect(
             self.interface_pops.error_p.pop,
-            self.cerebellum.forw_N_IO_plus,
+            self.cerebellum.populations.forw_io_p_view.pop,
             "all_to_all",
             syn_spec=conn_spec,
-        )  # TODO this adds a "receptor_type": 1 which is NOT PRESENT in brain.py
-        # Check sign for negative connection in brain.py (line 861)
+        )
+        # Check sign for negative connection
         conn_spec_n = conn_spec.copy()
-        conn_spec_n["weight"] = -conn_spec_n[
-            "weight"
-        ]  # Assuming negative error drives negative IO
+        conn_spec_n["weight"] = -conn_spec_n["weight"]
         nest.Connect(
             self.interface_pops.error_n.pop,
-            self.cerebellum.forw_N_IO_minus,
+            self.cerebellum.populations.forw_io_n_view.pop,
             "all_to_all",
             syn_spec=conn_spec_n,
         )
-
-        # Fwd DCN -> Prediction Scaling Population (This connection is now handled in SingleDOFController)
-        # conn_spec = self.conn_params["dcn_forw_prediction"]
-        # w = conn_spec["weight"]
-        # d = conn_spec["delay"]
-        # self.log.debug("Connecting fwd_dcn -> prediction", weight=w, delay=d)
-        # nest.Connect(
-        #     self.forw_DCNp_plus.pop,  # This is a direct attribute, not in interface_pops
-        #     self.interface_pops.prediction_p.pop, # This would now be an external population
-        #     "all_to_all",
-        #     syn_spec={"weight": w, "delay": d},
-        # )
-        # nest.Connect(
-        #     self.forw_DCNp_minus.pop, # This is a direct attribute, not in interface_pops
-        #     self.interface_pops.prediction_p.pop, # This would now be an external population
-        #     "all_to_all",
-        #     syn_spec={"weight": -w, "delay": d},
-        # )
-        # nest.Connect(
-        #     self.forw_DCNp_minus.pop, # This is a direct attribute, not in interface_pops
-        #     self.interface_pops.prediction_n.pop, # This would now be an external population
-        #     "all_to_all",
-        #     syn_spec={"weight": w, "delay": d},
-        # )
-        # nest.Connect(
-        #     self.forw_DCNp_plus.pop, # This is a direct attribute, not in interface_pops
-        #     self.interface_pops.prediction_n.pop, # This would now be an external population
-        #     "all_to_all",
-        #     syn_spec={"weight": -w, "delay": d},
-        # )
 
         # --- Inverse Model Connections ---
         # Planner -> Inv Mossy Fibers
         self.log.debug("Connecting plan_to_inv -> inv_mf")
         nest.Connect(
             self.interface_pops.plan_to_inv_p.pop,
-            # TODO please remove the manual indexing, even if needed just create a PopView
-            # in Cerebellum and connect to that instead
-            self.cerebellum.inv_Nest_Mf[-self.N_mossy_inv :],
+            self.cerebellum.populations.inv_mf_p_view.pop,
             "one_to_one",
             # TODO hello? what is this weight?
             # syn_spec={"weight": 1.0},
         )
         nest.Connect(
             self.interface_pops.plan_to_inv_n.pop,
-            # TODO please remove the manual indexing, even if needed just create a PopView
-            # in Cerebellum and connect to that instead
-            self.cerebellum.inv_Nest_Mf[0 : self.N_mossy_inv],
+            self.cerebellum.populations.inv_mf_n_view.pop,
             "one_to_one",
             # TODO hello? what is this weight? Check weight sign
             # syn_spec={"weight": 1.0},
@@ -443,19 +326,19 @@ class CerebellumController:
         self.log.debug("Connecting error_inv -> inv_io", conn_spec=conn_spec)
         nest.Connect(
             self.interface_pops.error_inv_p.pop,
-            self.cerebellum.inv_N_IO_plus,
+            self.cerebellum.populations.inv_io_p_view.pop,
             "all_to_all",
             syn_spec=conn_spec,
         )
         # Assuming same sign convention for negative side
         conn_spec_n = conn_spec.copy()
-        # conn_spec_n["weight"] = -conn_spec_n["weight"] # TODO no negative weight!
+        # conn_spec_n["weight"] = -conn_spec_n["weight"] # TODO: Confirm if negative weight is needed or if IO_minus handles sign
         nest.Connect(
             self.interface_pops.error_inv_n.pop,
-            self.cerebellum.inv_N_IO_minus,
+            self.cerebellum.populations.inv_io_n_view.pop,
             "all_to_all",
-            syn_spec=conn_spec_n,
-        )  # TODO Weight sign?
+            syn_spec=conn_spec_n,  # TODO: Confirm weight sign logic
+        )
 
         # Inv DCN -> Motor Prediction Scaling Population
         conn_spec = self.conn_params["dcn_i_motor_pred"]
@@ -463,25 +346,25 @@ class CerebellumController:
         d = conn_spec["delay"]
         self.log.debug("Connecting inv_dcn -> motor_prediction", weight=w, delay=d)
         nest.Connect(
-            self.inv_DCNp_plus.pop,
+            self.cerebellum.populations.inv_dcnp_p_view.pop,
             self.interface_pops.motor_prediction_p.pop,
             "all_to_all",
             syn_spec={"weight": w, "delay": d},
         )
         nest.Connect(
-            self.inv_DCNp_plus.pop,
+            self.cerebellum.populations.inv_dcnp_p_view.pop,
             self.interface_pops.motor_prediction_n.pop,
             "all_to_all",
             syn_spec={"weight": w, "delay": d},
         )
         nest.Connect(
-            self.inv_DCNp_minus.pop,
+            self.cerebellum.populations.inv_dcnp_n_view.pop,
             self.interface_pops.motor_prediction_p.pop,
             "all_to_all",
             syn_spec={"weight": -w, "delay": d},
         )
         nest.Connect(
-            self.inv_DCNp_minus.pop,
+            self.cerebellum.populations.inv_dcnp_n_view.pop,
             self.interface_pops.motor_prediction_n.pop,
             "all_to_all",
             syn_spec={"weight": -w, "delay": d},
@@ -526,25 +409,25 @@ class CerebellumController:
         w_dcn = conn_spec_dcn["weight"]
         self.log.debug("Connecting fwd_dcn -> error (inhibitory)", weight=w_dcn)
         nest.Connect(
-            self.forw_DCNp_plus.pop,
+            self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
             syn_spec={"weight": -w_dcn},
         )
         nest.Connect(
-            self.forw_DCNp_plus.pop,
+            self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
             syn_spec={"weight": -w_dcn},
         )
         nest.Connect(
-            self.forw_DCNp_minus.pop,
+            self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
             syn_spec={"weight": w_dcn},
         )
         nest.Connect(
-            self.forw_DCNp_minus.pop,
+            self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
             syn_spec={"weight": w_dcn},

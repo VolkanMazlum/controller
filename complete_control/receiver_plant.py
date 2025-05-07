@@ -47,7 +47,6 @@ run_timestamp_str, run_paths = None, None
 shared_data = MPI.COMM_WORLD.bcast(shared_data, root=0)
 run_timestamp_str = shared_data["timestamp"]
 run_paths: RunPaths = shared_data["paths"]
-print(f"\n\n\n{run_timestamp_str}\n\n\n")
 
 
 

@@ -540,37 +540,37 @@ class SingleDOFController:
         )
         # Connections from Cerebellum's DCN to the controller's prediction scaling neurons
         nest.Connect(
-            self.cerebellum_controller.forw_DCNp_plus.pop,
+            self.cerebellum_controller.cerebellum.populations.forw_dcnp_p_view.pop,
             self.pops.pred_p.pop,
             "all_to_all",
             syn_spec={"weight": w_dcn_pred, "delay": d_dcn_pred},
         )
         nest.Connect(
-            self.cerebellum_controller.forw_DCNp_minus.pop,
+            self.cerebellum_controller.cerebellum.populations.forw_dcnp_n_view.pop,
             self.pops.pred_p.pop,
             "all_to_all",
             syn_spec={
-                "weight": -w_dcn_pred,
+                "weight": -w_dcn_pred,  # DCN minus inhibits Positive Prediction
                 "delay": d_dcn_pred,
-            },  # Minus DCN inhibits Pos Pred
+            },
         )
         nest.Connect(
-            self.cerebellum_controller.forw_DCNp_minus.pop,
+            self.cerebellum_controller.cerebellum.populations.forw_dcnp_n_view.pop,
             self.pops.pred_n.pop,
             "all_to_all",
             syn_spec={
-                "weight": w_dcn_pred,
+                "weight": w_dcn_pred,  # DCN minus drives Negative Prediction
                 "delay": d_dcn_pred,
-            },  # Minus DCN drives Neg Pred
+            },
         )
         nest.Connect(
-            self.cerebellum_controller.forw_DCNp_plus.pop,
+            self.cerebellum_controller.cerebellum.populations.forw_dcnp_p_view.pop,
             self.pops.pred_n.pop,
             "all_to_all",
             syn_spec={
-                "weight": -w_dcn_pred,
+                "weight": -w_dcn_pred,  # DCN plus inhibits Negative Prediction
                 "delay": d_dcn_pred,
-            },  # Plus DCN inhibits Neg Pred
+            },
         )
         # --- Connections TO Cerebellum Controller Interfaces ---
         # MC Out -> Cereb Motor Commands Input
