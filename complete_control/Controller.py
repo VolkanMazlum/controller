@@ -61,6 +61,7 @@ class Controller:
         sim_params: Dict[str, Any],
         path_data: str,
         comm: Comm,
+        music_cfg: Dict[str, Any],
         label_prefix: str = "",
         use_cerebellum: bool = False,
         cerebellum_config: Optional[Dict[str, Any]] = None,
@@ -92,14 +93,12 @@ class Controller:
         self.pops_params = pops_params
         self.conn_params = conn_params
         self.sim_params = sim_params
+        self.music_cfg = music_cfg
         self.path_data = path_data
         self.use_cerebellum = use_cerebellum
         self.cerebellum_config = cerebellum_config
         self.comm = comm
-
-        # Use path_data implicitly via PopView labels if saving to file
-        # self.label = f"{label_prefix}dof{dof_id}_"
-        self.label = f"{label_prefix}"  # Keep label simple as prefix
+        self.label = f"{label_prefix}"
 
         self.log.debug(
             "Controller Parameters",
@@ -110,14 +109,14 @@ class Controller:
             spine_params=spine_params,
             state_params=state_params,
             pops_params=pops_params,
-            conn_params=conn_params,  # Note: Ensure these contain cerebellum sections if needed
+            conn_params=conn_params,
             sim_params=sim_params,
+            music_cfg=music_cfg,
             use_cerebellum=self.use_cerebellum,
             cerebellum_config=self.cerebellum_config,
             comm=self.comm,
         )
 
-        # Instantiate the populations dataclass
         self.pops = ControllerPopulations()
         self.cerebellum_handler: Optional[CerebellumHandler] = None
 
@@ -138,6 +137,11 @@ class Controller:
         if use_cerebellum:
             self.cerebellum_handler.connect_to_main_controller_populations()
 
+        self.log.info("Creating music interface...")
+        # --- MUSIC Setup and Connection ---
+        self.create_and_setup_music_interface()
+        self.log.info(f"Connecting controller to MUSIC")
+        self.connect_controller_to_music()
         self.log.info("Controller initialization complete.")
 
     def _instantiate_cerebellum_handler(self, controller_pops: ControllerPopulations):
@@ -519,14 +523,110 @@ class Controller:
             )
         # Note: The MC Output -> Brainstem connection happens in both cases and is handled above
 
-    # --- 3. Input/Output Access ---
-    # These return PopView objects now, callers can access .pop if needed
-    def get_sensory_input_popviews(self) -> Tuple[Optional[PopView], Optional[PopView]]:
-        """Returns the positive and negative sensory input PopViews."""
-        return self.pops.sn_p, self.pops.sn_n
+    # --- MUSIC Setup ---
+    def create_and_setup_music_interface(self):
+        """Creates MUSIC proxies for input and output."""
+        msc_params = self.music_cfg
+        spine_params = self.spine_params
+        n_total_neurons = 2 * self.N
 
-    def get_brainstem_output_popviews(
-        self,
-    ) -> Tuple[Optional[PopView], Optional[PopView]]:
-        """Returns the positive and negative brainstem output PopViews."""
-        return self.pops.brainstem_p, self.pops.brainstem_n
+        out_port_name = msc_params["out_port"]
+        in_port_name = msc_params["in_port"]
+        latency_const = msc_params["const"]
+
+        # Output proxy
+        self.log.info("Creating MUSIC out proxy", port=out_port_name)
+        self.proxy_out = nest.Create(
+            "music_event_out_proxy", 1, params={"port_name": out_port_name}
+        )
+        self.log.info(
+            "Created MUSIC out proxy", port=out_port_name, gids=self.proxy_out.tolist()
+        )
+
+        # Input proxy
+        self.proxy_in = nest.Create(
+            "music_event_in_proxy", n_total_neurons, params={"port_name": in_port_name}
+        )
+        self.log.info(
+            "Creating MUSIC in proxy", port=in_port_name, channels=n_total_neurons
+        )
+        for i, n in enumerate(self.proxy_in):
+            nest.SetStatus(n, {"music_channel": i})
+        self.log.info(
+            f"Created MUSIC in proxy: port '{in_port_name}' with {n_total_neurons} channels"
+        )
+
+        # We need to tell MUSIC, through NEST, that it's OK (due to the delay)
+        # to deliver spikes a bit late. This is what makes the loop possible.
+        # Set acceptable latency for the input port
+        # Use feedback delay from spine parameters
+        fbk_delay = spine_params["fbk_delay"]
+        latency = fbk_delay - latency_const
+        # if latency < nest.GetKernelStatus("min_delay"):
+        #     print(
+        #         f"Warning: Calculated MUSIC latency ({latency}) is less than min_delay ({nest.GetKernelStatus('min_delay')}). Clamping to min_delay."
+        #     )
+        #     latency = nest.GetKernelStatus("min_delay")
+
+        nest.SetAcceptableLatency(in_port_name, latency)
+        self.log.info(
+            "Set MUSIC acceptable latency", port=in_port_name, latency=latency
+        )
+        return
+
+    def connect_controller_to_music(self):
+        """Connects a single controller's inputs/outputs to MUSIC proxies."""
+        self.log.debug("Connecting MUSIC interfaces", N=self.N)
+        bs_p, bs_n = self.pops.brainstem_p, self.pops.brainstem_n
+        sn_p, sn_n = self.pops.sn_p, self.pops.sn_n
+
+        # Connect Brainstem outputs
+        start_channel_out = 0
+        # note: previously, there were multiple DoFs, and start_channel_out was 0*N*dof_id
+        self.log.debug(
+            "Connecting brainstem outputs to MUSIC out proxy",
+            start_channel=start_channel_out,
+            num_neurons=self.N,
+        )
+        for i, neuron in enumerate(bs_p.pop):
+            nest.Connect(
+                neuron,
+                self.proxy_out,
+                "one_to_one",
+                {"music_channel": start_channel_out + i},
+            )
+        for i, neuron in enumerate(bs_n.pop):
+            nest.Connect(
+                neuron,
+                self.proxy_out,
+                "one_to_one",
+                {"music_channel": start_channel_out + self.N + i},
+            )
+
+        # Connect MUSIC In Proxy to Sensory Neuron inputs
+        start_channel_in = 2 * self.N * self.dof_id
+        idx_start_p = start_channel_in
+        idx_end_p = idx_start_p + self.N
+        idx_start_n = idx_end_p
+        idx_end_n = idx_start_n + self.N
+        delay = self.spine_params["fbk_delay"]
+        wgt = self.spine_params["wgt_sensNeur_spine"]
+        self.log.debug(
+            "Connecting MUSIC in proxy to sensory inputs",
+            start_channel=start_channel_in,
+            num_neurons=self.N,
+            delay=delay,
+            weight=wgt,
+        )
+        nest.Connect(
+            self.proxy_in[idx_start_p:idx_end_p],
+            sn_p.pop,
+            "one_to_one",
+            {"weight": wgt, "delay": delay},
+        )
+        nest.Connect(
+            self.proxy_in[idx_start_n:idx_end_n],
+            sn_n.pop,
+            "one_to_one",
+            {"weight": wgt, "delay": delay},
+        )

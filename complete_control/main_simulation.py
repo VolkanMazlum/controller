@@ -130,7 +130,7 @@ def setup_nest_kernel(sim_params: dict, seed: int, path_data: Path):
 
     kernel_status = {
         "resolution": sim_params["res"],
-        "overwrite_files": True,  # Important for multiple trials/runs
+        "overwrite_files": True,  # optional since differen data paths
         "data_path": str(path_data),
         # "print_time": True, # Optional: Print simulation progress
     }
@@ -141,110 +141,6 @@ def setup_nest_kernel(sim_params: dict, seed: int, path_data: Path):
     )
     random.seed(seed)
     np.random.seed(seed)
-
-
-# --- MUSIC Setup ---
-def setup_music_interface(n_dof: int, N: int, msc_params: dict, spine_params: dict):
-    log = structlog.get_logger("main.music_setup")
-    """Creates MUSIC proxies for input and output."""
-    n_total_neurons = 2 * N * n_dof
-
-    out_port_name = msc_params["out_port"]
-    in_port_name = msc_params["in_port"]
-    latency_const = msc_params["const"]
-
-    # Output proxy
-    log.info("Creating MUSIC out proxy", port=out_port_name)
-    proxy_out = nest.Create(
-        "music_event_out_proxy", 1, params={"port_name": out_port_name}
-    )
-    log.info("Created MUSIC out proxy", port=out_port_name, gids=proxy_out.tolist())
-
-    # Input proxy
-    proxy_in = nest.Create(
-        "music_event_in_proxy", n_total_neurons, params={"port_name": in_port_name}
-    )
-    log.info("Creating MUSIC in proxy", port=in_port_name, channels=n_total_neurons)
-    for i, n in enumerate(proxy_in):
-        nest.SetStatus(n, {"music_channel": i})
-    log.info(
-        f"Created MUSIC in proxy: port '{in_port_name}' with {n_total_neurons} channels"
-    )
-
-    # We need to tell MUSIC, through NEST, that it's OK (due to the delay)
-    # to deliver spikes a bit late. This is what makes the loop possible.
-    # Set acceptable latency for the input port
-    # Use feedback delay from spine parameters
-    fbk_delay = spine_params["fbk_delay"]
-    latency = fbk_delay - latency_const
-    # if latency < nest.GetKernelStatus("min_delay"):
-    #     print(
-    #         f"Warning: Calculated MUSIC latency ({latency}) is less than min_delay ({nest.GetKernelStatus('min_delay')}). Clamping to min_delay."
-    #     )
-    #     latency = nest.GetKernelStatus("min_delay")
-
-    nest.SetAcceptableLatency(in_port_name, latency)
-    log.info("Set MUSIC acceptable latency", port=in_port_name, latency=latency)
-
-    return proxy_in, proxy_out
-
-
-def connect_controller_to_music(controller: Controller, proxy_in, proxy_out, dof_id, N):
-    log = structlog.get_logger(f"main.music_connect.dof_{dof_id}")
-    """Connects a single controller's inputs/outputs to MUSIC proxies."""
-    log.debug("Connecting MUSIC interfaces", N=N)  # dof_id is in logger name
-    # Get PopView objects
-    bs_p_view, bs_n_view = controller.get_brainstem_output_popviews()
-    sn_p_view, sn_n_view = controller.get_sensory_input_popviews()
-    # Connect Brainstem outputs (access .pop from PopView)
-    if bs_p_view and bs_n_view:
-        start_channel_out = 2 * N * dof_id
-        log.debug(
-            "Connecting brainstem outputs to MUSIC out proxy",
-            start_channel=start_channel_out,
-            num_neurons=N,
-        )
-        for i, neuron in enumerate(bs_p_view.pop):
-            nest.Connect(
-                neuron,
-                proxy_out,
-                "one_to_one",
-                {"music_channel": start_channel_out + i},
-            )
-        for i, neuron in enumerate(bs_n_view.pop):
-            nest.Connect(
-                neuron,
-                proxy_out,
-                "one_to_one",
-                {"music_channel": start_channel_out + N + i},
-            )
-    # Connect MUSIC In Proxy to Sensory Neuron inputs (access .pop from PopView)
-    start_channel_in = 2 * N * dof_id
-    idx_start_p = start_channel_in
-    idx_end_p = idx_start_p + N
-    idx_start_n = idx_end_p
-    idx_end_n = idx_start_n + N
-    delay = controller.spine_params["fbk_delay"]
-    wgt = controller.spine_params["wgt_sensNeur_spine"]
-    log.debug(
-        "Connecting MUSIC in proxy to sensory inputs",
-        start_channel=start_channel_in,
-        num_neurons=N,
-        delay=delay,
-        weight=wgt,
-    )
-    nest.Connect(
-        proxy_in[idx_start_p:idx_end_p],
-        sn_p_view.pop,
-        "one_to_one",
-        {"weight": wgt, "delay": delay},
-    )
-    nest.Connect(
-        proxy_in[idx_start_n:idx_end_n],
-        sn_n_view.pop,
-        "one_to_one",
-        {"weight": wgt, "delay": delay},
-    )
 
 
 # --- Simulation Execution ---
@@ -299,27 +195,12 @@ def run_simulation(
             wall_time=str(trial_wall_time),
         )
 
-        log.debug("Checking spike events", population="fbk_smooth_p")
-        senders_refactored, times_refactored = controller.pops.fbk_smooth_p.get_events()
-        log.debug(f"--- Refactored fbk_smooth_p spikes ---")
-        log.debug(f"Num spikes: {len(times_refactored)}")
-        if len(times_refactored) > 0:
-            print(
-                f"First spike time: {times_refactored[0]}, sender: {senders_refactored[0]}"
-            )
-            print(
-                f"Last spike time: {times_refactored[-1]}, sender: {senders_refactored[-1]}"
-            )
-
         # --- Data Collapsing ---
         log.info("Attempting data collapsing...")
         start_collapse_time = timer()
-        # Use the dynamically gathered labels and views for collapsing
         if grouped_pop_views:
-            # collapse_files expects a string path ending with "/"
-            data_path_str = str(path_data) + "/"
             collapse_files(
-                data_path_str,
+                str(path_data) + "/",
                 unique_labels,
                 grouped_pop_views,
                 len(controllers),
@@ -490,18 +371,8 @@ if __name__ == "__main__":
     )
     # Verify data length against single trial time vector
     if len(trj) != len(single_trial_time_vect):
-        main_log.warning(
+        raise ValueError(
             f"Input data length ({len(trj)}) does not match single trial time vector length ({len(single_trial_time_vect)} based on timeMax={sim_params['timeMax']}, timeWait={sim_params['timeWait']}, res={res})."
-        )
-        # Option 1: Truncate data (might lose information)
-        # if len(trj) > len(single_trial_time_vect):
-        #     trj = trj[:len(single_trial_time_vect)]
-        #     motor_commands = motor_commands[:len(single_trial_time_vect)]
-        #     print("Truncated input data to match single trial duration.")
-        # Option 2: Adjust simulation times (might not be desired)
-        # Option 3: Assume data spans *all* trials (requires different handling in Controller) - Less likely based on original code
-        main_log.warning(
-            "Proceeding with potentially mismatched data/time vector length. Check parameters."
         )
 
     # --- Network Construction ---
@@ -532,18 +403,12 @@ if __name__ == "__main__":
             sim_params=sim_params,
             path_data=run_paths.data_nest,
             label_prefix="",
+            music_cfg=music_cfg,
             use_cerebellum=True,
             cerebellum_config={},  # TODO
             comm=comm,
         )
         controllers.append(controller)
-
-    # --- MUSIC Setup and Connection ---
-    spine_params = module_params["spine"]  # Get spine params again for MUSIC setup
-    proxy_in, proxy_out = setup_music_interface(njt, N, music_cfg, spine_params)
-    for j, controller in enumerate(controllers):
-        main_log.info(f"Connecting controller to MUSIC", dof=j)
-        connect_controller_to_music(controller, proxy_in, proxy_out, j, N)
 
     # --- Inter-Controller Connections (if any) ---
     # Add code here if controllers need to be connected to each other

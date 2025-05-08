@@ -88,8 +88,9 @@ class Cerebellum:
         adapter.load_modules(simulation_forw)
         adapter.load_modules(simulation_inv)
 
-        adapter.set_settings(simulation_forw)
-        adapter.set_settings(simulation_inv)
+        # let's just keep the settings we set for the rest of the simulation. specifically, the seed
+        # adapter.set_settings(simulation_forw)
+        # adapter.set_settings(simulation_inv)
 
         print(f"duration: FWD:{simulation_forw.duration}; INV{simulation_inv.duration}")
         print(
