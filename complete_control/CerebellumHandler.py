@@ -1,23 +1,51 @@
-# complete_control/cerebellum_controller.py
 from typing import Any, Dict, Optional
 
 import nest
 import numpy as np
 import structlog
-from CerebellumInterfacePopulations import (
-    CerebellumInterfacePopulations,  # Added import
-)
+from CerebellumHandlerPopulations import CerebellumHandlerPopulations  # Added import
 from ControllerPopulations import ControllerPopulations
 from mpi4py.MPI import Comm
 
-from cerebellum_build import Cerebellum
+from Cerebellum import Cerebellum
 from population_view import PopView  # Use relative import
 
+#                                    ┌───┐
+#                              ┌────▶│Mf └──────────────┐
+#                              │     └───┐              └────┐    ┌───────────┐
+#                              │         │Inverse model | DCN├───►│ motor     │
+#                              │     ┌───┘              ┌────┘    │ prediction│
+#                              │  ┌─▶│IO ┌──────────────┘         └────┬──────┘
+#                              │  │  └───┘                             │
+# t      ┌─────────┐           │  │                                    │
+# r ────▶│ Planner │───┬───────┘  │          Motor Cortex              │
+# a      └─────────┘   │          │ ┌───────────────────────────┐      ▼
+# j.txt                │          │ │  ┌──────────┐  ┌─────────┐│   ┌─────────┐
+#                      │+         │ │  │   Ffwd   ├─►│   Out   ├┼─┬►│Smoothing│
+#                      └──►█──────┤ │  └──────────┘  └─────────┘│ │ └─────────┘         __
+#                          ▲      │ │                     ▲     │ │       |     _(\    |@@|
+#                        - │      │ │                     │     │ │       ▼    (__/\__ \--/ __
+#                          │      │ │  ┌──────────┐       │     │ │    robotic    \___|----|  |   __
+#                          │      └─┼─►│   Fbk    ├───────┘     │ │     plant         \ }{ /\ )_ / _\
+#                      ┌───┘        │  └──────────┘             │ │       │           /\__/\ \__O (__
+#                      │            └───────────────────────────┘ │       ▼          (--/\--)    \__/
+#           ┌──────────┴──┐     ⚖️                                │ ┌───────────┐    _)(  )(_
+#           │  State      │◄────█◄────────────────────────────────)┬┤  Sensory  │     --''---`
+#           │  estimator  │     ▲                      ┌───┐      │││   system  │
+#           └─────────────┘     │        ┌─────────────┘ Mf│◄─────┘│└───────────┘
+#                               │    ┌───┘              ┌──┘       │
+#                               ├────┤DCN| Forward model│          │
+#                               │    └───┐              └──┐       │
+#                               │        └──────────────┐IO│◄────█◄┘+
+#                               │                       └──┘     ▲
+#                               └────────────────────────────────┘-
+#
 
-class CerebellumController:
+
+class CerebellumHandler:
     """
     Encapsulates the NEST network components and connections for the cerebellum model
-    and its interface populations, designed to be instantiated within SingleDOFController.
+    and its interface populations, designed to be instantiated within Controller.
     """
 
     def __init__(
@@ -50,7 +78,7 @@ class CerebellumController:
             controller_pops (Optional[ControllerPopulations]): Populations from the main controller.
         """
         self.log = structlog.get_logger(f"cerebellum_controller.dof_{dof_id}")
-        self.log.info("Initializing CerebellumController")
+        self.log.info("Initializing CerebellumHandler")
 
         self.N = N
         self.total_time_vect = total_time_vect
@@ -65,7 +93,7 @@ class CerebellumController:
         self.controller_pops = controller_pops
 
         # --- Initialize Interface Populations Dataclass ---
-        self.interface_pops = CerebellumInterfacePopulations()
+        self.interface_pops = CerebellumHandlerPopulations()
 
         # --- Instantiate the Core Cerebellum Model ---
         self.log.info("Instantiating core Cerebellum object", config=cerebellum_config)
@@ -103,7 +131,7 @@ class CerebellumController:
         self.log.info("Connecting populations for error calculation")
         self._connect_error_calculation()
 
-        self.log.info("CerebellumController initialization complete.")
+        self.log.info("CerebellumHandler initialization complete.")
 
     def _create_pop_view(
         self, nest_pop: nest.NodeCollection, base_label: str
@@ -118,7 +146,7 @@ class CerebellumController:
         # --- Populations based on brain.py logic ---
 
         # Feedback Scaling (Input to Fwd Error Calc)
-        # prediction_p and prediction_n are now created in SingleDOFController
+        # prediction_p and prediction_n are now created in Controller
         params = self.pops_params["feedback"]
         pop_params = {
             "kp": params["kp"],
@@ -505,17 +533,6 @@ class CerebellumController:
             syn_spec={"weight": -w_state, "delay": d_state},
         )
 
-        # Connect Sensory -> Feedback Inverse (if used)
-        # conn_spec_sn_finv = self.conn_params["sn_feedback_inv"]
-        # w_sn_finv = conn_spec_sn_finv["weight"]
-        # d_sn_finv = conn_spec_sn_finv["delay"]
-        # self.log.debug("Connecting sensory -> feedback_inv", weight=w_sn_finv, delay=d_sn_finv)
-        # # Need access to sn_p/n from SingleDOFController here, or pass them in.
-        # # This connection might need to happen in SingleDOFController._connect_blocks instead.
-        # # Placeholder:
-        # # nest.Connect(sn_p, self.feedback_inv_p.pop, "all_to_all", syn_spec={"weight": w_sn_finv, "delay": d_sn_finv})
-        # # nest.Connect(sn_n, self.feedback_inv_n.pop, "all_to_all", syn_spec={"weight": -w_sn_finv, "delay": d_sn_finv})
-
     def connect_to_main_controller_populations(self):
         if not self.controller_pops:
             self.log.error(
@@ -525,7 +542,7 @@ class CerebellumController:
                 "ControllerPopulations not provided, cannot connect to main controller."
             )
 
-        self.log.info("Connecting CerebellumController to main controller populations")
+        self.log.info("Connecting CerebellumHandler to main controller populations")
 
         # --- Connections FROM Cerebellum Controller (Fwd DCN) TO controller_pops.pred_p/n ---
         conn_spec_dcn_pred = self.conn_params["dcn_forw_prediction"]
@@ -702,7 +719,7 @@ class CerebellumController:
         )
 
     # --- Methods to get interface populations (optional, for clarity) ---
-    # def get_forward_prediction_outputs( # Obsolete as prediction_p/n are now in SingleDOFController
+    # def get_forward_prediction_outputs( # Obsolete as prediction_p/n are now in Controller
     #     self,
     # ) -> tuple[Optional[PopView], Optional[PopView]]:
     #     """Returns the forward model prediction output PopViews."""
@@ -717,7 +734,7 @@ class CerebellumController:
             self.interface_pops.motor_prediction_n,
         )
 
-    # Add getters for input interface populations if needed by SingleDOFController
+    # Add getters for input interface populations if needed by Controller
     # e.g., get_motor_command_inputs(), get_planner_inputs(), etc.
     # Example:
     # def get_motor_command_inputs(self) -> tuple[Optional[PopView], Optional[PopView]]:

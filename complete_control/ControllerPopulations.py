@@ -13,7 +13,7 @@ from population_view import PopView
 class ControllerPopulations:
     """
     Holds the PopView instances for various populations in the controller.
-    If CerebellumController is used, it will connect to the following populations from this dataclass:
+    If CerebellumHandler is used, it will connect to the following populations from this dataclass:
     - mc_out_p, mc_out_n (Motor Cortex outputs)
     - planner_p, planner_n (Planner outputs)
     - sn_p, sn_n (Sensory inputs)

@@ -1,4 +1,3 @@
-# complete_control/CerebellumInterfacePopulations.py
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -6,15 +5,15 @@ from population_view import PopView
 
 
 @dataclass
-class CerebellumInterfacePopulations:
+class CerebellumHandlerPopulations:
     """
-    Holds the PopView instances for interface populations created by CerebellumController.
+    Holds the PopView instances for interface populations created by CerebellumHandler.
     These populations mediate signals to/from the core cerebellum model or are
-    involved in intermediate calculations within CerebellumController.
+    involved in intermediate calculations within CerebellumHandler.
     """
 
-    # === Inputs TO Core Cerebellum (via CerebellumController) ===
-    # These are populations created by CerebellumController to scale/relay signals
+    # === Inputs TO Core Cerebellum (via CerebellumHandler) ===
+    # These are populations created by CerebellumHandler to scale/relay signals
     # before they reach the core cerebellum model (defined in cerebellum_build.py).
 
     # From Motor Cortex Output (scaled by basic_neuron_nestml, to Fwd Mossy Fibers)
@@ -39,7 +38,7 @@ class CerebellumInterfacePopulations:
     state_to_inv_n: Optional[PopView] = None
 
     # === Error Calculation Populations (Input to Core Cerebellum IO) ===
-    # These are diff_neuron_nestml populations created by CerebellumController.
+    # These are diff_neuron_nestml populations created by CerebellumHandler.
     # Their inputs are other interface populations (e.g., feedback_p/n, DCN outputs).
     # Their outputs connect to the core cerebellum's IO cells.
 
@@ -51,19 +50,19 @@ class CerebellumInterfacePopulations:
     error_inv_p: Optional[PopView] = None
     error_inv_n: Optional[PopView] = None
 
-    # === Outputs FROM Core Cerebellum (via CerebellumController) ===
-    # These are populations created by CerebellumController to scale/relay signals
+    # === Outputs FROM Core Cerebellum (via CerebellumHandler) ===
+    # These are populations created by CerebellumHandler to scale/relay signals
     # received from the core cerebellum model.
 
     # Inverse Model Motor Prediction (diff_neuron_nestml, scales output from Inv DCN)
     motor_prediction_p: Optional[PopView] = None
     motor_prediction_n: Optional[PopView] = None
 
-    # Note: Forward model prediction (from Fwd DCN) is handled by CerebellumController
+    # Note: Forward model prediction (from Fwd DCN) is handled by CerebellumHandler
     # connecting core Fwd DCN PopViews (from CerebellumPopulations) directly
-    # to 'pred_p'/'pred_n' populations within SingleDOFController.pops.
+    # to 'pred_p'/'pred_n' populations within Controller.pops.
     # The 'prediction_p/n' fields that might have been in earlier versions of
-    # CerebellumInterfacePopulations for this purpose are not needed here.
+    # CerebellumHandlerPopulations for this purpose are not needed here.
 
     def get_all_views(self) -> List[PopView]:
         """Helper to get all valid PopView objects stored in this dataclass."""

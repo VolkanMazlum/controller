@@ -15,6 +15,7 @@ import nest
 import numpy as np
 import paths
 import structlog
+from Controller import Controller
 from data_handling import collapse_files
 from log import setup_logging, tqdm
 from mpi4py import MPI
@@ -22,8 +23,6 @@ from mpi4py.MPI import Comm
 from paths import RunPaths, setup_run_paths
 from plot_utils import plot_controller_outputs
 from settings import SEED, Experiment, Simulation
-
-from controller import SingleDOFController
 
 
 # --- Configuration and Setup ---
@@ -190,9 +189,7 @@ def setup_music_interface(n_dof: int, N: int, msc_params: dict, spine_params: di
     return proxy_in, proxy_out
 
 
-def connect_controller_to_music(
-    controller: SingleDOFController, proxy_in, proxy_out, dof_id, N
-):
+def connect_controller_to_music(controller: Controller, proxy_in, proxy_out, dof_id, N):
     log = structlog.get_logger(f"main.music_connect.dof_{dof_id}")
     """Connects a single controller's inputs/outputs to MUSIC proxies."""
     log.debug("Connecting MUSIC interfaces", N=N)  # dof_id is in logger name
@@ -255,7 +252,7 @@ def run_simulation(
     sim_params: dict,
     n_trials: int,
     path_data: Path,
-    controllers: list[SingleDOFController],
+    controllers: list[Controller],
     comm: Comm,
 ):
     log: structlog.stdlib.BoundLogger = structlog.get_logger("main.simulation_loop")
@@ -520,7 +517,7 @@ if __name__ == "__main__":
         spine_p = module_params["spine"]
         state_p = module_params["state"]
 
-        controller = SingleDOFController(
+        controller = Controller(
             dof_id=j,
             N=N,
             total_time_vect=single_trial_time_vect,  # Pass single trial vector

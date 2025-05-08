@@ -1,11 +1,9 @@
-# controller.py (Updated SingleDOFController)
-
 from typing import Any, Dict, Optional, Tuple
 
 import nest
 import numpy as np
 import structlog
-from cerebellum_controller import CerebellumController
+from CerebellumHandler import CerebellumHandler
 from ControllerPopulations import ControllerPopulations
 from mpi4py.MPI import Comm
 
@@ -41,7 +39,7 @@ from stateestimator import StateEstimator_mass
 NJT = 1
 
 
-class SingleDOFController:
+class Controller:
     """
     Encapsulates the NEST network components and connections for a single DoF,
     using PopView for recording and a dataclass for population management.
@@ -121,12 +119,10 @@ class SingleDOFController:
 
         # Instantiate the populations dataclass
         self.pops = ControllerPopulations()
-        self.cerebellum_controller: Optional[CerebellumController] = None
+        self.cerebellum_handler: Optional[CerebellumHandler] = None
 
         if use_cerebellum:
-            self.cerebellum_controller = self._instantiate_cerebellum_controller(
-                self.pops
-            )
+            self.cerebellum_handler = self._instantiate_cerebellum_handler(self.pops)
         # this order has a reason to it: beside the obvious dependency connect -> create, there is a more insidious one:
         # Cerebellum ALWAYS tries to import custom_stdp, but if it had been imported already NEST will error out
         # (tracking_neuron_nestml already exists, choose a different model name); this means that Cerebellum must be
@@ -140,15 +136,13 @@ class SingleDOFController:
 
         # --- Connect Cerebellum and Controller (needs to be here... >:( )
         if use_cerebellum:
-            self.cerebellum_controller.connect_to_main_controller_populations()
+            self.cerebellum_handler.connect_to_main_controller_populations()
 
         self.log.info("Controller initialization complete.")
 
-    def _instantiate_cerebellum_controller(
-        self, controller_pops: ControllerPopulations
-    ):
-        """Instantiates the internal CerebellumController."""
-        self.log.info("Instantiating internal CerebellumController")
+    def _instantiate_cerebellum_handler(self, controller_pops: ControllerPopulations):
+        """Instantiates the internal CerebellumHandler."""
+        self.log.info("Instantiating internal CerebellumHandler")
         if self.cerebellum_config is None:
             raise ValueError(
                 "Cerebellum config must be provided when use_cerebellum is True"
@@ -169,7 +163,7 @@ class SingleDOFController:
             "dcn_forw_prediction",
             "error_io_f",
             "dcn_f_error",  # Fwd connections
-            "feedback_error",  # Used by CerebellumController for fwd error calculation
+            "feedback_error",  # Used by CerebellumHandler for fwd error calculation
             "plan_to_inv_error_inv",
             "state_error_inv",  # Inv error connections (state_error_inv might not exist, handled below)
             "error_inv_io_i",
@@ -186,7 +180,7 @@ class SingleDOFController:
         cereb_conn_params = self.conn_params
 
         try:
-            cerebellum_controller = CerebellumController(
+            cerebellum_controller = CerebellumHandler(
                 N=self.N,
                 total_time_vect=self.total_time_vect,
                 sim_params=self.sim_params,
@@ -199,11 +193,11 @@ class SingleDOFController:
                 comm=self.comm,
                 controller_pops=controller_pops,
             )
-            self.log.info("Internal CerebellumController instantiated successfully.")
+            self.log.info("Internal CerebellumHandler instantiated successfully.")
             return cerebellum_controller
         except Exception as e:
             self.log.error(
-                "Failed to instantiate internal CerebellumController",
+                "Failed to instantiate internal CerebellumHandler",
                 error=str(e),
                 exc_info=True,
             )
@@ -536,28 +530,3 @@ class SingleDOFController:
     ) -> Tuple[Optional[PopView], Optional[PopView]]:
         """Returns the positive and negative brainstem output PopViews."""
         return self.pops.brainstem_p, self.pops.brainstem_n
-
-    # Note: connect_external_prediction method might be obsolete or need rethinking
-    # with the internal CerebellumController instantiation. Keep for now if needed elsewhere.
-    # def connect_external_prediction(
-    #     self, pred_pop_p: nest.NodeCollection, pred_pop_n: nest.NodeCollection
-    # ):
-    #     """Connects external prediction populations (e.g., shared cerebellum)
-    #     to this controller's prediction scaling neurons."""
-    #     # This logic needs review: if cerebellum_controller exists, prediction comes from it.
-    #     # If not, self.pops.pred_p/n might exist for internal prediction.
-    #     target_p = self.pops.pred_p
-    #     target_n = self.pops.pred_n
-    #     if self.cerebellum_controller:
-    #         self.log.warning("connect_external_prediction called while internal cerebellum is active. Ignoring.")
-    #         return
-    #
-    #     if target_p:
-    #         self.log.debug("Connecting external prediction (P) -> internal prediction (P)")
-    #         nest.Connect(pred_pop_p, target_p.pop, "all_to_all", syn_spec={"weight": 1.0})
-    #     if target_n:
-    #         self.log.debug("Connecting external prediction (N) -> internal prediction (N)")
-    #         nest.Connect(pred_pop_n, target_n.pop, "all_to_all", syn_spec={"weight": 1.0})
-    #
-    #     if not target_p and not target_n:
-    #          self.log.warning("Attempted to connect external prediction, but no target prediction populations found.")
