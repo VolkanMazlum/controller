@@ -1,14 +1,14 @@
 from pathlib import Path
 
 import numpy as np
+from Controller import Controller
 from mpi4py import MPI
 
-from controller import SingleDOFController
 from population_view import plotPopulation
 
 
 def plot_controller_outputs(
-    controllers: list[SingleDOFController],
+    controllers: list[Controller],
     total_time_vect_concat: np.ndarray,
     path_fig_str: str,
 ):
