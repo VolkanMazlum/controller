@@ -14,7 +14,7 @@ from data_handling import add_entry, collapse_files
 from settings import Brain, Experiment, MusicCfg, Simulation
 
 import trajectories as tj
-from cerebellum_build import Cerebellum
+from Cerebellum import Cerebellum
 from motorcortex import MotorCortex
 from planner import Planner
 from population_view import PopView, plotPopulation, plotPopulation_diff

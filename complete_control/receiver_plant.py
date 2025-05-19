@@ -15,8 +15,8 @@ import pybullet as p
 import structlog
 from log import setup_logging
 from mpi4py import MPI
-from plant_config import PlantConfig
-from plant_simulator import PlantSimulator
+from plant.plant_config import PlantConfig
+from plant.plant_simulator import PlantSimulator
 
 
 def coordinate_with_simulation():

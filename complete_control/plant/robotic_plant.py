@@ -4,7 +4,7 @@ import numpy as np
 import structlog
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
-from plant_config import PlantConfig
+from plant.plant_config import PlantConfig
 
 
 class RoboticPlant:

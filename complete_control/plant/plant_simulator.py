@@ -5,16 +5,16 @@ from typing import Any, Dict, List, Tuple
 import music
 import numpy as np
 import paths as project_paths  # For RunPaths type hinting and potentially access
-import plant_utils  # Utility functions for data and plotting
+import plant.plant_utils as plant_utils  # Utility functions for data and plotting
 import pybullet as p  # The PyBullet instance will be passed in
 
 # Logging
 import structlog
 from log import setup_logging  # Assuming log.py provides setup_logging
-from plant_config import PlantConfig
+from plant.plant_config import PlantConfig
 
 # Project-specific imports
-from robotic_plant import RoboticPlant
+from plant.robotic_plant import RoboticPlant
 
 from sensoryneuron import SensoryNeuron
 from try_bullet.arm_1dof.robot_arm_1dof import RobotArm1Dof

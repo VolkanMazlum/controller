@@ -1,7 +1,7 @@
 # Applications
 [from]
-  binary=./brain.py
-  np=3
+  binary=./main_simulation.py
+  np=6
 
 [to]
   binary=./receiver_plant.py

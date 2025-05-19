@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import structlog
-from plant_config import PlantConfig
+from plant.plant_config import PlantConfig
 
 _log = structlog.get_logger(__name__)
 
@@ -363,7 +363,7 @@ def plot_ee_space(
 
     plt.axis("equal")
     plt.xlabel("Position X (m)")
-    plt.ylabel("Position Z (m) (or Y if that's the vertical axis)")
+    plt.ylabel("Position Z (m)")
     plt.title("End-Effector Trajectory")
     plt.legend()
     if save_fig:
