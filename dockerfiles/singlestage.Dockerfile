@@ -91,6 +91,8 @@ RUN mkdir -p nest-build \
     && make -j$(nproc) \
     && make install 
 
+ENV PYNEST_QUIET=1
+
 ENV BULLET_MUSCLE_DIR=$DEPS_DIR/bullet_muscle_sim
 ENV SDF_MODELS_DIR=/sim/embodiment_sdf_models
 RUN mkdir -p $BULLET_MUSCLE_DIR $SDF_MODELS_DIR 
