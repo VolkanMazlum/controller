@@ -154,6 +154,7 @@ def run_simulation(
     log: structlog.stdlib.BoundLogger = structlog.get_logger("main.simulation_loop")
     """Runs the NEST simulation for the specified number of trials."""
     total_sim_time_ms = sim_params["timeMax"] + sim_params["timeWait"]
+    nest.set_verbosity("M_WARNING")
 
     # --- Prepare for Data Collapsing ---
     pop_views_to_collapse_by_label = defaultdict(list)
@@ -182,7 +183,7 @@ def run_simulation(
             duration_ms=total_sim_time_ms,
             current_sim_time_ms=current_sim_start_time,
         )
-        print(f"Current simulation time: {current_sim_start_time} ms")
+        log.info(f"Current simulation time: {current_sim_start_time} ms")
         start_trial_time = timer()
 
         nest.Simulate(total_sim_time_ms)
@@ -249,7 +250,7 @@ if __name__ == "__main__":
     rank = comm.rank
     run_timestamp_str, run_paths = coordinate_paths_with_receiver()
     setup_logging(
-        comm,
+        MPI.COMM_WORLD,
         log_dir_path=run_paths.logs,
         timestamp_str=run_timestamp_str,
         log_level=os.environ.get("LOG_LEVEL", "DEBUG"),

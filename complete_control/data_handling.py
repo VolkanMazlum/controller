@@ -25,7 +25,7 @@ def collapse_files(dir, names, pops, njt, comm: Comm = None):
     files = [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f))]
     pops_dict = {name: pop for name, pop in zip(names, pops)}
 
-    if mpi4py.MPI.COMM_WORLD.rank == 0:
+    if comm.rank == 0:
         for name, pop in pops_dict.items():
             file_list = []
             senders = []

@@ -15,3 +15,6 @@ built_custom_stdp
 logs
 .env
 
+runs/*
+try_bullet/*
+cerebellum/*

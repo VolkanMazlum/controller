@@ -48,9 +48,7 @@ class Cerebellum:
         total_time_vect: np.ndarray,
         label_prefix: str,
     ):
-        print("init cerebellum")
         options.verbosity = 4
-        print(f"increased bsb verbosity to {options.verbosity}")
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
         self.total_time_vect = total_time_vect

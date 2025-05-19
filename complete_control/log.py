@@ -127,7 +127,7 @@ def setup_logging(
 
     # 1. Console Handler (Human Readable, TQDM Friendly, Rank 0 Only)
     # only on rank 0 to avoid duplicate console output
-    if rank == 0:
+    if rank == 0 or rank == size - 1:
         console_formatter = structlog.stdlib.ProcessorFormatter(
             # The final processor formats the log entry for console
             processor=structlog.dev.ConsoleRenderer(colors=COLORS_IN_CONSOLE),
@@ -141,7 +141,7 @@ def setup_logging(
         root_logger.setLevel(log_level.upper())  # Set level on the stdlib logger
 
         # 1.b. Plain Text File Handler (Mirrors Console, Rank 0 Only)
-        log_file_plain_name = f"log_{timestamp_str}_rank0.log"
+        log_file_plain_name = f"log_{timestamp_str}_console.log"
         log_file_plain_path = log_dir_path / log_file_plain_name
         plain_file_handler = logging.FileHandler(log_file_plain_path, mode="w")
         # Create a specific formatter for the plain file, disabling colors
