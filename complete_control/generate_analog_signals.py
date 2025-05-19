@@ -7,12 +7,17 @@ import nest
 import numpy as np
 
 sys.path.insert(1, "../")
+from datetime import timedelta
+from timeit import default_timer as timer
+
 from settings import Experiment, Simulation
 
 import trajectories as tj
 
 exp = Experiment()
 sim = Simulation()
+
+start = timer()
 
 res = sim.resolution
 n_trials = sim.n_trials
@@ -29,17 +34,14 @@ time_sim_vec = np.linspace(
 total_time_vec = np.linspace(
     0, total_time, num=int(np.round(total_time / res)), endpoint=True
 )
-nest.ResetKernel()
-nest.SetKernelStatus({"resolution": res})
-nest.SetKernelStatus({"overwrite_files": True})
 
 dynSys = exp.dynSys
 njt = exp.dynSys.numVariables()
 
 
 # Joint space
-init_pos = exp.init_pos_angle
-tgt_pos = exp.tgt_pos_angle
+init_pos = np.array([exp.init_pos_angle])
+tgt_pos = np.array([exp.tgt_pos_angle])
 
 
 ## Compute minimum jerk trajectory (input to Planner)
@@ -69,7 +71,7 @@ trj = np.tile(np.concatenate((trj_wait, trj.flatten())), n_trials)
 
 
 ## Save trajectory to file
-np.savetxt("trajectory.txt", trj.flatten().tolist())
+# np.savetxt("trajectory.txt", trj.flatten().tolist())
 
 
 ## Compute motor commands (input to Motor Cortex)
@@ -135,7 +137,7 @@ def generateMotorCommands(init_pos, des_pos, time_vector):
 motorCommands = generateMotorCommands(init_pos, tgt_pos, time_sim_vec / 1e3)
 mc_wait = motorCommands[0] * np.ones(int(time_wait / res))
 motorCommands = np.tile(np.concatenate((mc_wait, motorCommands.flatten())), n_trials)
-np.savetxt("motor_commands.txt", motorCommands.flatten().tolist())
+# np.savetxt("motor_commands.txt", motorCommands.flatten().tolist())
 
 # Check
 print(
@@ -156,11 +158,12 @@ print(
     len(trj),
     ", ",
     len(motorCommands),
+    f"took {timedelta(seconds=timer() - start)}",
 )
 
 
-# Plot (test)
-fig, ax = plt.subplots(2, 1)
-ax[0].plot(total_time_vec, trj)
-ax[1].plot(total_time_vec, motorCommands)
-plt.savefig("test.png")
+# # Plot (test)
+# fig, ax = plt.subplots(2, 1)
+# ax[0].plot(total_time_vec, trj)
+# ax[1].plot(total_time_vec, motorCommands)
+# plt.savefig("test.png")
