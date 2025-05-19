@@ -100,11 +100,26 @@ cereb_controlled_joint = 0 # x = 0, y = 1
 nest.Install("controller_module")
 #### Planner
 print("init planner")
+print("--- Original Simulation Planner Init ---")
+print(f"N: {N}")
+print(f"njt: {njt}")
+print(f"total_time_vect len: {len(total_time_vect)}, start: {total_time_vect[0]:.2f}, end: {total_time_vect[-1]:.2f}, res: {res}")
+print(f"trj shape: {trj.shape}, start: {trj[0]:.4f}, end: {trj[-1]:.4f}")
+print(f"pathData: {pathData}")
+print(f"plan_params['kpl']: {plan_params['kpl']}")
+print(f"plan_params['base_rate']: {plan_params['base_rate']}")
+print(f"plan_params['kp']: {plan_params['kp']}")
 planner = Planner(N, njt, total_time_vect, trj, pathData, plan_params["kpl"], plan_params["base_rate"], plan_params["kp"])
 
 #### Motor cortex
 print("init mc")
 preciseControl = False # Precise or approximated ffwd commands?
+print("--- Original Simulation MotorCortex Init ---")
+print(f"N: {N}")
+print(f"njt: {njt}")
+print(f"total_time_vect len: {len(total_time_vect)}, start: {total_time_vect[0]:.2f}, end: {total_time_vect[-1]:.2f}, res: {res}")
+print(f"motorCommands shape: {motorCommands.shape}, start: {motorCommands[0]:.4f}, end: {motorCommands[-1]:.4f}")
+print(f"mc_params: {mc_params}")
 mc = MotorCortex(N, njt, total_time_vect, motorCommands, **mc_params)
 
 #### State Estimator
@@ -112,6 +127,11 @@ print("init state")
 buf_sz = state_params['buffer_size']
 additional_state_params = {'N_fbk': N, 'N_pred': N, 'fbk_bf_size': N*int(buf_sz/res), 'pred_bf_size': N*int(buf_sz/res), 'time_wait': sim.timeWait, 'time_trial': sim.timeMax+sim.timeWait}
 state_params.update(additional_state_params)
+print("--- Original Simulation StateEstimator Init ---")
+print(f"N: {N}")
+print(f"njt: {njt}")
+print(f"total_time_vect len: {len(total_time_vect)}, start: {total_time_vect[0]:.2f}, end: {total_time_vect[-1]:.2f}, res: {res}")
+print(f"state_params for StateEstimator_mass: {state_params}")
 stEst = StateEstimator_mass(N, njt, total_time_vect, **state_params)
 
 #%% SPINAL CORD ########################
@@ -349,6 +369,8 @@ spikedetector_brain_stem_neg = nest.Create("spike_recorder", params={"label": "B
 nest.Connect(brain_stem_new_p[j].pop, spikedetector_brain_stem_pos)
 nest.Connect(brain_stem_new_n[j].pop, spikedetector_brain_stem_neg)
 
+nest.Connect(fbk_smoothed_p, spikedetector_fbk_smoothed_pos)
+
 
 nest.Connect(sn_p[cereb_controlled_joint].pop, spikedetector_fbk_pos)
 nest.Connect(sn_n[cereb_controlled_joint].pop, spikedetector_fbk_neg)
@@ -384,11 +406,23 @@ names = exp.names
 pops = [planner.pops_p, planner.pops_n, mc.ffwd_p, mc.ffwd_n, mc.fbk_p, mc.fbk_n, mc.out_p, mc.out_n, brain_stem_new_p, brain_stem_new_n, sn_p, sn_n, prediction_p, prediction_n, stEst.pops_p, stEst.pops_n]
 
 total_len = int(time_span)
+
+print(nest.GetNodes())
+
+
 for trial in range(n_trials):
     if mpi4py.MPI.COMM_WORLD.rank == 0:
         print('Simulating trial {} lasting {} ms'.format(trial+1,total_len))
     nest.Simulate(total_len)
     collapse_files(pathData, names, pops, njt)
+events_orig = nest.GetStatus(spikedetector_fbk_smoothed_pos, "events")[0]
+times_orig = events_orig["times"]
+senders_orig = events_orig["senders"]
+print(f"--- Original fbk_smooth_p spikes ---")
+print(f"Num spikes: {len(times_orig)}")
+if len(times_orig) > 0:
+    print(f"First spike time: {times_orig[0]}, sender: {senders_orig[0]}")
+    print(f"Last spike time: {times_orig[-1]}, sender: {senders_orig[-1]}")
 '''
 if mpi4py.MPI.COMM_WORLD.rank == 0:
     choice = input("Save?")
@@ -527,201 +561,7 @@ if mpi4py.MPI.COMM_WORLD.rank == 0:
     ax[1,1].plot(bins_n[:-1], rate_n - rate_stEst_n)
 
     plt.savefig("check_planner_state.png")
-    
 
-'''
-if mpi4py.MPI.COMM_WORLD.rank == 0:
-    lgd = ['theta']
-    time_vect_paused = np.linspace(0, total_len*n_trial, num=int(np.round(total_len/res)), endpoint=True)
-
-    # Positive
-    fig, ax = plt.subplots(1,1)
-    for i in range(njt):
-        planner.pops_p[i].plot_rate(time_vect_paused,ax=ax,bar=True,color='r',label='planner')
-        sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
-        stEst.pops_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
-    ax.legend()
-    ax.set_xlabel("time (ms)")
-    plt.suptitle("Positive")
-    if saveFig:
-        plt.savefig(pathFig+"populations_pos.png")
-
-    # Negative
-    fig, ax = plt.subplots(1,1)
-    for i in range(njt):
-        planner.pops_n[i].plot_rate(time_vect_paused,ax=ax,bar=False,color='b',label='planner')
-        sn_n[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
-        stEst.pops_n[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state neg')
-        ax.legend()
-    ax.set_xlabel("time (ms)")
-    plt.suptitle("Negative")
-    if saveFig:
-        plt.savefig(pathFig+"populations_neg.png")
-    
-    # # MC fbk
-    for i in range(njt):
-        plotPopulation(time_vect_paused, mc.fbk_p[i],mc.fbk_n[i], title=lgd[i],buffer_size=10)
-        plt.suptitle("MC fbk")
-        plt.xlabel("time (ms)")
-        if saveFig:
-            plt.savefig(pathFig+"mtctx_fbk_"+lgd[i]+".png")
-    
-    # # MC ffwd
-    for i in range(njt):
-        plotPopulation(time_vect_paused, mc.ffwd_p[i],mc.ffwd_n[i], title=lgd[i],buffer_size=10)
-        plt.suptitle("MC ffwd")
-        plt.xlabel("time (ms)")
-        if saveFig:
-            plt.savefig(pathFig+"mtctx_ffwd_"+lgd[i]+".png")
-    # MC out
-    for i in range(njt):
-        plotPopulation(time_vect_paused, mc.out_p[i],mc.out_n[i], title=lgd[i],buffer_size=10)
-        plt.suptitle("MC out")
-        plt.xlabel("time (ms)")
-        if saveFig:
-            plt.savefig(pathFig+"mtctx_out_"+lgd[i]+".png")
-
-
-    lgd = ['theta']
-    
-    ## Planner
-    for i in range(njt):
-        plotPopulation(time_vect_paused, planner.pops_p[i],planner.pops_n[i], title=lgd[i],buffer_size=15)
-        plt.suptitle("Planner")
-        if saveFig:
-            plt.savefig(pathFig+"planner_"+lgd[i]+".png")
-    '''
-'''    
-    ## Brainstem
-    fig, ax = plt.subplots(1,1)
-    for i in range(njt):
-        brain_stem_new_p[i].plot_rate(time_vect_paused,ax=ax,bar=True,color='r',label='brainstem')
-        #sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
-        # stEst.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
-    ax.legend()
-    ax.set_xlabel("time (ms)")
-    plt.suptitle("Positive")
-    if saveFig:
-        plt.savefig(pathFig+"brainstem_pos.png")
-    
-    fig, ax = plt.subplots(1,1)
-    for i in range(njt):
-        brain_stem_new_n[i].plot_rate(time_vect_paused,ax=ax,bar=True,color='b',label='brainstem')
-        #sn_p[i].plot_rate(time_vect_paused,ax=ax,bar=False,title=lgd[i]+" (Hz)",color='b',label='sensory')
-        # stEst.out_p[i].plot_rate(time_vect_paused,buffer_sz=5,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b',linestyle=':', label='state pos')
-    ax.legend()
-    ax.set_xlabel("time (ms)")
-    plt.suptitle("Negative")
-    if saveFig:
-        plt.savefig(pathFig+"brainstem_neg.png")
-    '''
-'''
-    # Brainstem
-    for i in range(njt):
-        events_bs_pos = nest.GetStatus(spikedetector_brain_stem_pos, keys="events")[0]
-        evs_p = events_bs_pos["senders"]
-        ts_p = events_bs_pos["times"]
-        
-        events_bs_neg = nest.GetStatus(spikedetector_brain_stem_neg, keys="events")[0]
-        evs_n = events_bs_neg["senders"]
-        ts_n = events_bs_neg["times"]
-        
-        y_p =   evs_p - brain_stem_new_p[i].pop[0].get("global_id") + 1
-        y_n = -(evs_n - brain_stem_new_n[i].pop[0].get("global_id") + 1)
-        
-        fig, ax = plt.subplots(2,1,sharex=True)
-        ax[0].scatter(ts_p, y_p, marker='.', s=1,c="r")
-        ax[0].scatter(ts_n, y_n, marker='.', s=1)
-        ax[0].set_ylabel("raster")
-        brain_stem_new_p[i].plot_rate(time_vect_paused, 15, ax=ax[1],color="r")
-        brain_stem_new_n[i].plot_rate(time_vect_paused, 15, ax=ax[1], title='PSTH (Hz)')
-        ax[0].set_title(lgd[0])
-        ax[0].set_ylim( bottom=-(len(brain_stem_new_n[i].pop)+1), top=len(brain_stem_new_p[i].pop)+1 )
-        plt.suptitle("Brainstem")
-        if saveFig:
-            plt.savefig(pathFig+"brainstem_"+lgd[i]+".png")
-
-    # Sensory feedback
-    for i in range(njt):
-        plotPopulation(time_vect_paused, sn_p[i], sn_n[i], title=lgd[i],buffer_size=15)
-        plt.suptitle("Sensory feedback")
-        if saveFig:
-            plt.savefig(pathFig+"sensory_"+lgd[i]+".png")
-    
-    lgd = ['x','y']
-    
-    # State estimator
-    for i in range(njt):
-        plotPopulation(time_vect_paused, stEst.pops_p[i],stEst.pops_n[i], title=lgd[i],buffer_size=15)
-        plt.suptitle("State estimator")
-        if saveFig:
-            plt.savefig(pathFig+"stateEst_"+lgd[i]+".png")
-
-    lgd = ['theta']
-    for i in range(njt):
-        fig, ax = plt.subplots(2,1, figsize=(10,10))
-        ax[0].plot(time_vect,trj, linewidth=5)
-        ax[0].set_title('Trajectory [theta]')
-        ax[0].set_xlabel('Time [ms]')
-        ax[1].plot(time_vect,motorCommands, linewidth=5)
-        ax[1].set_title('Motor command')
-        ax[1].set_xlabel('Time [ms]')
-        if saveFig:
-            plt.savefig(pathFig+'_'+"motor_commands"+lgd[i]+".png")
-    #
-    #
-
-
-    fig, ax = plt.subplots(2,1)
-    for i in range(njt):
-        mc.out_p[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,color='r',label='out')
-        mc.out_n[i].plot_rate(time_vect_paused,ax=ax[i],bar=False,title=lgd[i]+" (Hz)",color='b')
-
-        b,c,pos_r = mc.out_p[i].computePSTH(time_vect_paused,buffer_sz=25)
-        b,c,neg_r = mc.out_n[i].computePSTH(time_vect_paused,buffer_sz=25)
-        if i==0:
-            plt.figure()
-        plt.plot(b[:-1],pos_r-neg_r)
-        plt.xlabel("time (ms)")
-        plt.ylabel("spike rate positive - negative")
-        plt.legend(lgd)
-    '''
-'''
-    #plt.savefig("mctx_out_pos-neg.png")
-
-# ## Collapsing data files into one file
-# names = []
-# network_neurons = ["Input inferior Olive Forw pos","Input inferior Olive Forw neg","Input inferior Olive Inv pos","Input inferior Olive Inv neg","Feedback pos","Feedback neg","State estimator pos","State estimator neg","Planner pos","Planner neg","Feedback cerebellum pos","Feedback cerebellum neg","mc_out_p_0","mc_out_n_0","mc_out_p_1","mc_out_n_1","sens_fbk_0_p","sens_fbk_0_n","sens_fbk_1_p","sens_fbk_1_n","Cereb motor pred pos","Cereb motor pred neg","Cereb pred pos","Cereb pred neg","State estimator Max pos","State estimator Max neg","Feedback smoothed pos","Feedback smoothed neg"]
-# cereb_neurons = ["granule_cell","golgi_cell","dcn_cell_glut_large","purkinje_cell","basket_cell","stellate_cell","dcn_cell_GABA","mossy_fibers",'io_cell',"glomerulus","dcn_cell_Gly-I"]
-
-# for t in tags:
-#     for n in cereb_neurons:
-#         names.append(t + '_' + n)
-#     #print(names.append(t + '_' + n))
-# names.extend(network_neurons)
-
-# files = [f for f in os.listdir(pthDat) if os.path.isfile(os.path.join(pthDat,f))]
-
-
-# # if mpi4py.MPI.COMM_WORLD.rank == 0:
-# #     file_list = []
-# #     for name in names:
-# #         if (name + '_spikes' + '.gdf' not in files):
-# #             for f in files:
-# #                 if (f.startswith(name)):
-# #                     file_list.append(f)
-# #             print(file_list)
-# #             with open(pthDat + name + ".gdf", "w") as wfd:
-# #                 for f in file_list:
-# #                     with open(pthDat + f, "r") as fd:
-# #                         wfd.write(fd.read())
-# #             for f in file_list:
-# #                 os.remove(pthDat+f)
-# #             file_list = []
-# #         else:
-# #             print('Già fatto')
-# #     print('Collapsing files ended')
-'''
 
 time_brainpy = timedelta(seconds=timer() - start)
 
