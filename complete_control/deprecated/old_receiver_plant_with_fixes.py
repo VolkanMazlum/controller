@@ -10,7 +10,8 @@ import music
 import numpy as np
 from arm_1dof.bullet_arm_1dof import BulletArm1Dof
 from arm_1dof.robot_arm_1dof import RobotArm1Dof
-from data_handling import add_entry, collapse_files_bullet
+
+# from data_handling import add_entry, collapse_files_bullet
 from mpi4py import MPI
 
 # Just to get the following imports right!
@@ -22,12 +23,13 @@ import json
 import random
 import time
 
-from paths import RunPaths
 from settings import SEED
 
 import trajectories as tj
 from complete_control.settings import Brain, Experiment, MusicCfg, Simulation
 from sensoryneuron import SensoryNeuron
+
+from ..paths import RunPaths
 
 # from util import plotPopulation
 

@@ -151,7 +151,7 @@ def _save_spikes_to_file(filepath: Path, spikes: List[Tuple[float, int]]):
 
 def save_all_data(
     config: PlantConfig,
-    data_arrays: Dict[str, np.ndarray],
+    data_arrays: DataArrays,
     received_spikes: Dict[
         str, List[List[Tuple[float, int]]]
     ],  # {'pos': [spikes_j0, ...], 'neg': [spikes_j0, ...]}
@@ -166,6 +166,7 @@ def save_all_data(
     _log.info("Saving all simulation data", path=str(pth_dat_bullet))
 
     # Save spike rates
+    # TODO make all these constants
     np.savetxt(
         pth_dat_bullet / "motNeur_rate_pos.csv",
         data_arrays["spk_rate_pos_hz"],
@@ -184,11 +185,12 @@ def save_all_data(
 
     # Save positions and velocities
     np.savetxt(
-        pth_dat_bullet / "pos_real_joint.csv", data_arrays["pos_j_rad"], delimiter=","
+        pth_dat_bullet / "pos_real_joint.csv", data_arrays.pos_j_rad, delimiter=","
     )
     np.savetxt(
-        pth_dat_bullet / "vel_real_joint.csv", data_arrays["vel_j_rad_s"], delimiter=","
+        pth_dat_bullet / "vel_real_joint.csv", data_arrays.vel_j_rad_s, delimiter=","
     )
+    np.savetxt(pth_dat_bullet / "pos_real_ee.csv", data_arrays.pos_ee_m, delimiter=",")
     np.savetxt(
         pth_dat_bullet / "pos_real_ee.csv", data_arrays["pos_ee_m"], delimiter=","
     )
@@ -219,12 +221,12 @@ def save_all_data(
     # np.savetxt(pth_dat_bullet / "inputCmd_des.csv", inputDes, delimiter=",") # 'inputDes' needs to be calculated
     np.savetxt(
         pth_dat_bullet / "inputCmd_motNeur.csv",
-        data_arrays["input_cmd_torque"],
+        data_arrays.input_cmd_torque,
         delimiter=",",
     )
     np.savetxt(
         pth_dat_bullet / "inputCmd_tot.csv",
-        data_arrays["input_cmd_total_torque"],
+        data_arrays.input_cmd_total_torque,
         delimiter=",",
     )
 

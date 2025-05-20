@@ -1,10 +1,13 @@
 from pathlib import Path
 
 import numpy as np
+import structlog
 from Controller import Controller
 from mpi4py import MPI
 
 from population_view import plotPopulation
+
+_log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 def plot_controller_outputs(
@@ -16,16 +19,16 @@ def plot_controller_outputs(
     if MPI.COMM_WORLD.rank != 0:
         return  # Only rank 0 plots
     if not controllers:
-        print("No controllers provided, skipping plotting.")
+        _log.debug("No controllers provided, skipping plotting.")
         return
     path_fig = Path(path_fig_str)
     njt = len(controllers)
     lgd = [f"DoF {i}" for i in range(njt)]
 
-    print("Generating plots...")
+    _log.debug("Generating plots...")
 
     for i, controller in enumerate(controllers):
-        print(f"Plotting for DoF {i}...")
+        _log.debug(f"Plotting for DoF {i}...")
 
         # Plot Planner
         fig, ax = plotPopulation(
@@ -97,4 +100,4 @@ def plot_controller_outputs(
             filepath=path_fig / f"sensoryneuron_{i}.png",
         )
 
-    print("Plot generation finished.")
+    _log.debug("Plot generation finished.")

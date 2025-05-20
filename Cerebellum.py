@@ -8,27 +8,15 @@ __version__ = "1.0.1"
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import music
-import nest
 import numpy as np
+import structlog
 
 # from bsb.core import from_storage
-from bsb import (
-    ConfigurationError,
-    Scaffold,
-    SimulationData,
-    config,
-    from_storage,
-    get_simulation_adapter,
-    options,
-)
+from bsb import SimulationData, config, from_storage, get_simulation_adapter, options
 from bsb_nest import NestAdapter
 from bsb_nest.adapter import NestResult
 from mpi4py import MPI
-from settings import Experiment, Simulation
 
-import trajectories as tj
 from complete_control.CerebellumPopulations import CerebellumPopulations  # Added import
 from population_view import PopView
 
@@ -48,7 +36,10 @@ class Cerebellum:
         total_time_vect: np.ndarray,
         label_prefix: str,
     ):
-        options.verbosity = 4
+        self.log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
+        options.verbosity = (
+            0  # TODO how to we handle this verbosity? keep 0 for now but...
+        )
         self.filename_h5 = filename_h5
         self.filename_config = filename_config
         self.total_time_vect = total_time_vect
@@ -64,14 +55,14 @@ class Cerebellum:
         self.forward_model.simulations[SIMULATION_NAME_IN_YAML] = (
             conf_forward.simulations[SIMULATION_NAME_IN_YAML]
         )
-        print("loaded forward model and its configuration")
+        self.log.debug("loaded forward model and its configuration")
 
         self.inverse_model = from_storage(str(PATH_HDF5), comm)
         conf_inverse = config.parse_configuration_file(str(PATH_YAML_INVERSE))
         self.inverse_model.simulations[SIMULATION_NAME_IN_YAML] = (
             conf_inverse.simulations[SIMULATION_NAME_IN_YAML]
         )
-        print("loaded inverse model and its configuration")
+        self.log.debug("loaded inverse model and its configuration")
 
         simulation_forw = self.forward_model.get_simulation(SIMULATION_NAME_IN_YAML)
         simulation_inv = self.inverse_model.get_simulation(SIMULATION_NAME_IN_YAML)
@@ -90,22 +81,24 @@ class Cerebellum:
         # adapter.set_settings(simulation_forw)
         # adapter.set_settings(simulation_inv)
 
-        print(f"duration: FWD:{simulation_forw.duration}; INV{simulation_inv.duration}")
-        print(
+        self.log.debug(
+            f"duration: FWD:{simulation_forw.duration}; INV{simulation_inv.duration}"
+        )
+        self.log.debug(
             f"resolution: FWD:{simulation_forw.resolution}; INV{simulation_inv.resolution}"
         )
 
         adapter.create_neurons(simulation_forw)
         adapter.create_neurons(simulation_inv)
-        print("created cerebellum neurons")
+        self.log.debug("created cerebellum neurons")
 
         adapter.connect_neurons(simulation_forw)
         adapter.connect_neurons(simulation_inv)
-        print("connected cerebellum neurons")
+        self.log.debug("connected cerebellum neurons")
 
         adapter.create_devices(simulation_forw)
         adapter.create_devices(simulation_inv)
-        print("created cerebellum devices")
+        self.log.debug("created cerebellum devices")
 
         ### FORWARD MODEL
         # Mossy fibers

@@ -11,10 +11,11 @@ import matplotlib.pyplot as plt
 import mpi4py
 import nest
 import numpy as np
+import structlog
 from settings import Experiment
 
 exp = Experiment()
-pathData = exp.pathData + "nest/"
+_log = structlog.get_logger(__name__)
 
 
 ################ TODO: NOT TESTED
@@ -202,7 +203,7 @@ def plotPopulation(
 
     if filepath:
         fig.savefig(filepath)
-        print(f"Saved plot at {filepath}")
+        _log.debug(f"Saved plot at {filepath}")
         plt.close(fig)
 
     return fig, ax

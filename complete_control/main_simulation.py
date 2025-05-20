@@ -24,6 +24,8 @@ from paths import RunPaths, setup_run_paths
 from plot_utils import plot_controller_outputs
 from settings import SEED, Experiment, Simulation
 
+nest.set_verbosity("M_ERROR")  # M_WARNING
+
 
 # --- Configuration and Setup ---
 def load_config(json_path):
@@ -154,7 +156,6 @@ def run_simulation(
     log: structlog.stdlib.BoundLogger = structlog.get_logger("main.simulation_loop")
     """Runs the NEST simulation for the specified number of trials."""
     total_sim_time_ms = sim_params["timeMax"] + sim_params["timeWait"]
-    nest.set_verbosity("M_WARNING")
 
     # --- Prepare for Data Collapsing ---
     pop_views_to_collapse_by_label = defaultdict(list)
@@ -232,7 +233,7 @@ def coordinate_paths_with_receiver() -> tuple[str, RunPaths]:
             "%Y%m%d_%H%M%S"
         )
         shared_data["paths"] = setup_run_paths(run_timestamp_str)
-        print("sending...")
+        print("sending paths to all processes...")
 
     shared_data = MPI.COMM_WORLD.bcast(shared_data, root=0)
     run_timestamp_str = shared_data["timestamp"]
@@ -274,16 +275,13 @@ if __name__ == "__main__":
     nest.ResetKernel()
     config_source = paths.PARAMS
 
-    # --- Load Configuration ---
     params = load_config(config_source)
     sim = Simulation()
     exp = Experiment()
 
-    # --- Extract Parameters or Set Defaults ---
-    # Module, Pop, Connection params (directly from JSON)
-    module_params = params.get("modules", {})
-    pops_params = params.get("pops", {})
-    conn_params = params.get("connections", {})
+    module_params = params["modules"]
+    pops_params = params["pops"]
+    conn_params = params["connections"]
     main_log.debug(
         "Loaded Parameters", params=params, sim_settings=sim, exp_settings=exp
     )
@@ -302,7 +300,6 @@ if __name__ == "__main__":
         except Exception as e:
             main_log.error("Error copying config file", error=str(e), exc_info=True)
 
-    # Simulation parameters (provide defaults if not in JSON)
     # TODO: Consider adding a "simulation" section to new_params.json
     sim_params = {
         "res": sim.resolution,  # ms - Simulation resolution
@@ -312,7 +309,6 @@ if __name__ == "__main__":
         "clear_old_data": True,  # Option to clear previous data
     }
 
-    # Experiment parameters (provide defaults if not in JSON)
     # TODO: Consider adding an "experiment" section to new_params.json
     exp_params = {
         "seed": SEED,  # Generate random seed if not provided
@@ -325,7 +321,6 @@ if __name__ == "__main__":
     main_log.info("Simulation Parameters", **sim_params)
     main_log.info("Experiment Parameters", **exp_params)
 
-    # MUSIC configuration (provide defaults if not in JSON)
     # TODO: Consider adding a "music" section to new_params.json
     music_cfg = {
         "out_port": "mot_cmd_out",

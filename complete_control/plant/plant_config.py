@@ -3,12 +3,10 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-import paths  # Assuming paths.py is in the same directory (complete_control)
+import paths
 import settings
 import structlog
 from settings import Brain, Experiment, MusicCfg, Simulation
-
-import trajectories as tj  # Assuming this is the trajectories.py from the project root
 
 
 class PlantConfig:

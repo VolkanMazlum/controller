@@ -8,7 +8,6 @@ from ControllerPopulations import ControllerPopulations
 from mpi4py.MPI import Comm
 
 from motorcortex import MotorCortex
-from planner import Planner
 from population_view import PopView
 from stateestimator import StateEstimator_mass
 
@@ -239,9 +238,7 @@ class Controller:
 
     # --- Build Methods (Example: Planner) ---
     def _build_planner(self, to_file=False):
-        # --- Replicate Planner logic or use Planner class ---
         p_params = self.plan_params
-        pop_params = self.pops_params  # Assuming params structure
         N = self.N
         self.log.debug(
             "Initializing Planner sub-module",
@@ -251,18 +248,30 @@ class Controller:
             base_rate=p_params["base_rate"],
             kp=p_params["kp"],
         )
-        self.planner = Planner(
-            N,
-            NJT,
-            self.total_time_vect,
-            self.trajectory_slice,
-            self.path_data,
-            p_params["kpl"],
-            p_params["base_rate"],
-            p_params["kp"],
+        tmp_pop_p = nest.Create(
+            "tracking_neuron_nestml",
+            n=N,
+            params={
+                "kp": p_params["kp"],
+                "base_rate": p_params["base_rate"],
+                "pos": True,
+                "traj": self.trajectory_slice.tolist(),
+                "simulation_steps": len(self.trajectory_slice),
+            },
         )
-        self.pops.planner_p = self.planner.pops_p[0]
-        self.pops.planner_n = self.planner.pops_n[0]
+        tmp_pop_n = nest.Create(
+            "tracking_neuron_nestml",
+            n=N,
+            params={
+                "kp": p_params["kp"],
+                "base_rate": p_params["base_rate"],
+                "pos": False,
+                "traj": self.trajectory_slice.tolist(),
+                "simulation_steps": len(self.trajectory_slice),
+            },
+        )
+        self.pops.planner_p = self._create_pop_view(tmp_pop_p, "planner_p", to_file)
+        self.pops.planner_n = self._create_pop_view(tmp_pop_n, "planner_n", to_file)
 
     def _build_motor_cortex(self, to_file=False):
         self.log.debug(
