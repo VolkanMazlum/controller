@@ -1,23 +1,13 @@
-import time  # For PyBullet simulation step timing if needed, and general timing
-from dataclasses import dataclass
-from typing import Any, Dict, List, Tuple
+from typing import Any, List, Tuple
 
 import music
-import numpy as np
-import paths as project_paths  # For RunPaths type hinting and potentially access
-import plant.plant_utils as plant_utils  # Utility functions for data and plotting
-import pybullet as p  # The PyBullet instance will be passed in
-
-# Logging
+import plant.plant_utils as plant_utils
 import structlog
-from log import setup_logging  # Assuming log.py provides setup_logging
+from generate_analog_signals import generate_signals
 from plant.plant_config import PlantConfig
-
-# Project-specific imports
 from plant.robotic_plant import RoboticPlant
 
 from sensoryneuron import SensoryNeuron
-from try_bullet.arm_1dof.robot_arm_1dof import RobotArm1Dof
 
 
 class PlantSimulator:
@@ -253,14 +243,14 @@ class PlantSimulator:
 
             rate_pos_hz, _ = plant_utils.compute_spike_rate(
                 spikes=self.received_spikes_pos[j],
-                weight=self.config.WGT_MOTCTX_MOTNEUR,  # w from original
+                weight=self.config.WGT_MOTCTX_MOTNEUR,
                 n_neurons=self.config.N_NEURONS,
                 time_start=buffer_start_time,
                 time_end=current_sim_time_s,
             )
             rate_neg_hz, _ = plant_utils.compute_spike_rate(
                 spikes=self.received_spikes_neg[j],
-                weight=self.config.WGT_MOTCTX_MOTNEUR,  # w from original
+                weight=self.config.WGT_MOTCTX_MOTNEUR,
                 n_neurons=self.config.N_NEURONS,
                 time_start=buffer_start_time,
                 time_end=current_sim_time_s,
@@ -277,14 +267,13 @@ class PlantSimulator:
             self.plant.simulate_step(self.config.RESOLUTION_S)
 
             # 6. Record data for this step
-            # Ensure ee_vel_m is correctly formatted if original slicing [vx,vz] is strictly needed by record_step_data
             plant_utils.record_step_data(
                 data_arrays=self.data_arrays,
                 step=step,
                 joint_pos_rad=joint_pos_rad,
                 joint_vel_rad_s=joint_vel_rad_s,
                 ee_pos_m=ee_pos_m,  # [x,y,z]
-                ee_vel_m_s=ee_vel_m_list,  # [vx,vy,vz] -> record_step_data will handle slicing if needed
+                ee_vel_m_s=ee_vel_m_list,  # [vx,vy,vz]
                 spk_rate_pos_hz=rate_pos_hz,
                 spk_rate_neg_hz=rate_neg_hz,
                 spk_rate_net_hz=net_rate_hz,
@@ -378,6 +367,7 @@ class PlantSimulator:
                 : self.step_if_early_exit()
             ],  # Use actual number of steps run
             pos_j_rad_actual=self.data_arrays.pos_j_rad[: self.step_if_early_exit(), :],
+            desired_trj_joint_rad=generate_signals()[0],
         )
         plant_utils.plot_ee_space(
             config=self.config,

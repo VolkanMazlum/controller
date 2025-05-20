@@ -17,6 +17,7 @@ import paths
 import structlog
 from Controller import Controller
 from data_handling import collapse_files
+from generate_analog_signals import generate_signals
 from log import setup_logging, tqdm
 from mpi4py import MPI
 from mpi4py.MPI import Comm
@@ -329,12 +330,12 @@ if __name__ == "__main__":
     }
     main_log.info("MUSIC Configuration", **music_cfg)
 
-    # --- Environment Setup ---
     setup_environment()
-    # --- Load Input Data ---
-    trj, motor_commands = load_input_data(paths.TRAJECTORY, paths.MOTOR_COMMANDS)
-    njt = trj.shape[1]  # Infer number of DoFs
-    main_log.info(f"Inferred {njt} DoF(s) from input data.")
+
+    trj, motor_commands = generate_signals()
+
+    njt = 1
+    main_log.info(f"assuming {njt} DoF.")
 
     main_log.info("Input data loaded", dof=njt)
     # --- Time Vectors ---
@@ -365,11 +366,6 @@ if __name__ == "__main__":
         num_steps_total=len(total_time_vect_concat),
         num_steps_trial=len(single_trial_time_vect),
     )
-    # Verify data length against single trial time vector
-    if len(trj) != len(single_trial_time_vect):
-        raise ValueError(
-            f"Input data length ({len(trj)}) does not match single trial time vector length ({len(single_trial_time_vect)} based on timeMax={sim_params['timeMax']}, timeWait={sim_params['timeWait']}, res={res})."
-        )
 
     # --- Network Construction ---
     start_network_time = timer()
@@ -387,9 +383,9 @@ if __name__ == "__main__":
         controller = Controller(
             dof_id=j,
             N=N,
-            total_time_vect=single_trial_time_vect,  # Pass single trial vector
-            trajectory_slice=trj[:, j],
-            motor_cmd_slice=motor_commands[:, j],
+            total_time_vect=single_trial_time_vect,
+            trajectory_slice=trj,
+            motor_cmd_slice=motor_commands,
             mc_params=mc_p,
             plan_params=plan_p,
             spine_params=spine_p,

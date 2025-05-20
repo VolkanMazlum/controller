@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -80,39 +79,6 @@ class PlantConfig:
         self.NJT: int = self.exp_settings.dynSys.numVariables()
         self.DYN_SYS = self.exp_settings.dynSys
         self.CONNECT_GUI = False
-
-        # Desired trajectories
-        # Assuming trajectory.txt contains joint space trajectory for the single trial duration (timeMax + timeWait)
-        try:
-            self.trajectory_joint_single_trial_rad: np.ndarray = np.loadtxt(
-                self.trajectory_path
-            )
-            if self.trajectory_joint_single_trial_rad.ndim == 1:
-                self.trajectory_joint_single_trial_rad = (
-                    self.trajectory_joint_single_trial_rad.reshape(-1, 1)
-                )
-            if len(self.trajectory_joint_single_trial_rad) != len(
-                self.time_vector_single_trial_s
-            ):
-                self.log.error(
-                    "Trajectory length mismatch with single trial time vector",
-                    traj_len=len(self.trajectory_joint_single_trial_rad),
-                    time_vec_len=len(self.time_vector_single_trial_s),
-                )
-                # If trajectory.txt is only for the 'active' part (timeMax), it needs to be padded for 'timeWait'.
-                raise ValueError(
-                    "Trajectory length mismatch with single trial time vector"
-                )
-        except FileNotFoundError:
-            self.log.error("Trajectory file not found", path=str(self.trajectory_path))
-            raise
-        except Exception as e:
-            self.log.error(
-                "Error loading trajectory file",
-                path=str(self.trajectory_path),
-                error=str(e),
-            )
-            raise
 
         self.initial_joint_pos_rad: float = self.exp_settings.init_pos_angle
         self.target_joint_pos_rad: float = self.exp_settings.tgt_pos_angle

@@ -192,25 +192,7 @@ def save_all_data(
     )
     np.savetxt(pth_dat_bullet / "pos_real_ee.csv", data_arrays.pos_ee_m, delimiter=",")
     np.savetxt(
-        pth_dat_bullet / "pos_real_ee.csv", data_arrays["pos_ee_m"], delimiter=","
-    )
-    np.savetxt(
-        pth_dat_bullet / "vel_real_ee.csv", data_arrays["vel_ee_m_s"], delimiter=","
-    )
-
-    # Save desired trajectories (assuming config holds the full desired trajectory for the whole sim)
-    # The original saved 'trj' (joint) and 'trj_ee' (end-effector)
-    # config.trajectory_joint_single_trial_rad is for one trial. We need to tile it for all trials.
-
-    # For simplicity, let's assume PlantConfig provides the full desired trajectories if they are to be saved here.
-    # Or, they are reconstructed/loaded separately if needed for comparison.
-    # The original receiver_plant loaded 'trajectory.txt' and derived 'trj_ee', 'inputDes'.
-    # For now, let's save what's directly available or easily derived.
-    # If config.trajectory_joint_single_trial_rad is what's available:
-    np.savetxt(
-        pth_dat_bullet / "pos_des_joint_single_trial.csv",
-        config.trajectory_joint_single_trial_rad,
-        delimiter=",",
+        pth_dat_bullet / "vel_real_ee.csv", data_arrays.vel_ee_m_s, delimiter=","
     )
 
     # To get full desired EE trajectory, we'd need to apply forward kinematics to the tiled joint trajectory
@@ -257,7 +239,7 @@ def plot_joint_space(
     config: PlantConfig,
     time_vector_s: np.ndarray,
     pos_j_rad_actual: np.ndarray,
-    # desired_trj_joint_rad: np.ndarray, # This should be the full desired trajectory
+    desired_trj_joint_rad: np.ndarray,
     save_fig: bool = True,
 ) -> None:
     """Plots joint space position (actual vs desired)."""
@@ -277,7 +259,7 @@ def plot_joint_space(
 
     # Example: Overlaying the single trial desired trajectory for each trial period
     single_trial_steps = len(config.time_vector_single_trial_s)
-    desired_single_trial = config.trajectory_joint_single_trial_rad[:, 0]
+    desired_single_trial = desired_trj_joint_rad
 
     full_desired_plot = np.full_like(pos_j_rad_actual[:, 0], np.nan)
     for trial_n in range(config.N_TRIALS):
