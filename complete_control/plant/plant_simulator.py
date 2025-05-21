@@ -1,13 +1,13 @@
 from typing import Any, List, Tuple
 
 import music
-import plant.plant_utils as plant_utils
 import structlog
-from generate_analog_signals import generate_signals
-from plant.plant_config import PlantConfig
-from plant.robotic_plant import RoboticPlant
+from utils_common.generate_analog_signals import generate_signals
 
-from sensoryneuron import SensoryNeuron
+from . import plant_utils
+from .plant_config import PlantConfig
+from .robotic_plant import RoboticPlant
+from .sensoryneuron import SensoryNeuron
 
 
 class PlantSimulator:

@@ -1,11 +1,10 @@
 import json
 from typing import Any
 
+import config.paths as paths
 import numpy as np
-import paths
-import settings
 import structlog
-from settings import Brain, Experiment, MusicCfg, Simulation
+from config.settings import SEED, Brain, Experiment, MusicCfg, Simulation
 
 
 class PlantConfig:
@@ -49,7 +48,7 @@ class PlantConfig:
         self.music_settings = MusicCfg()
 
         # --- Extract and Store Key Parameters ---
-        self.SEED: int = settings.SEED
+        self.SEED: int = SEED
         np.random.seed(self.SEED)  # Seed numpy as early as possible
 
         # Module-specific params (can be accessed via self.params_from_json['modules']['module_name'])

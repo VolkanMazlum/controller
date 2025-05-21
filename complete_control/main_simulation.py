@@ -11,19 +11,19 @@ from datetime import timedelta
 from pathlib import Path
 from timeit import default_timer as timer
 
+import config.paths as paths
 import nest
 import numpy as np
-import paths
 import structlog
-from Controller import Controller
-from data_handling import collapse_files
-from generate_analog_signals import generate_signals
-from log import setup_logging, tqdm
+from config.paths import RunPaths, setup_run_paths
+from config.settings import SEED, Experiment, Simulation
 from mpi4py import MPI
 from mpi4py.MPI import Comm
-from paths import RunPaths, setup_run_paths
-from plot_utils import plot_controller_outputs
-from settings import SEED, Experiment, Simulation
+from neural.Controller import Controller
+from neural.data_handling import collapse_files
+from neural.plot_utils import plot_controller_outputs
+from utils_common.generate_analog_signals import generate_signals
+from utils_common.log import setup_logging, tqdm
 
 nest.set_verbosity("M_ERROR")  # M_WARNING
 
@@ -77,51 +77,6 @@ def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
         )
         log.error(
             "Ensure module is compiled and accessible (check LD_LIBRARY_PATH/compilation)."
-        )
-        sys.exit(1)
-
-
-def load_input_data(traj_file: Path, cmd_file: Path):
-    log = structlog.get_logger("main.input_data")
-    """Loads trajectory and motor command data."""
-    try:
-        trj = np.loadtxt(traj_file)
-        motor_commands = np.loadtxt(cmd_file)
-
-        if trj.shape[0] != motor_commands.shape[0]:
-            log.error(
-                "Input data length mismatch",
-                traj_file=traj_file,
-                traj_len=trj.shape[0],
-                cmd_file=cmd_file,
-                cmd_len=motor_commands.shape[0],
-            )
-            raise ValueError(
-                f"Trajectory ({traj_file}, len {trj.shape[0]}) and motor command ({cmd_file}, len {motor_commands.shape[0]}) files have different lengths."
-            )
-        # Handle 1D vs 2D data consistently
-        if trj.ndim == 1:
-            trj = trj.reshape(-1, 1)
-        if motor_commands.ndim == 1:
-            motor_commands = motor_commands.reshape(-1, 1)
-        log.info(
-            "Loaded input data",
-            trajectory_shape=trj.shape,
-            motor_cmd_shape=motor_commands.shape,
-        )
-        return trj, motor_commands
-    except FileNotFoundError as e:
-        log.error(
-            f"Error loading input data: {e}. Ensure '{traj_file}' and '{cmd_file}' exist."
-        )
-        sys.exit(1)
-    except ValueError as e:
-        log.error(f"Error processing input data files: {e}", exc_info=True)
-        sys.exit(1)
-    except Exception as e:
-        log.error(
-            f"An unexpected error occurred during input data loading: {e}",
-            exc_info=True,
         )
         sys.exit(1)
 

@@ -23,9 +23,9 @@ import nest
 # Just to get the following imports right!
 sys.path.insert(1, '../')
 
-from motorcortex import MotorCortex
+from neural.motorcortex import MotorCortex
 from planner import Planner
-from stateestimator import StateEstimator, StateEstimator_mass
+from neural.stateestimator import StateEstimator, StateEstimator_mass
 #from cerebellum import Cerebellum
 from population_view import plotPopulation, PopView
 

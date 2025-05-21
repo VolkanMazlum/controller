@@ -16,5 +16,4 @@ logs
 .env
 
 runs/*
-try_bullet/*
 cerebellum/*

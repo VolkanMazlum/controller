@@ -9,13 +9,13 @@ music_setup = music.Setup()
 # play nice with nest and mpi. if you want to change it, go ahead, but make sure it
 # works before pushing
 
-import paths as project_paths
+import config.paths as project_paths
 import pybullet as p
 import structlog
-from log import setup_logging
 from mpi4py import MPI
 from plant.plant_config import PlantConfig
 from plant.plant_simulator import PlantSimulator
+from utils_common.log import setup_logging
 
 
 def coordinate_with_simulation():
