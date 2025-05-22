@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional, Tuple
 import nest
 import numpy as np
 import structlog
+from config.settings import Simulation
 from mpi4py.MPI import Comm
 
 from .CerebellumHandler import CerebellumHandler
@@ -57,7 +58,7 @@ class Controller:
         state_params: Dict[str, Any],
         pops_params: Dict[str, Any],
         conn_params: Dict[str, Any],
-        sim_params: Dict[str, Any],
+        sim_params: Simulation,
         path_data: str,
         comm: Comm,
         music_cfg: Dict[str, Any],
@@ -297,10 +298,8 @@ class Controller:
         additional_state_params = {
             "N_fbk": N,
             "N_pred": N,
-            "fbk_bf_size": N * int(buf_sz / self.sim_params["res"]),
-            "pred_bf_size": N * int(buf_sz / self.sim_params["res"]),
-            "time_wait": self.sim_params["timeWait"],
-            "time_trial": self.sim_params["timeMax"] + self.sim_params["timeWait"],
+            "fbk_bf_size": N * int(buf_sz / self.sim_params.resolution),
+            "pred_bf_size": N * int(buf_sz / self.sim_params.resolution),
         }
         self.state_params.update(additional_state_params)
         self.log.debug(

@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 import nest
 import numpy as np
 import structlog
+from config.settings import Simulation
 from mpi4py.MPI import Comm
 
 from .Cerebellum import Cerebellum
@@ -52,7 +53,7 @@ class CerebellumHandler:
         self,
         N: int,
         total_time_vect: np.ndarray,
-        sim_params: Dict[str, Any],
+        sim_params: Simulation,
         pops_params: Dict[str, Any],  # Parameters for interface populations
         conn_params: Dict[str, Any],  # Parameters for connections
         cerebellum_config: Dict[str, Any],  # Params for Cerebellum object (paths etc)
@@ -89,7 +90,7 @@ class CerebellumHandler:
         self.path_data = path_data
         self.comm = comm
         self.label_prefix = label_prefix
-        self.res = sim_params.get("res", 0.1)  # Get resolution
+        self.res = sim_params.resolution
         self.controller_pops = controller_pops
 
         # --- Initialize Interface Populations Dataclass ---

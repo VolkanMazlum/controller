@@ -82,20 +82,20 @@ def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
 
 
 # --- NEST Kernel Setup ---
-def setup_nest_kernel(sim_params: dict, seed: int, path_data: Path):
+def setup_nest_kernel(sim: Simulation, seed: int, path_data: Path):
     log = structlog.get_logger("main.nest_setup")
     """Configures the NEST kernel."""
 
     kernel_status = {
-        "resolution": sim_params["res"],
-        "overwrite_files": True,  # optional since differen data paths
+        "resolution": sim.resolution,
+        "overwrite_files": True,  # optional since different data paths
         "data_path": str(path_data),
         # "print_time": True, # Optional: Print simulation progress
     }
     kernel_status["rng_seed"] = seed  # Set seed via kernel status
     nest.SetKernelStatus(kernel_status)
     log.info(
-        f"NEST Kernel: Resolution: {sim_params['res']}ms, Seed: {seed}, Data path: {str(path_data)}"
+        f"NEST Kernel: Resolution: {sim.resolution}ms, Seed: {seed}, Data path: {str(path_data)}"
     )
     random.seed(seed)
     np.random.seed(seed)
@@ -103,7 +103,7 @@ def setup_nest_kernel(sim_params: dict, seed: int, path_data: Path):
 
 # --- Simulation Execution ---
 def run_simulation(
-    sim_params: dict,
+    sim: Simulation,
     n_trials: int,
     path_data: Path,
     controllers: list[Controller],
@@ -111,7 +111,7 @@ def run_simulation(
 ):
     log: structlog.stdlib.BoundLogger = structlog.get_logger("main.simulation_loop")
     """Runs the NEST simulation for the specified number of trials."""
-    total_sim_time_ms = sim_params["timeMax"] + sim_params["timeWait"]
+    single_trial_ms = sim.duration_single_trial_ms
 
     # --- Prepare for Data Collapsing ---
     pop_views_to_collapse_by_label = defaultdict(list)
@@ -256,15 +256,6 @@ if __name__ == "__main__":
         except Exception as e:
             main_log.error("Error copying config file", error=str(e), exc_info=True)
 
-    # TODO: Consider adding a "simulation" section to new_params.json
-    sim_params = {
-        "res": sim.resolution,  # ms - Simulation resolution
-        "timeMax": sim.timeMax,  # ms - Duration of one trial segment
-        "timeWait": sim.timeWait,  # ms - Pause/wait time after trial segment
-        "n_trials": sim.n_trials,  # Number of trials to run
-        "clear_old_data": True,  # Option to clear previous data
-    }
-
     # TODO: Consider adding an "experiment" section to new_params.json
     exp_params = {
         "seed": SEED,  # Generate random seed if not provided
@@ -274,7 +265,7 @@ if __name__ == "__main__":
     seed = exp_params["seed"]
     N = exp_params["N"]
 
-    main_log.info("Simulation Parameters", **sim_params)
+    # main_log.info("Simulation Parameters", sim)
     main_log.info("Experiment Parameters", **exp_params)
 
     # TODO: Consider adding a "music" section to new_params.json
@@ -294,9 +285,9 @@ if __name__ == "__main__":
 
     main_log.info("Input data loaded", dof=njt)
     # --- Time Vectors ---
-    res = sim_params["res"]
-    time_span_per_trial = sim_params["timeMax"] + sim_params["timeWait"]
-    n_trials = sim_params["n_trials"]
+    res = sim.resolution
+    time_span_per_trial = sim.duration_single_trial_ms
+    n_trials = sim.n_trials
     total_sim_duration = time_span_per_trial * n_trials
 
     # Time vector for a single trial (passed to PopView)
@@ -324,7 +315,7 @@ if __name__ == "__main__":
 
     # --- Network Construction ---
     start_network_time = timer()
-    setup_nest_kernel(sim_params, seed, run_paths.data_nest)
+    setup_nest_kernel(sim, seed, run_paths.data_nest)
 
     controllers = []
     main_log.info(f"Constructing Network", dof=njt, N=N)
@@ -347,7 +338,7 @@ if __name__ == "__main__":
             state_params=state_p,
             pops_params=pops_params,
             conn_params=conn_params,
-            sim_params=sim_params,
+            sim_params=sim,
             path_data=run_paths.data_nest,
             label_prefix="",
             music_cfg=music_cfg,
