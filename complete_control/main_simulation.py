@@ -101,7 +101,6 @@ def setup_nest_kernel(sim: Simulation, seed: int, path_data: Path):
     np.random.seed(seed)
 
 
-# --- Simulation Execution ---
 def run_simulation(
     sim: Simulation,
     n_trials: int,
@@ -119,26 +118,26 @@ def run_simulation(
         pop_views.extend(controller.get_all_recorded_views())
 
     log.info("collected all popviews")
+    with nest.RunManager():
+        for trial in range(n_trials):
+            current_sim_start_time = nest.GetKernelStatus("biological_time")
+            log.info(
+                f"Starting Trial {trial + 1}/{n_trials}",
+                duration_ms=single_trial_ms,
+                current_sim_time_ms=current_sim_start_time,
+            )
+            log.info(f"Current simulation time: {current_sim_start_time} ms")
+            start_trial_time = timer()
 
-    for trial in range(n_trials):
-        current_sim_start_time = nest.GetKernelStatus("biological_time")
-        log.info(
-            f"Starting Trial {trial + 1}/{n_trials}",
-            duration_ms=total_sim_time_ms,
-            current_sim_time_ms=current_sim_start_time,
-        )
-        log.info(f"Current simulation time: {current_sim_start_time} ms")
-        start_trial_time = timer()
+            nest.Run(single_trial_ms)
 
-        nest.Simulate(total_sim_time_ms)
-
-        end_trial_time = timer()
-        trial_wall_time = timedelta(seconds=end_trial_time - start_trial_time)
-        log.info(
-            f"Finished Trial {trial + 1}/{n_trials}",
-            sim_time_end_ms=nest.GetKernelStatus("biological_time"),
-            wall_time=str(trial_wall_time),
-        )
+            end_trial_time = timer()
+            trial_wall_time = timedelta(seconds=end_trial_time - start_trial_time)
+            log.info(
+                f"Finished Trial {trial + 1}/{n_trials}",
+                sim_time_end_ms=nest.GetKernelStatus("biological_time"),
+                wall_time=str(trial_wall_time),
+            )
 
     log.info("--- All Trials Finished ---")
 
