@@ -163,7 +163,7 @@ def save_all_data(
     Saves all collected simulation data to files.
     """
     pth_dat_bullet = config.run_paths.data_bullet
-    _log.info("Saving all simulation data", path=str(pth_dat_bullet))
+    _log.info(f"Saving all simulation data at {pth_dat_bullet}")
 
     # Save spike rates
     # TODO make all these constants
@@ -288,7 +288,7 @@ def plot_joint_space(
     if save_fig:
         filepath = pth_fig_receiver / f"position_joint_{timestamp}.png"
         plt.savefig(filepath)
-        _log.info("Saved joint space plot", path=str(filepath))
+        _log.info(f"Saved joint space plot at {filepath}")
     plt.close()
 
 
@@ -353,7 +353,7 @@ def plot_ee_space(
     if save_fig:
         filepath = pth_fig_receiver / f"position_ee_{timestamp}.png"
         plt.savefig(filepath)
-        _log.info("Saved end-effector space plot", path=str(filepath))
+        _log.info(f"Saved end-effector space plot at {filepath}")
     plt.close()
 
 
@@ -380,7 +380,7 @@ def plot_motor_commands(
     if save_fig:
         filepath = pth_fig_receiver / f"{cond_str}_motCmd_{timestamp}.png"
         plt.savefig(filepath)
-        _log.info("Saved motor commands plot", path=str(filepath))
+        _log.info(f"Saved motor commands plot at {filepath}")
     plt.close()
 
 
@@ -407,5 +407,5 @@ def plot_errors_per_trial(
     if save_fig:
         filepath = pth_fig_receiver / f"{cond_str}_error_ee_trial_{timestamp}.png"
         plt.savefig(filepath)
-        _log.info("Saved error per trial plot", path=str(filepath))
+        _log.info(f"Saved error per trial plot at at {filepath}")
     plt.close()

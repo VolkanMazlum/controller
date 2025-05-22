@@ -144,7 +144,9 @@ class Controller:
         self.connect_controller_to_music()
         self.log.info("Controller initialization complete.")
 
-    def _instantiate_cerebellum_handler(self, controller_pops: ControllerPopulations):
+    def _instantiate_cerebellum_handler(
+        self, controller_pops: ControllerPopulations
+    ) -> CerebellumHandler:
         """Instantiates the internal CerebellumHandler."""
         self.log.info("Instantiating internal CerebellumHandler")
         if self.cerebellum_config is None:
