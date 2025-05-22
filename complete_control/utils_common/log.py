@@ -29,7 +29,8 @@ COLORS_IN_CONSOLE = True
 
 # --- TQDM Configuration ---
 # Make tqdm rank-aware (only display bar on rank 0)
-tqdm = partial(std_tqdm, dynamic_ncols=True, disable=(rank != 0))
+tqdm = partial(std_tqdm, dynamic_ncols=True)
+# tqdm = partial(std_tqdm, dynamic_ncols=True, disable=(rank != 0))
 
 
 # --- TQDM Handler for standard logging ---

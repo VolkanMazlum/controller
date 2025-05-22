@@ -3,6 +3,7 @@ from typing import Any, List, Tuple
 import music
 import structlog
 from utils_common.generate_analog_signals import generate_signals
+from utils_common.log import tqdm
 
 from . import plant_utils
 from .plant_config import PlantConfig
@@ -198,7 +199,7 @@ class PlantSimulator:
         )
 
     def run_simulation(self) -> None:
-        """Runs the main simulation loop."""
+        """Runs the main simulation loop. **NJT==1**"""
         self.log.info(
             "Starting simulation loop...",
             total_duration_s=self.config.TOTAL_SIM_DURATION_S,
@@ -209,133 +210,133 @@ class PlantSimulator:
         current_sim_time_s = 0.0
         step = 0
 
-        # Simulation loop
-        # Loop while current_sim_time_s is less than the total duration.
-        # Add a small epsilon to ensure the last step is processed if time is exact.
-        while current_sim_time_s < self.config.TOTAL_SIM_DURATION_S - (
-            self.config.RESOLUTION_S / 2.0
-        ):
-            current_sim_time_s = music_runtime.time()  # Current time from MUSIC
+        with tqdm(total=self.num_total_steps, unit="step", desc="Simulating") as pbar:
+            # Simulation loop
+            # Loop while current_sim_time_s is less than the total duration.
+            # Add a small epsilon to ensure the last step is processed if time is exact.
+            while current_sim_time_s < self.config.TOTAL_SIM_DURATION_S - (
+                self.config.RESOLUTION_S / 2.0
+            ):
+                current_sim_time_s = music_runtime.time()  # Current time from MUSIC
 
-            if step >= self.num_total_steps:
-                self.log.warning(
-                    "Step index exceeds data_array size, breaking loop.",
+                if step >= self.num_total_steps:
+                    self.log.warning(
+                        "Step index exceeds data_array size, breaking loop.",
+                        step=step,
+                        max_steps=self.num_total_steps,
+                        sim_time=current_sim_time_s,
+                    )
+                    break
+
+                if not (step % 500):
+                    self.log.debug(
+                        "Simulation progress", step=step, sim_time_s=current_sim_time_s
+                    )
+
+                # 1. Get current plant state
+                self.plant.update_stats()
+                joint_pos_rad, joint_vel_rad_s = self.plant.get_joint_state()
+                ee_pos_m, ee_vel_m_list = self.plant.get_ee_pose_and_velocity()
+
+                # 2. Send sensory feedback via MUSIC
+                self._update_sensory_feedback(joint_pos_rad, current_sim_time_s)
+
+                # 3. Calculate motor command from received spikes
+                # For NJT=1
+                j = 0  # Current joint index
+                buffer_start_time = current_sim_time_s - self.config.BUFFER_SIZE_S
+
+                rate_pos_hz, _ = plant_utils.compute_spike_rate(
+                    spikes=self.received_spikes_pos[j],
+                    weight=self.config.WGT_MOTCTX_MOTNEUR,
+                    n_neurons=self.config.N_NEURONS,
+                    time_start=buffer_start_time,
+                    time_end=current_sim_time_s,
+                )
+                rate_neg_hz, _ = plant_utils.compute_spike_rate(
+                    spikes=self.received_spikes_neg[j],
+                    weight=self.config.WGT_MOTCTX_MOTNEUR,
+                    n_neurons=self.config.N_NEURONS,
+                    time_start=buffer_start_time,
+                    time_end=current_sim_time_s,
+                )
+                net_rate_hz = rate_pos_hz - rate_neg_hz
+                input_torque = net_rate_hz / self.config.SCALE_TORQUE
+
+                # TODO: Add perturbation logic here if needed, to calculate input_cmd_total_torque
+
+                # 4. Apply motor command to plant
+                self.plant.set_joint_torques([input_torque])
+
+                # 5. Step PyBullet simulation
+                self.plant.simulate_step(self.config.RESOLUTION_S)
+
+                # 6. Record data for this step
+                plant_utils.record_step_data(
+                    data_arrays=self.data_arrays,
                     step=step,
-                    max_steps=self.num_total_steps,
-                    sim_time=current_sim_time_s,
-                )
-                break
-
-            if not (
-                step % 2000
-            ):  # Log progress every 2000 steps (approx 2s if res=1ms)
-                self.log.debug(
-                    "Simulation progress", step=step, sim_time_s=current_sim_time_s
+                    joint_pos_rad=joint_pos_rad,
+                    joint_vel_rad_s=joint_vel_rad_s,
+                    ee_pos_m=ee_pos_m,  # [x,y,z]
+                    ee_vel_m_s=ee_vel_m_list,  # [vx,vy,vz]
+                    spk_rate_pos_hz=rate_pos_hz,
+                    spk_rate_neg_hz=rate_neg_hz,
+                    spk_rate_net_hz=net_rate_hz,
+                    input_cmd_torque=input_torque,
                 )
 
-            # 1. Get current plant state
-            self.plant.update_stats()
-            joint_pos_rad, joint_vel_rad_s = self.plant.get_joint_state()
-            ee_pos_m, ee_vel_m_list = (
-                self.plant.get_ee_pose_and_velocity()
-            )  # ee_vel_m is [vx,vy,vz]
+                # 7. Trial end logic (reset plant)
+                # Check if current_sim_time_s is at the end of a trial period
+                # (timeMax + timeWait). Using fmod for float comparison robustness.
+                # A trial ends right BEFORE the next one starts or at the very end of simulation.
+                current_trial_time_s = current_sim_time_s % self.config.TIME_TRIAL_S
+                # Check if we are close to the end of the active part of the trial (timeMax)
+                # or more robustly, if we are at the end of the full trial period (timeMax + timeWait)
+                # The original reset happened if tickt % time_trial == 0 (and not at t=0) OR at exp_duration - res
 
-            # 2. Send sensory feedback via MUSIC
-            self._update_sensory_feedback(joint_pos_rad, current_sim_time_s)
+                # A trial is considered finished after (timeMax + timeWait)
+                # So, reset happens when current_sim_time_s is a multiple of TIME_TRIAL_S
+                # (but not at t=0, and also at the very end of the simulation)
+                is_trial_end_time = False
+                if step > 0:  # Avoid reset at the very beginning
+                    # Check if current_sim_time_s is (almost) a multiple of TIME_TRIAL_S
+                    # Or if it's the last step of the simulation
+                    if abs(current_sim_time_s % self.config.TIME_TRIAL_S) < (
+                        self.config.RESOLUTION_S / 2.0
+                    ) or abs(
+                        current_sim_time_s
+                        - (self.config.TOTAL_SIM_DURATION_S - self.config.RESOLUTION_S)
+                    ) < (
+                        self.config.RESOLUTION_S / 2.0
+                    ):
+                        if not (
+                            abs(current_sim_time_s) < self.config.RESOLUTION_S / 2.0
+                            and step == 0
+                        ):  # ensure not t=0
+                            is_trial_end_time = True
 
-            # 3. Calculate motor command from received spikes
-            # For NJT=1
-            j = 0  # Current joint index
-            buffer_start_time = current_sim_time_s - self.config.BUFFER_SIZE_S
+                if is_trial_end_time:
+                    final_error_rad = joint_pos_rad - self.config.target_joint_pos_rad
+                    self.errors_per_trial.append(final_error_rad)
+                    self.log.info(
+                        "Trial finished. Resetting plant.",
+                        trial_num=len(self.errors_per_trial),  # 1-based
+                        sim_time_s=current_sim_time_s,
+                        final_error_rad=final_error_rad,
+                    )
+                    self.plant.reset_plant()
+                    # Clear spike buffers for the next trial? Original code did not explicitly clear spikes_pos/neg lists.
+                    # MUSIC spikes are timestamped, so old spikes won't affect future rate calculations
+                    # as long as the buffer_start_time correctly moves forward.
 
-            rate_pos_hz, _ = plant_utils.compute_spike_rate(
-                spikes=self.received_spikes_pos[j],
-                weight=self.config.WGT_MOTCTX_MOTNEUR,
-                n_neurons=self.config.N_NEURONS,
-                time_start=buffer_start_time,
-                time_end=current_sim_time_s,
-            )
-            rate_neg_hz, _ = plant_utils.compute_spike_rate(
-                spikes=self.received_spikes_neg[j],
-                weight=self.config.WGT_MOTCTX_MOTNEUR,
-                n_neurons=self.config.N_NEURONS,
-                time_start=buffer_start_time,
-                time_end=current_sim_time_s,
-            )
-            net_rate_hz = rate_pos_hz - rate_neg_hz
-            input_torque = net_rate_hz / self.config.SCALE_TORQUE
-
-            # TODO: Add perturbation logic here if needed, to calculate input_cmd_total_torque
-
-            # 4. Apply motor command to plant
-            self.plant.set_joint_torques([input_torque])
-
-            # 5. Step PyBullet simulation
-            self.plant.simulate_step(self.config.RESOLUTION_S)
-
-            # 6. Record data for this step
-            plant_utils.record_step_data(
-                data_arrays=self.data_arrays,
-                step=step,
-                joint_pos_rad=joint_pos_rad,
-                joint_vel_rad_s=joint_vel_rad_s,
-                ee_pos_m=ee_pos_m,  # [x,y,z]
-                ee_vel_m_s=ee_vel_m_list,  # [vx,vy,vz]
-                spk_rate_pos_hz=rate_pos_hz,
-                spk_rate_neg_hz=rate_neg_hz,
-                spk_rate_net_hz=net_rate_hz,
-                input_cmd_torque=input_torque,
-            )
-
-            # 7. Trial end logic (reset plant)
-            # Check if current_sim_time_s is at the end of a trial period
-            # (timeMax + timeWait). Using fmod for float comparison robustness.
-            # A trial ends right BEFORE the next one starts or at the very end of simulation.
-            current_trial_time_s = current_sim_time_s % self.config.TIME_TRIAL_S
-            # Check if we are close to the end of the active part of the trial (timeMax)
-            # or more robustly, if we are at the end of the full trial period (timeMax + timeWait)
-            # The original reset happened if tickt % time_trial == 0 (and not at t=0) OR at exp_duration - res
-
-            # A trial is considered finished after (timeMax + timeWait)
-            # So, reset happens when current_sim_time_s is a multiple of TIME_TRIAL_S
-            # (but not at t=0, and also at the very end of the simulation)
-            is_trial_end_time = False
-            if step > 0:  # Avoid reset at the very beginning
-                # Check if current_sim_time_s is (almost) a multiple of TIME_TRIAL_S
-                # Or if it's the last step of the simulation
-                if abs(current_sim_time_s % self.config.TIME_TRIAL_S) < (
-                    self.config.RESOLUTION_S / 2.0
-                ) or abs(
-                    current_sim_time_s
-                    - (self.config.TOTAL_SIM_DURATION_S - self.config.RESOLUTION_S)
-                ) < (
-                    self.config.RESOLUTION_S / 2.0
-                ):
-                    if not (
-                        abs(current_sim_time_s) < self.config.RESOLUTION_S / 2.0
-                        and step == 0
-                    ):  # ensure not t=0
-                        is_trial_end_time = True
-
-            if is_trial_end_time:
-                final_error_rad = joint_pos_rad - self.config.target_joint_pos_rad
-                self.errors_per_trial.append(final_error_rad)
-                self.log.info(
-                    "Trial finished. Resetting plant.",
-                    trial_num=len(self.errors_per_trial),  # 1-based
-                    sim_time_s=current_sim_time_s,
-                    final_error_rad=final_error_rad,
-                )
-                self.plant.reset_plant()
-                # Clear spike buffers for the next trial? Original code did not explicitly clear spikes_pos/neg lists.
-                # MUSIC spikes are timestamped, so old spikes won't affect future rate calculations
-                # as long as the buffer_start_time correctly moves forward.
-
-            # 8. Advance MUSIC time
-            music_runtime.tick()
-            step += 1
-            # PyBullet is stepped by plant.simulate_step.
-            # If direct p.stepSimulation() was used, it would be here.
+                # 8. Advance MUSIC time
+                music_runtime.tick()
+                step += 1
+                # Update tqdm progress bar
+                pbar.update(1)
+                # pbar.set_postfix(sim_time_s=f"{current_sim_time_s:.2f}", refresh=True)
+                # PyBullet is stepped by plant.simulate_step.
+                # If direct p.stepSimulation() was used, it would be here.
 
         music_runtime.finalize()
         self.log.info("Simulation loop finished.")
