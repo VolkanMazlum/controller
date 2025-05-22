@@ -12,7 +12,7 @@ simulations:
     duration: 50
     modules:
     - cerebmodule
-    - custom_stdp_module
+    # - custom_stdp_module
     seed: 1234
     cell_models:
       mossy_fibers:
