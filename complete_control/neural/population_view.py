@@ -7,14 +7,253 @@ __license__ = "GPL"
 __version__ = "1.0.1"
 
 
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import nest
 import numpy as np
+import pandas as pd
 import structlog
-from config.settings import Experiment
 
-exp = Experiment()
 _log = structlog.get_logger(__name__)
+
+
+############################ POPULATION VIEW #############################
+class PopView:
+    """
+    Population View Class
+
+    Wrapper around neural populations for visualization and analysis
+
+    Attributes
+    ----------
+    pop : nest.NodeCollection
+        The neural population being monitored
+    detector : nest.NodeCollection
+        Spike detector connected to the population
+    total_n_events : int
+        Counter for total number of spike events
+    rates_history : list
+        History of firing rates across trials
+    time_vect : array-like
+        Time vector for the simulation
+    trial_len : float
+        Length of each trial
+    Methods
+    -------
+    connect(other, rule="one_to_one", w=1.0, d=0.1)
+        Connect this population to another population
+    slice(start, end=None, step=None)
+        Create a new PopView with a slice of the current population
+    get_events()
+        Retrieve spike events from the detector
+    plot_spikes(time, boundaries=None, title="", ax=None)
+        Plot spike raster
+    computePSTH(time, buffer_sz=10)
+        Compute Peri-Stimulus Time Histogram
+    plot_rate(time, buffer_sz=10, title="", ax=None, bar=True, **kwargs)
+        Plot firing rate over time
+    get_rate(n_trials=1)
+        Get average firing rate over trials
+    reset_per_trial_rate()
+        Reset trial-related rate statistics
+    get_per_trial_rate(trial_i=None)
+        Calculate firing rate for a specific trial
+    plot_per_trial_rates(title="", ax=None)
+        Plot firing rates across trials
+    """
+
+    def __init__(self, pop, time_vect, to_file=False, label=""):
+        """
+        Initialize PopulationView object to monitor spiking activity.
+        Args:
+            pop: Population to monitor.
+            time_vect: Time vector for simulation.
+            to_file (bool, optional): Flag to save data to file. Defaults to False.
+            label (str, optional): Label for file saving. Required if to_file=True. Defaults to "".
+        Raises:
+            Exception: If to_file=True and no label provided.
+        """
+
+        self.pop = pop
+        self.label = None
+        if to_file:
+            if label == "":
+                raise Exception("To save into file, you need to specify a label")
+            self.label = label
+            param_file = {"record_to": "ascii", "label": label}
+            self.detector = self._create_connect_spike_detector(pop, **param_file)
+            # nest will create file(s) for this recorder and write the names to
+            # self.detector.get("filenames"); once data is collapsed to a single file
+            # for usability, this property will hold the filename
+            self.filepath: Path = None
+        else:
+            self.detector = self._create_connect_spike_detector(pop)
+
+        self.total_n_events = 0
+        self.rates_history = []
+
+        self.time_vect = time_vect
+        self.trial_len = time_vect[len(time_vect) - 1]
+
+    def _create_connect_spike_detector(self, pop, **kwargs):
+        spike_detector = nest.Create("spike_recorder")
+        nest.SetStatus(spike_detector, params=kwargs)
+        nest.Connect(pop, spike_detector)
+        return spike_detector
+
+    def connect(self, other, rule="one_to_one", w=1.0, d=0.1):
+        nest.Connect(self.pop, other.pop, rule, syn_spec={"weight": w, "delay": d})
+
+    def slice(self, start, end=None, step=None):
+        return PopView(self.pop[start:end:step])
+
+    def plot_spikes(self, time, boundaries=None, title="", ax=None):
+        evs, ts = self.get_spike_events()
+
+        if boundaries is not None:
+            i_0, i_1 = boundaries
+
+            selected = Events(
+                Event(e.n_id, e.t)
+                for e in Events(evs, ts)
+                if self.trial_len * i_0 <= e.t < self.trial_len * i_1
+            )
+            evs, ts = selected.n_ids, selected.ts
+
+        plot_spikes(evs, ts, time, self.pop, title, ax)
+
+    # Buffer size in ms
+    # NOTE: the time vector is in seconds, therefore buffer_sz needs to be converted
+    def computePSTH(self, time, buffer_sz=10):
+        t_init = time[0]
+        t_end = time[len(time) - 1]
+        N = len(self.pop)
+        evs, ts = self.get_spike_events()
+        count, bins = np.histogram(ts, bins=np.arange(t_init, t_end + 1, buffer_sz))
+        rate = 1000 * count / (N * buffer_sz)
+        return bins, count, rate
+
+    def plot_rate(self, time, buffer_sz=10, title="", ax=None, bar=True, **kwargs):
+        t_init = time[0]
+        t_end = time[len(time) - 1]
+
+        bins, count, rate = self.computePSTH(time, buffer_sz)
+        """
+        rate_sm = np.convolve(rate, np.ones(5)/5,mode='same')
+        """
+        rate_padded = np.pad(rate, pad_width=2, mode="reflect")
+        rate_sm = np.convolve(rate_padded, np.ones(5) / 5, mode="valid")
+
+        no_ax = ax is None
+        if no_ax:
+            fig, ax = plt.subplots(1)
+
+        if bar:
+            ax.bar(bins[:-1], rate, width=bins[1] - bins[0], **kwargs)
+            ax.plot(bins[:-1], rate_sm, color="k")
+        else:
+            ax.plot(bins[:-1], rate_sm, **kwargs)
+        ax.set(xlim=(t_init, t_end))
+        ax.set_ylabel(title, fontsize=15)
+        ax.set_xlabel("Time [ms]")
+
+        return rate
+
+    ########## ACROSS TRIALS STUFF ##########
+
+    # NOTE: only for constant signals
+    def get_rate(self, n_trials=1):
+        return get_rate(self.detector, self.pop, self.trial_len, n_trials)
+
+    def reset_per_trial_rate(self):
+        self.total_n_events = 0
+        self.rates_history = []
+
+    def get_per_trial_rate(self, trial_i=None):
+        if trial_i is not None:
+            n_ids, ts = self.get_spike_events()
+            events = Events(n_ids, ts)
+
+            trial_events = Events(
+                Event(e.n_id, e.t)
+                for e in events
+                if self.trial_len * trial_i <= e.t < self.trial_len * (trial_i + 1)
+            )
+            n_events = len(trial_events)
+        else:
+            print("Warning: deprecated, pass trial_i explicitly")
+            n_events = nest.GetStatus(self.detector, keys="n_events")[0]
+
+            n_events -= self.total_n_events
+            self.total_n_events += n_events
+
+        rate = n_events * 1e3 / self.trial_len
+        rate /= len(self.pop)
+
+        self.rates_history.append(rate)
+        return rate
+
+    def plot_per_trial_rates(self, title="", ax=None):
+        no_ax = ax is None
+        if no_ax:
+            fig, ax = plt.subplots(1)
+
+        ax.plot(self.rates_history)
+        ax.set_ylabel(title, fontsize=15)
+
+        if no_ax:
+            plt.show()
+
+    def get_spike_events(self):
+        spike_detector = self.detector
+        # Get metadata about the recorder
+        metadata = spike_detector.get()
+
+        if metadata.get("record_to") == "memory":
+            dSD = spike_detector.get("events")
+            evs = dSD["senders"]
+            ts = dSD["times"]
+            return evs, ts
+
+        elif metadata.get("record_to") == "ascii":
+            if not self.filepath:
+                # assume collapse hasn't been called yet
+                raise NotImplementedError(
+                    "not ready to handle non-collapsed objects..."
+                )
+                # if not metadata.get("filenames"):
+                #     return [], []
+                # filepath = Path(metadata.get("filenames")[0])
+            else:
+                filepath = self.filepath
+
+            # Check if the file exists
+            if not filepath.exists():
+                raise FileNotFoundError(
+                    f"Recording file not found: {filepath}\nDid you call simulate()?"
+                )
+
+            # Read the file (skip the first two lines which are comments)
+            df = pd.read_csv(filepath, sep="\t", comment="#")
+
+            # Extract senders and times (convert ms to ms if time_in_steps is False)
+            evs = df["sender"].values
+
+            # Check if times are in milliseconds or steps
+            if "time_ms" in df.columns:
+                ts = df["time_ms"].values
+            elif "time_step" in df.columns:
+                ts = df["time_step"].values
+            else:
+                raise ValueError("Cannot find time column in the recording file")
+
+            return evs, ts
+
+        else:
+            raise NotImplementedError(
+                f"Unknown recording backend: {metadata.get('record_to')}"
+            )
 
 
 ################ TODO: NOT TESTED
@@ -48,60 +287,7 @@ class Events(list):
         return [e.t for e in self]
 
 
-###################### UTIL ######################
-
-import os
-
-import nest
-import pandas as pd
-
-
-def get_spike_events(spike_detector):
-    # Get metadata about the recorder
-    metadata = spike_detector.get()
-
-    # Case 1: Memory-based recorder (current implementation)
-    if metadata.get("record_to") == "memory":
-        dSD = spike_detector.get("events")
-        evs = dSD["senders"]
-        ts = dSD["times"]
-        return evs, ts
-
-    # Case 2: ASCII-based recorder
-    elif metadata.get("record_to") == "ascii":
-        # Get the filename from the metadata
-        if not metadata.get("filenames"):
-            # No data has been written yet
-            return [], []
-
-        filename = metadata.get("filenames")[0]
-        # TODO fix these god awful paths
-        filepath = filename
-
-        # Check if the file exists
-        if not os.path.exists(filepath):
-            raise FileNotFoundError(
-                f"Recording file not found: {filepath}\nDid you call simulate()?"
-            )
-
-        # Read the file (skip the first two lines which are comments)
-        df = pd.read_csv(filepath, sep="\t", skiprows=2)
-
-        # Extract senders and times (convert ms to ms if time_in_steps is False)
-        evs = df["sender"].values
-
-        # Check if times are in milliseconds or steps
-        if "time_ms" in df.columns:
-            ts = df["time_ms"].values
-        elif "time_step" in df.columns:
-            ts = df["time_step"].values
-        else:
-            raise ValueError("Cannot find time column in the recording file")
-
-        return evs, ts
-
-    else:
-        raise ValueError(f"Unknown recording backend: {metadata.get('record_to')}")
+###################### UTIL #####################
 
 
 def plot_spikes(evs, ts, time_vect, pop=None, title="", ax=None):
@@ -287,201 +473,3 @@ def plotPopulation_diff(
         ax[i].spines["left"].set_visible(True)
 
     return fig, ax
-
-
-############################ POPULATION VIEW #############################
-class PopView:
-    """
-    Population View Class
-
-    Wrapper around neural populations for visualization and analysis
-
-    Attributes
-    ----------
-    pop : nest.NodeCollection
-        The neural population being monitored
-    detector : nest.NodeCollection
-        Spike detector connected to the population
-    total_n_events : int
-        Counter for total number of spike events
-    rates_history : list
-        History of firing rates across trials
-    time_vect : array-like
-        Time vector for the simulation
-    trial_len : float
-        Length of each trial
-    Methods
-    -------
-    connect(other, rule="one_to_one", w=1.0, d=0.1)
-        Connect this population to another population
-    slice(start, end=None, step=None)
-        Create a new PopView with a slice of the current population
-    get_events()
-        Retrieve spike events from the detector
-    plot_spikes(time, boundaries=None, title="", ax=None)
-        Plot spike raster
-    computePSTH(time, buffer_sz=10)
-        Compute Peri-Stimulus Time Histogram
-    plot_rate(time, buffer_sz=10, title="", ax=None, bar=True, **kwargs)
-        Plot firing rate over time
-    get_rate(n_trials=1)
-        Get average firing rate over trials
-    reset_per_trial_rate()
-        Reset trial-related rate statistics
-    get_per_trial_rate(trial_i=None)
-        Calculate firing rate for a specific trial
-    plot_per_trial_rates(title="", ax=None)
-        Plot firing rates across trials
-    gather_data(senders, times)
-        Store spike data from senders and times
-    """
-
-    def __init__(self, pop, time_vect, to_file=False, label=""):
-        """
-        Initialize PopulationView object to monitor spiking activity.
-        Args:
-            pop: Population to monitor.
-            time_vect: Time vector for simulation.
-            to_file (bool, optional): Flag to save data to file. Defaults to False.
-            label (str, optional): Label for file saving. Required if to_file=True. Defaults to "".
-        Raises:
-            Exception: If to_file=True and no label provided.
-        """
-
-        self.pop = pop
-        self.label = None
-        if to_file == True:
-            if label == "":
-                raise Exception("To save into file, you need to specify a label")
-            self.label = label
-            param_file = {"record_to": "ascii", "label": label}
-            self.detector = self._create_connect_spike_detector(pop, **param_file)
-        else:
-            self.detector = self._create_connect_spike_detector(pop)
-
-        self.total_n_events = 0
-        self.rates_history = []
-
-        self.time_vect = time_vect
-        self.trial_len = time_vect[len(time_vect) - 1]
-
-    def _create_connect_spike_detector(self, pop, **kwargs):
-        spike_detector = nest.Create("spike_recorder")
-        nest.SetStatus(spike_detector, params=kwargs)
-        nest.Connect(pop, spike_detector)
-        return spike_detector
-
-    def connect(self, other, rule="one_to_one", w=1.0, d=0.1):
-        nest.Connect(self.pop, other.pop, rule, syn_spec={"weight": w, "delay": d})
-
-    def slice(self, start, end=None, step=None):
-        return PopView(self.pop[start:end:step])
-
-    def get_events(self):
-        return get_spike_events(self.detector)
-
-    def plot_spikes(self, time, boundaries=None, title="", ax=None):
-        evs, ts = self.get_events()
-
-        if boundaries is not None:
-            i_0, i_1 = boundaries
-
-            selected = Events(
-                Event(e.n_id, e.t)
-                for e in Events(evs, ts)
-                if self.trial_len * i_0 <= e.t < self.trial_len * i_1
-            )
-            evs, ts = selected.n_ids, selected.ts
-
-        plot_spikes(evs, ts, time, self.pop, title, ax)
-
-    # Buffer size in ms
-    # NOTE: the time vector is in seconds, therefore buffer_sz needs to be converted
-    def computePSTH(self, time, buffer_sz=10):
-        t_init = time[0]
-        t_end = time[len(time) - 1]
-        N = len(self.pop)
-        if hasattr(self, "total_evs") and hasattr(self, "total_ts"):
-            evs = self.total_evs
-            ts = self.total_ts
-        else:
-            evs, ts = self.get_events()
-        count, bins = np.histogram(ts, bins=np.arange(t_init, t_end + 1, buffer_sz))
-        rate = 1000 * count / (N * buffer_sz)
-        return bins, count, rate
-
-    def plot_rate(self, time, buffer_sz=10, title="", ax=None, bar=True, **kwargs):
-
-        t_init = time[0]
-        t_end = time[len(time) - 1]
-
-        bins, count, rate = self.computePSTH(time, buffer_sz)
-        """
-        rate_sm = np.convolve(rate, np.ones(5)/5,mode='same')
-        """
-        rate_padded = np.pad(rate, pad_width=2, mode="reflect")
-        rate_sm = np.convolve(rate_padded, np.ones(5) / 5, mode="valid")
-
-        no_ax = ax is None
-        if no_ax:
-            fig, ax = plt.subplots(1)
-
-        if bar:
-            ax.bar(bins[:-1], rate, width=bins[1] - bins[0], **kwargs)
-            ax.plot(bins[:-1], rate_sm, color="k")
-        else:
-            ax.plot(bins[:-1], rate_sm, **kwargs)
-        ax.set(xlim=(t_init, t_end))
-        ax.set_ylabel(title, fontsize=15)
-        ax.set_xlabel("Time [ms]")
-
-        return rate
-
-    ########## ACROSS TRIALS STUFF ##########
-
-    # NOTE: only for constant signals
-    def get_rate(self, n_trials=1):
-        return get_rate(self.detector, self.pop, self.trial_len, n_trials)
-
-    def reset_per_trial_rate(self):
-        self.total_n_events = 0
-        self.rates_history = []
-
-    def get_per_trial_rate(self, trial_i=None):
-        if trial_i is not None:
-            n_ids, ts = self.get_events()
-            events = Events(n_ids, ts)
-
-            trial_events = Events(
-                Event(e.n_id, e.t)
-                for e in events
-                if self.trial_len * trial_i <= e.t < self.trial_len * (trial_i + 1)
-            )
-            n_events = len(trial_events)
-        else:
-            print("Warning: deprecated, pass trial_i explicitly")
-            n_events = nest.GetStatus(self.detector, keys="n_events")[0]
-
-            n_events -= self.total_n_events
-            self.total_n_events += n_events
-
-        rate = n_events * 1e3 / self.trial_len
-        rate /= len(self.pop)
-
-        self.rates_history.append(rate)
-        return rate
-
-    def plot_per_trial_rates(self, title="", ax=None):
-        no_ax = ax is None
-        if no_ax:
-            fig, ax = plt.subplots(1)
-
-        ax.plot(self.rates_history)
-        ax.set_ylabel(title, fontsize=15)
-
-        if no_ax:
-            plt.show()
-
-    def gather_data(self, senders, times):
-        self.total_evs = senders
-        self.total_ts = times

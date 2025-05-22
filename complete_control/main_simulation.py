@@ -114,24 +114,11 @@ def run_simulation(
     single_trial_ms = sim.duration_single_trial_ms
 
     # --- Prepare for Data Collapsing ---
-    pop_views_to_collapse_by_label = defaultdict(list)
+    pop_views = []
     for controller in controllers:
-        for view in controller.pops.get_all_views():
-            if view.label is not None:  # Check if label exists (meaning to_file=True)
-                pop_views_to_collapse_by_label[view.label].append(view)
+        pop_views.extend(controller.get_all_recorded_views())
 
-    # Extract unique labels and the grouped PopView lists
-    unique_labels = list(pop_views_to_collapse_by_label.keys())
-    grouped_pop_views = list(pop_views_to_collapse_by_label.values())
-
-    if unique_labels:
-        log.info(
-            f"Found {len(unique_labels)} population types for data collapsing based on labels: {unique_labels}"
-        )
-    else:
-        log.info(
-            "No populations configured for file output (to_file=True with a label)."
-        )
+    log.info("collected all popviews")
 
     for trial in range(n_trials):
         current_sim_start_time = nest.GetKernelStatus("biological_time")
@@ -153,27 +140,23 @@ def run_simulation(
             wall_time=str(trial_wall_time),
         )
 
-        # --- Data Collapsing ---
-        log.info("Attempting data collapsing...")
-        start_collapse_time = timer()
-        if grouped_pop_views:
-            collapse_files(
-                str(path_data) + "/",
-                unique_labels,
-                grouped_pop_views,
-                len(controllers),
-                comm,
-            )
-            log.info("Data collapsing function executed.")
-        else:
-            log.info("No populations configured for file output found to collapse.")
+    log.info("--- All Trials Finished ---")
 
-        end_collapse_time = timer()
-        collapse_wall_time = timedelta(seconds=end_collapse_time - start_collapse_time)
-        log.info(
-            f"Trial {trial + 1} data collapsing finished",
-            wall_time=str(collapse_wall_time),
-        )
+    # --- Data Collapsing (after all trials) ---
+    log.info("Attempting data collapsing for all trials...")
+    start_collapse_time = timer()
+    collapse_files(
+        path_data,
+        pop_views,
+        comm,
+    )
+
+    end_collapse_time = timer()
+    collapse_wall_time = timedelta(seconds=end_collapse_time - start_collapse_time)
+    log.info(
+        "Data collapsing for all trials finished",
+        wall_time=str(collapse_wall_time),
+    )
 
     log.info("--- Simulation Finished ---")
 

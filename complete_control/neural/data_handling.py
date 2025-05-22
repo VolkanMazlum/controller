@@ -1,50 +1,44 @@
-import os
+from pathlib import Path
 
-import mpi4py
+import structlog
 from mpi4py.MPI import Comm
 
+from complete_control.neural.population_view import PopView
 
-def collapse_files(dir, names, pops, njt, comm: Comm = None):
+_log: structlog.stdlib.BoundLogger = structlog.get_logger(str(__file__))
+
+
+def collapse_files(dir: Path, pops: list[PopView], comm: Comm = None):
     """
     Collapses multiple ASCII recording files from different processes into single files per population.
+    TODO decide how to handle non-ascii popviews: fail or ignore?
     Parameters
     ----------
     dir : str
         Directory path containing the recording files
-    names : list
-        List of population names
-    pops : list
-        List of population objects
-    njt : int
-        Number of jobs/threads
+    pops : list[PopView]
+    comm : Comm
+        Comm on which to barrier() on
     Notes
     -----
     Files are processed only by rank 0 process. For each population, files starting with
     the population name are combined, duplicates are removed, and original files are deleted.
     """
-    files = [f for f in os.listdir(dir) if os.path.isfile(os.path.join(dir, f))]
-    pops_dict = {name: pop for name, pop in zip(names, pops)}
-
     if comm.rank == 0:
-        for name, pop in pops_dict.items():
-            file_list = []
+        for pop in pops:
+            name = pop.label
+            file_list = [i for i in dir.iterdir() if i.name.startswith(name)]
             senders = []
             times = []
-
-            for f in files:
-                if f.startswith(name):
-                    file_list.append(f)
-
             combined_data = []
 
             for f in file_list:
-                with open(dir + f, "r") as fd:
+                with open(dir / f, "r") as fd:
                     lines = fd.readlines()
                     for line in lines:
                         if line.startswith("#") or line.startswith("sender"):
                             continue
                         combined_data.append(line.strip())
-
             unique_lines = list(set(combined_data))
 
             for line in unique_lines:
@@ -52,14 +46,13 @@ def collapse_files(dir, names, pops, njt, comm: Comm = None):
                 senders.append(int(sender))
                 times.append(float(time))
 
-            for i in range(njt):
-                pop[i].gather_data(senders, times)
-
-            with open(dir + name + ".gdf", "a") as wfd:
+            complete_file = dir / (name + ".gdf")
+            with open(complete_file, "a") as wfd:
+                wfd.write("sender\ttime_ms\n")
                 for line in unique_lines:
                     wfd.write(line + "\n")
+            pop.filepath = complete_file
             for f in file_list:
-                os.remove(dir + f)
+                f.unlink()
 
-        print("Collapsing files ended")
     comm.barrier()

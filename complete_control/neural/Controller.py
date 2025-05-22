@@ -638,3 +638,27 @@ class Controller:
             "one_to_one",
             {"weight": wgt, "delay": delay},
         )
+
+    def get_all_recorded_views(self) -> list[PopView]:
+        """
+        Collects all PopView instances that are configured for recording from
+        the main controller populations and, if enabled, from the cerebellum populations.
+        """
+        all_views = []
+        self.log.debug("Collecting views from ControllerPopulations")
+        all_views.extend(self.pops.get_all_views())
+
+        if self.use_cerebellum:
+            self.log.debug("Collecting views from CerebellumHandler.interface_pops")
+            all_views.extend(self.cerebellum_handler.interface_pops.get_all_views())
+            all_views.extend(
+                self.cerebellum_handler.cerebellum.populations.get_all_views()
+            )
+        else:
+            self.log.debug("Cerebellum not in use, skipping cerebellum views.")
+
+        recorded_views = [view for view in all_views if view and view.label]
+        self.log.info(
+            f"Collected {len(recorded_views)} views with labels for recording."
+        )
+        return recorded_views
