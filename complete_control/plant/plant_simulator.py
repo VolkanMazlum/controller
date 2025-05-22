@@ -175,14 +175,21 @@ class PlantSimulator:
             neurons_per_pop=self.config.N_NEURONS,
         )
 
+    def _should_mask_sensory_info(self, current_sim_time_s: float) -> bool:
+        "mask sensory during TIME_BEFORE_NEXT"
+        time_in_trial = current_sim_time_s % self.config.TIME_TRIAL_S
+        return (self.config.TIME_PREP_S + self.config.TIME_TRIAL_S) < time_in_trial
+
     def _update_sensory_feedback(
         self, current_joint_pos_rad: float, current_sim_time_s: float
     ) -> None:
         """
         Updates all sensory neurons based on the current plant state.
-        Assumes NJT=1 for simplicity in passing joint_pos.
+        **Assumes NJT=1**
         """
-        # For NJT=1
+        if self._should_mask_sensory_info(current_sim_time_s):
+            current_joint_pos_rad = 0
+
         self.sensory_neurons_p[0].update(
             current_joint_pos_rad, self.config.RESOLUTION_S, current_sim_time_s
         )
