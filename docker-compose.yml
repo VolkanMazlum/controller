@@ -3,7 +3,7 @@ services:
     image: simulation:latest
     build:
       context: .
-      dockerfile: dockerfiles/singlestage.Dockerfile
+      dockerfile: docker/singlestage.Dockerfile
       # The entrypoint script handles the runtime matching regardless.
       args:
         # expect there to be either a .env or suitable env vars
