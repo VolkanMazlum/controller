@@ -16,7 +16,7 @@ class PlantConfig:
         self,
         run_paths: paths.RunPaths,
     ):
-        self.log = structlog.get_logger(type(self).__name__)  # TODO configure later
+        self.log = structlog.get_logger(type(self).__name__)
         self.log.info("Initializing PlantConfig...")
 
         self.run_paths: paths.RunPaths = run_paths
@@ -49,7 +49,7 @@ class PlantConfig:
 
         # --- Extract and Store Key Parameters ---
         self.SEED: int = SEED
-        np.random.seed(self.SEED)  # Seed numpy as early as possible
+        np.random.seed(self.SEED)
 
         # Module-specific params (can be accessed via self.params_from_json['modules']['module_name'])
         self.module_params: dict[str, Any] = self.params_from_json["modules"]
@@ -58,13 +58,17 @@ class PlantConfig:
         # Simulation timing
         self.RESOLUTION_MS: float = self.sim_settings.resolution
         self.RESOLUTION_S: float = self.RESOLUTION_MS / 1000.0
-        self.TIME_MAX_MS: float = self.sim_settings.timeMax
-        self.TIME_MAX_S: float = self.TIME_MAX_MS / 1000.0
-        self.TIME_WAIT_MS: float = self.sim_settings.timeWait
-        self.TIME_WAIT_S: float = self.TIME_WAIT_MS / 1000.0
+        self.TIME_TRIAL_MS: float = self.sim_settings.time_move
+        self.TIME_TRIAL_S: float = self.TIME_TRIAL_MS / 1000.0
+        self.TIME_PREP_MS: float = self.sim_settings._time_prep
+        self.TIME_PREP_S: float = self.TIME_PREP_MS / 1000.0
         self.N_TRIALS: int = self.sim_settings.n_trials
+        self.TIME_BEFORE_NEXT_MS: float = self.sim_settings.time_post
+        self.TIME_BEFORE_NEXT_S: float = self.TIME_BEFORE_NEXT_MS / 1000.0
 
-        self.TIME_TRIAL_S: float = self.TIME_MAX_S + self.TIME_WAIT_S
+        self.TIME_TRIAL_S: float = (
+            self.TIME_PREP_S + self.TIME_TRIAL_S + self.TIME_BEFORE_NEXT_S
+        )
         self.TOTAL_SIM_DURATION_S: float = self.TIME_TRIAL_S * self.N_TRIALS
         self.time_vector_total_s: np.ndarray = np.arange(
             0, self.TOTAL_SIM_DURATION_S, self.RESOLUTION_S

@@ -329,7 +329,7 @@ if __name__ == "__main__":
         controller = Controller(
             dof_id=j,
             N=N,
-            total_time_vect=single_trial_time_vect,
+            total_time_vect=total_time_vect_concat,
             trajectory_slice=trj,
             motor_cmd_slice=motor_commands,
             mc_params=mc_p,
@@ -342,7 +342,7 @@ if __name__ == "__main__":
             path_data=run_paths.data_nest,
             label_prefix="",
             music_cfg=music_cfg,
-            use_cerebellum=True,
+            use_cerebellum=True,  # TODO move this to parameters
             cerebellum_config={},  # TODO
             comm=comm,
         )
@@ -358,7 +358,7 @@ if __name__ == "__main__":
     )
 
     # --- Simulation ---
-    run_simulation(sim_params, n_trials, run_paths.data_nest, controllers, comm)
+    run_simulation(sim, n_trials, run_paths.data_nest, controllers, comm)
 
     # --- Plotting (Rank 0 Only) ---
     if rank == 0:

@@ -1,8 +1,6 @@
-from datetime import timedelta
-from timeit import default_timer as timer
-
 import numpy as np
-from config.settings import Experiment, Simulation
+
+from complete_control.config.settings import Experiment, Simulation
 
 
 def generate_signals():
@@ -15,17 +13,16 @@ def generate_signals():
     exp = Experiment()
     sim = Simulation()
 
-    start = timer()
-
     res = sim.resolution
     n_trials = sim.n_trials
-    time_sim = sim.timeMax
-    time_wait = sim.timeWait
-    time_span = time_sim + time_wait
-    total_time = time_span * n_trials
+    time_sim = sim.time_move
+    time_prep = sim.time_prep
+    time_post = sim.time_post
+    total_time_trial = time_prep + time_sim + time_post
+    total_time = total_time_trial * n_trials
 
     time_vect = np.linspace(
-        0, time_span, num=int(np.round(time_span / res)), endpoint=True
+        0, total_time_trial, num=int(np.round(total_time_trial / res)), endpoint=True
     )
     time_sim_vec = np.linspace(
         0, time_sim, num=int(np.round(time_sim / res)), endpoint=True
@@ -63,8 +60,9 @@ def generate_signals():
     trj, pol = minimumJerk(init_pos, tgt_pos, time_sim_vec)  # Joint space (angle)
     trj_ee = dynSys.forwardKin(trj)  # End-effector space
 
-    trj_wait = 0 * np.ones(int(time_wait / res))
-    trj = np.tile(np.concatenate((trj_wait, trj.flatten())), n_trials)
+    trj_prep = 0 * np.ones(int(time_prep / res))
+    trj_post = trj[-1] * np.ones(int(time_post / res))
+    trj = np.tile(np.concatenate((trj_prep, trj.flatten(), trj_post)), n_trials)
 
     ## Compute motor commands (input to Motor Cortex)
     # Double derivative of the trajectory
@@ -126,9 +124,10 @@ def generate_signals():
         return mcmd[0]
 
     motorCommands = generateMotorCommands(init_pos, tgt_pos, time_sim_vec / 1e3)
-    mc_wait = motorCommands[0] * np.ones(int(time_wait / res))
+    mc_prep = 0 * np.ones(int(time_prep / res))
+    mc_post = 0 * np.ones(int(time_post / res))
     motorCommands = np.tile(
-        np.concatenate((mc_wait, motorCommands.flatten())), n_trials
+        np.concatenate((mc_prep, motorCommands.flatten(), mc_post)), n_trials
     )
 
     return trj, motorCommands
@@ -136,5 +135,11 @@ def generate_signals():
 
 if __name__ == "__main__":
     trj, motorCommands = generate_signals()
+    sim = Simulation()
     print(f"Generated trajectory shape: {trj.shape}")
+    print(trj)
     print(f"Generated motor commands shape: {motorCommands.shape}")
+    print(motorCommands)
+    print(
+        f"expected length: {(sim.time_prep + sim.time_move + sim.time_post)*sim.n_trials/sim.resolution}"
+    )

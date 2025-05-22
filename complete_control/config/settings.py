@@ -204,33 +204,54 @@ class Simulation:
         # Nest resolution (milliseconds)
         self._resolution = 0.1
 
+        # Waiting time before movement execution (milliseconds)
+        self._time_prep = 50.0
+        # time_prep [150] -> time_trial [500] -> time_wait [350]
+
         # Simulation time (milliseconds)
-        self._timeMax = 500.0
+        self._time_move = 250.0
 
         # Pause after movement (milliseconds)
-        self._timePause = 0.0
+        self._time_post = 100.0
 
         # Number of trials
-        self._n_trials = 1
-
-        # Waiting time before movement execution (milliseconds)
-        self.timeWait = 150.0
+        self._n_trials = 2
 
     @property
     def resolution(self):
         return self._resolution
 
     @property
-    def timeMax(self):
-        return self._timeMax
+    def time_prep(self):
+        return self._time_prep
 
     @property
-    def timePause(self):
-        return self._timePause
+    def time_move(self):
+        return self._time_move
+
+    @property
+    def time_post(self):
+        return self._time_post
 
     @property
     def n_trials(self):
         return self._n_trials
+
+    @property
+    def duration_single_trial_ms(self):
+        return self.time_prep + self.time_move + self.time_post
+
+    @property
+    def duration_single_trial_s(self):
+        return self.duration_single_trial_ms / 1000
+
+    @property
+    def total_duration_all_trials_ms(self):
+        return self.duration_single_trial_ms * self.n_trials
+
+    @property
+    def total_steps_single_trial(self):
+        return self.duration_single_trial_s / self.resolution
 
 
 ####################################################################
