@@ -44,6 +44,8 @@ def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
     # This is fragile. Better to manage environments or installation paths.
     ld_lib_path = os.environ.get("LD_LIBRARY_PATH", "")
     nestml_path_str = str(nestml_build_dir)
+    # TODO do we really need this? can we delete this whole section?
+    # keep the install but everything else should go i think.
     if nestml_path_str not in ld_lib_path:
         # Check if the path exists before adding
         if nestml_build_dir.exists():
@@ -60,18 +62,16 @@ def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
     # Import NESTML models after path setup
     try:
         # Check if module is already installed to prevent errors on reset
-        if "controller_module" not in nest.Models(mtype="nodes"):
-            # TODO we should only install it if we are running without cerebellum, otherwise
-            # cerebellum tries installing it again (or remove it from configuration)
-            # nest.Install("controller_module")  # Install custom NESTML modules
-            log.info("Installed NESTML module", module="controller_module")
+        if "custom_stdp_module" not in nest.Models(mtype="nodes"):
+            nest.Install("custom_stdp_module")
+            log.info("Installed NESTML module", module="custom_stdp_module")
         else:
-            log.debug("NESTML module already installed", module="controller_module")
+            log.debug("NESTML module already installed", module="custom_stdp_module")
     except nest.NESTError as e:
         # Handle cases where installation fails even if not previously installed
         log.error(
             "Error installing NESTML module",
-            module="controller_module",
+            module="custom_stdp_module",
             error=str(e),
             exc_info=True,
         )
