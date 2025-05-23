@@ -39,6 +39,7 @@ class RoboticPlant:
 
         self.bullet_robot = self.bullet_world.LoadRobot()
         self.robot_id = self.bullet_robot._body_id
+        self.is_locked = False
         self.log.info("PyBullet initialized and robot loaded", robot_id=self.robot_id)
 
         # Specific joint ID for the 1-DOF arm
@@ -128,6 +129,7 @@ class RoboticPlant:
                 "Torques list must contain exactly one value for 1-DOF arm."
             )
 
+        self.is_locked = False
         self.bullet_robot.SetJointTorques(
             joint_ids=[self.elbow_joint_id], torques=torques
         )
@@ -156,3 +158,21 @@ class RoboticPlant:
             "Plant reset to initial position and zero velocity.",
             target_pos_rad=self.initial_joint_position_rad,
         )
+
+    def lock_joint(self) -> None:
+        if not self.is_locked:
+            self.log.debug("setting joint torque to zero")
+            self.set_joint_torques([0])
+            current_joint_pos_rad, vel = self.get_joint_state()
+            self.log.debug("current joint state", pos=current_joint_pos_rad, vel=vel)
+            self.p.resetJointState(
+                bodyUniqueId=self.robot_id,
+                jointIndex=self.elbow_joint_id,
+                targetValue=current_joint_pos_rad,
+                targetVelocity=0.0,
+            )
+            self.log.debug(
+                "Plant velocity locked.",
+                target_pos_rad=self.initial_joint_position_rad,
+            )
+            self.is_locked = True

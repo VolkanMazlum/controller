@@ -181,6 +181,16 @@ class PlantSimulator:
         time_in_trial = current_sim_time_s % self.config.TIME_TRIAL_S
         return (self.config.TIME_PREP_S + self.config.TIME_MOVE_S) < time_in_trial
 
+    def _should_lock_joint(self, current_sim_time_s: float) -> bool:
+        time_in_trial = current_sim_time_s % self.config.TIME_TRIAL_S
+        return (self.config.TIME_PREP_S + self.config.TIME_MOVE_S) < time_in_trial
+
+    def _set_joint_torque(self, joint_torque: float, current_sim_time_s: float) -> bool:
+        if self._should_lock_joint(current_sim_time_s):
+            self.plant.lock_joint()
+            return
+        self.plant.set_joint_torques([joint_torque])
+
     def _update_sensory_feedback(
         self, current_joint_pos_rad: float, current_sim_time_s: float
     ) -> None:
@@ -261,12 +271,12 @@ class PlantSimulator:
                     time_end=current_sim_time_s,
                 )
                 net_rate_hz = rate_pos_hz - rate_neg_hz
-                input_torque = net_rate_hz / self.config.SCALE_TORQUE
+                computed_torque_from_input = net_rate_hz / self.config.SCALE_TORQUE
 
                 # TODO: Add perturbation logic here if needed, to calculate input_cmd_total_torque
 
                 # 4. Apply motor command to plant
-                self.plant.set_joint_torques([input_torque])
+                self._set_joint_torque(computed_torque_from_input, current_sim_time_s)
 
                 # 5. Step PyBullet simulation
                 self.plant.simulate_step(self.config.RESOLUTION_S)
@@ -282,7 +292,7 @@ class PlantSimulator:
                     spk_rate_pos_hz=rate_pos_hz,
                     spk_rate_neg_hz=rate_neg_hz,
                     spk_rate_net_hz=net_rate_hz,
-                    input_cmd_torque=input_torque,
+                    input_cmd_torque=computed_torque_from_input,
                 )
 
                 # 7. Trial end logic (reset plant)
