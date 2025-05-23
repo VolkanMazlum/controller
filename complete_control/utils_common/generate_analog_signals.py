@@ -60,7 +60,7 @@ def generate_signals():
     trj, pol = minimumJerk(init_pos, tgt_pos, time_sim_vec)  # Joint space (angle)
     trj_ee = dynSys.forwardKin(trj)  # End-effector space
 
-    trj_prep = 0 * np.ones(int(time_prep / res))
+    trj_prep = trj[0] * np.ones(int(time_prep / res))
     trj_post = 0 * np.ones(int(time_post / res))
     trj = np.tile(np.concatenate((trj_prep, trj.flatten(), trj_post)), n_trials)
 
