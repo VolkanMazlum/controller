@@ -61,7 +61,7 @@ def generate_signals():
     trj_ee = dynSys.forwardKin(trj)  # End-effector space
 
     trj_prep = 0 * np.ones(int(time_prep / res))
-    trj_post = trj[-1] * np.ones(int(time_post / res))
+    trj_post = 0 * np.ones(int(time_post / res))
     trj = np.tile(np.concatenate((trj_prep, trj.flatten(), trj_post)), n_trials)
 
     ## Compute motor commands (input to Motor Cortex)

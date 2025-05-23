@@ -179,7 +179,7 @@ class PlantSimulator:
     def _should_mask_sensory_info(self, current_sim_time_s: float) -> bool:
         "mask sensory during TIME_BEFORE_NEXT"
         time_in_trial = current_sim_time_s % self.config.TIME_TRIAL_S
-        return (self.config.TIME_PREP_S + self.config.TIME_TRIAL_S) < time_in_trial
+        return (self.config.TIME_PREP_S + self.config.TIME_MOVE_S) < time_in_trial
 
     def _update_sensory_feedback(
         self, current_joint_pos_rad: float, current_sim_time_s: float

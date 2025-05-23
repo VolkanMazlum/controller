@@ -58,16 +58,16 @@ class PlantConfig:
         # Simulation timing
         self.RESOLUTION_MS: float = self.sim_settings.resolution
         self.RESOLUTION_S: float = self.RESOLUTION_MS / 1000.0
-        self.TIME_TRIAL_MS: float = self.sim_settings.time_move
-        self.TIME_TRIAL_S: float = self.TIME_TRIAL_MS / 1000.0
+        self.TIME_MOVE_MS: float = self.sim_settings.time_move
+        self.TIME_MOVE_S: float = self.TIME_MOVE_MS / 1000.0
         self.TIME_PREP_MS: float = self.sim_settings._time_prep
         self.TIME_PREP_S: float = self.TIME_PREP_MS / 1000.0
         self.N_TRIALS: int = self.sim_settings.n_trials
-        self.TIME_BEFORE_NEXT_MS: float = self.sim_settings.time_post
-        self.TIME_BEFORE_NEXT_S: float = self.TIME_BEFORE_NEXT_MS / 1000.0
+        self.TIME_POST_MS: float = self.sim_settings.time_post
+        self.TIME_POST_S: float = self.TIME_POST_MS / 1000.0
 
         self.TIME_TRIAL_S: float = (
-            self.TIME_PREP_S + self.TIME_TRIAL_S + self.TIME_BEFORE_NEXT_S
+            self.TIME_PREP_S + self.TIME_MOVE_S + self.TIME_POST_S
         )
         self.TOTAL_SIM_DURATION_S: float = self.TIME_TRIAL_S * self.N_TRIALS
         self.time_vector_total_s: np.ndarray = np.arange(
