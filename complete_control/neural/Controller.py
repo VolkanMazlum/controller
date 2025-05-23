@@ -302,6 +302,8 @@ class Controller:
             "N_pred": N,
             "fbk_bf_size": N * int(buf_sz / self.sim_params.resolution),
             "pred_bf_size": N * int(buf_sz / self.sim_params.resolution),
+            # the nestml model has a hardcoded solution to stop any spikes in time_wait
+            "time_wait": 0,
         }
         self.state_params.update(additional_state_params)
         self.log.debug(
