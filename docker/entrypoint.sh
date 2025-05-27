@@ -78,9 +78,18 @@ if [ ! -f "${BSB_NETWORK_FILE}" ]; then
     mkdir -p "$(dirname "${BSB_NETWORK_FILE}")" # Ensure parent directory exists
     echo "Found compressed file ${COMPRESSED_BSB_NETWORK_FILE}. Decompressing..."
     gzip -d -c "${COMPRESSED_BSB_NETWORK_FILE}" > "${BSB_NETWORK_FILE}"
+    echo "moving ownership to current user.."
+    chown -R "$DIR_UID:$DIR_GID" $BSB_NETWORK_FILE
+    echo "ownership changed"
 else
     echo "Uncompressed network file ${BSB_NETWORK_FILE} already exists. Skipping decompression."
 fi
+
+##### temporary patch for cerebmodule
+echo "Installing cerebmodule as it is not included in custom_stdp yet"
+gosu "$USERNAME" /sim/venv/bin/python ${CEREBELLUM_PATH}/cerebellum/nest_models/build_models.py
+
+##### temporary patch end
 
 echo "Installing custom stdp"
 cd $CONTROLLER_DIR/built_custom_stdp
