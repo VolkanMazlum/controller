@@ -8,11 +8,13 @@ echo "Running entrypoint..."
 # --- Configuration ---
 # Directory mounted from host, whose ownership we need to match primarily
 TARGET_DIR="${CONTROLLER_DIR}"
-CEREBELLUM_PATH="${TARGET_DIR}/cerebellum" # Assumes cerebellum is inside controller mount
+CEREBELLUM_PATH="${CEREBELLUM_PATH}"
 SHARED_DATA_DIR="${SHARED_DATA_DIR}"
 USERNAME="${USERNAME}"
 VENV_PATH="${VIRTUAL_ENV}"
 NEST_MODULE_PATH="${NEST_MODULE_PATH}"
+COMPRESSED_BSB_NETWORK_FILE="${COMPRESSED_BSB_NETWORK_FILE}"
+BSB_NETWORK_FILE="${BSB_NETWORK_FILE}"
 
 PYTHON_MAJOR_MINOR=$(python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
 SITE_PACKAGES_PATH="$VENV_PATH/lib/${PYTHON_MAJOR_MINOR}/site-packages"
@@ -69,6 +71,17 @@ else
     echo "$USERNAME UID/GID ($CURRENT_UID/$CURRENT_GID) matches target ($DIR_UID/$DIR_GID). No changes needed."
 fi
 
+# --- Decompress BSB Network File if necessary ---
+echo "Checking for BSB network file: ${BSB_NETWORK_FILE}"
+if [ ! -f "${BSB_NETWORK_FILE}" ]; then
+    echo "Uncompressed network file ${BSB_NETWORK_FILE} not found."
+    mkdir -p "$(dirname "${BSB_NETWORK_FILE}")" # Ensure parent directory exists
+    echo "Found compressed file ${COMPRESSED_BSB_NETWORK_FILE}. Decompressing..."
+    gzip -d -c "${COMPRESSED_BSB_NETWORK_FILE}" > "${BSB_NETWORK_FILE}"
+else
+    echo "Uncompressed network file ${BSB_NETWORK_FILE} already exists. Skipping decompression."
+fi
+
 # --- Prerequisite Scripts ---
 # Run the editable install script
 echo "Running python dependencies script as user '$USERNAME'..."
@@ -91,9 +104,6 @@ echo "----------------------------------------"
 # --- Set Environment Variables for Final Command ---
 # Ensure these are set *before* gosu executes the final command
 # so they are inherited by the user's environment.
-# Note: CEREBELLUM_PATH is defined earlier in this script
-
-# export PYTHONPATH="/sim/install/nest/lib/python3.10/site-packages${PYTHONPATH:+:$PYTHONPATH}"
 
 echo "Final LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
 echo "Final PATH: $PATH"

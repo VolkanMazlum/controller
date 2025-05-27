@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     gosu \
     vim \
+    gzip \
     # --- VNC Dependencies ---
     tigervnc-standalone-server \
     tigervnc-common \
@@ -49,6 +50,14 @@ ENV INSTALL_DIR=/sim/install
 ENV DEPS_DIR=/sim/dependencies
 ENV NEST_INSTALL_DIR=$INSTALL_DIR/nest
 ENV MUSIC_INSTALL_DIR=$INSTALL_DIR/music
+
+ENV CONTROLLER_DIR=/sim/controller
+ENV SHARED_DATA_DIR=/sim/shared_data
+ENV NEST_MODULE_PATH=/sim/install/nest/lib/nest
+RUN mkdir -p $CONTROLLER_DIR $SHARED_DATA_DIR $NEST_MODULE_PATH
+
+ENV CEREBELLUM_PATH=sim/controller/cerebellum
+ENV LD_LIBRARY_PATH="${MUSIC_INSTALL_DIR}/lib"
 
 RUN mkdir -p $INSTALL_DIR $DEPS_DIR $NEST_INSTALL_DIR $MUSIC_INSTALL_DIR
 
@@ -91,11 +100,16 @@ RUN mkdir -p nest-build \
     && make -j$(nproc) \
     && make install 
 
+# suppress nest startup message
 ENV PYNEST_QUIET=1
 
 ENV BULLET_MUSCLE_DIR=$DEPS_DIR/bullet_muscle_sim
 ENV SDF_MODELS_DIR=/sim/embodiment_sdf_models
 RUN mkdir -p $BULLET_MUSCLE_DIR $SDF_MODELS_DIR 
+
+# cerebellum
+ENV COMPRESSED_BSB_NETWORK_FILE=${CONTROLLER_DIR}/artifacts/cerebellum_plastic_base.hdf5.gz
+ENV BSB_NETWORK_FILE=${CEREBELLUM_PATH}/cerebellum_plastic_base.hdf5
 
 
 # Install bullet muscle simulation
@@ -117,11 +131,6 @@ ARG USER_GID
 ENV USERNAME=simuser
 RUN groupadd --gid $USER_GID $USERNAME && \
     useradd --uid $USER_UID --gid $USER_GID --create-home --shell /bin/bash $USERNAME
-
-ENV CONTROLLER_DIR=/sim/controller
-ENV SHARED_DATA_DIR=/sim/shared_data
-ENV NEST_MODULE_PATH=/sim/install/nest/lib/nest
-RUN mkdir -p $CONTROLLER_DIR $SHARED_DATA_DIR $NEST_MODULE_PATH
 
 COPY ./docker/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

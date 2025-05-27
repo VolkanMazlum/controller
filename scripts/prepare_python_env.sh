@@ -2,7 +2,7 @@
 set -e
 
 # This script runs as the non-root user ($USERNAME) after gosu.
-# It ensures the 'cerebellum' package (or similar) is installed editable.
+# It ensures the 'cerebellum' package is installed editable.
 
 # --- Inherited Environment Variables ---
 # VIRTUAL_ENV: Path to the virtual environment
@@ -11,7 +11,7 @@ set -e
 # CEREBELLUM_PATH
 
 # --- Configuration ---
-REQUIREMENTS_PATH="${CONTROLLER_DIR}/requirements.txt" # App requirements in the mount
+REQUIREMENTS_PATH="${CONTROLLER_DIR}/docker/requirements.txt"
 PYTHON_MAJOR_MINOR=$(python -c "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')")
 SITE_PACKAGES_PATH="$VIRTUAL_ENV/lib/${PYTHON_MAJOR_MINOR}/site-packages"
 

@@ -1,11 +1,4 @@
-"""Cerebellum class"""
-
-__authors__ = "Massimo Grillo"
-__copyright__ = "Copyright 2021"
-__credits__ = ["Massimo Grillo"]
-__license__ = "GPL"
-__version__ = "1.0.1"
-
+import os
 from pathlib import Path
 
 import numpy as np
@@ -22,7 +15,7 @@ from .population_view import PopView
 
 # maybe these can be moved in a paths object together with other folders!
 SIMULATION_NAME_IN_YAML = "basal_activity"
-PATH_HDF5 = Path("/sim/controller/cerebellum/mouse_cereb_microzones_complete.hdf5")
+PATH_HDF5 = os.environ.get("BSB_NETWORK_FILE")
 PATH_YAML_FORWARD = Path("/sim/controller/conf/forward.yaml")
 PATH_YAML_INVERSE = Path("/sim/controller/conf/inverse.yaml")
 
