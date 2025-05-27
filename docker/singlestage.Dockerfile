@@ -156,8 +156,6 @@ RUN cat /tmp/aliases.sh >> /etc/bash.bashrc && rm /tmp/aliases.sh
 # Set display for terminals opened in VNC
 RUN echo "export DISPLAY=${VNC_DISPLAY}" >> /etc/bash.bashrc 
 
-ENV CEREBELLUM_PATH="${CONTROLLER_DIR}/cerebellum"
-ENV LD_LIBRARY_PATH="${MUSIC_INSTALL_DIR}/lib"
 ENV PATH="${VIRTUAL_ENV}/bin:${MUSIC_INSTALL_DIR}/bin:${NEST_INSTALL_DIR}/bin:${PATH}"
 
 ENV PYTHONPATH="${CONTROLLER_DIR}:${BULLET_MUSCLE_DIR}:${CEREBELLUM_PATH}${PYTHONPATH:+:${PYTHONPATH}}"

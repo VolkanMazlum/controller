@@ -82,6 +82,11 @@ else
     echo "Uncompressed network file ${BSB_NETWORK_FILE} already exists. Skipping decompression."
 fi
 
+echo "Installing custom stdp"
+cd $CONTROLLER_DIR/built_custom_stdp
+make install
+cd $CONTROLLER_DIR
+
 # --- Prerequisite Scripts ---
 # Run the editable install script
 echo "Running python dependencies script as user '$USERNAME'..."

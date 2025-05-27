@@ -89,7 +89,7 @@ class PlantConfig:
         self.N_NEURONS: int = self.brain_settings.nNeurPop
 
         # Plant interaction parameters
-        self.SCALE_TORQUE: float = 500000.0  # From original receiver_plant.py
+        self.SCALE_TORQUE: float = 500000.0
         self.BUFFER_SIZE_S: float = (
             10.0 / 1000.0
         )  # Buffer to calculate spike rate (seconds)
