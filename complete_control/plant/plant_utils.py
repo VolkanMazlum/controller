@@ -319,7 +319,8 @@ def plot_ee_space(
         plt.plot(
             actual_traj_ee[start_idx:end_idx, 0],
             actual_traj_ee[start_idx:end_idx, 2],
-            "k",
+            "k.",
+            ms=1,
             label="Trajectory" if trial_n == 0 else None,
         )
         plt.plot(

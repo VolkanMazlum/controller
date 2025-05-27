@@ -27,8 +27,8 @@ SEED = 12345
 class Experiment:
 
     def __init__(self):
-        self._init_joint_angle = 0
-        self._tgt_joint_angle = 90
+        self._init_joint_angle = 75
+        self._tgt_joint_angle = 15
 
         # Perturbation
         alpha = 0  # np.arctan(self._tgt_pos[:,1]/self._tgt_pos[:,0])/np.pi*180
@@ -108,14 +108,14 @@ class Simulation:
         self._resolution = 0.1
 
         # Waiting time before movement execution (milliseconds)
-        self._time_prep = 50.0
+        self._time_prep = 150.0
         # time_prep [150] -> time_trial [500] -> time_wait [350]
 
         # Simulation time (milliseconds)
-        self._time_move = 250.0
+        self._time_move = 500.0
 
         # Pause after movement (milliseconds)
-        self._time_post = 100.0
+        self._time_post = 350.0
 
         # Number of trials
         self._n_trials = 2

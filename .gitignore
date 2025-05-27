@@ -10,7 +10,7 @@ __pycache__
 # **/*.txt
 **/*.hdf5
 /complete_control/demo_human_col
-/nestml/target
+nestml/target
 logs
 .env
 
