@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import structlog
-from plant.plant_config import PlantConfig
+from config.plant_config import PlantConfig
 
 _log = structlog.get_logger(__name__)
 

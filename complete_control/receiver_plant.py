@@ -12,8 +12,8 @@ music_setup = music.Setup()
 import config.paths as project_paths
 import pybullet as p
 import structlog
+from config.plant_config import PlantConfig
 from mpi4py import MPI
-from plant.plant_config import PlantConfig
 from plant.plant_simulator import PlantSimulator
 from utils_common.log import setup_logging
 

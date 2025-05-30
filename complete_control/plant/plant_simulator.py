@@ -2,11 +2,11 @@ from typing import Any, List, Tuple
 
 import music
 import structlog
+from config.plant_config import PlantConfig
 from utils_common.generate_analog_signals import generate_signals
 from utils_common.log import tqdm
 
 from . import plant_utils
-from .plant_config import PlantConfig
 from .robotic_plant import RoboticPlant
 from .sensoryneuron import SensoryNeuron
 
