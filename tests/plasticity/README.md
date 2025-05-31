@@ -33,7 +33,7 @@ In the folder `tests_plasticity` there is a battery of tests that can be run wit
 source do_tests.sh
 source do_tests_alpha.sh
 ```
-The tests are still targeted to the previous implementation with the workaround so they have to be adapted to the new implementation. `do_tests.sh` has all the test for sinexp synaptic plasticity mode. 
+The tests are still targeted to the previous implementation with the workaround so they have to be adapted to the new implementation. `do_tests_sinexp.sh` has all the test for sinexp synaptic plasticity mode. 
 - Base connections: IO -> PC  and GR -> PC
 `do_tests_alpha.sh` has all the test for alpha synaptic plasticity mode.
 - Base connections: IO -> MLI  and GR -> MLI
