@@ -30,7 +30,7 @@ nest.Install("module_name")
 
 In the folder `tests_plasticity` there is a battery of tests that can be run with:
 ```
-source do_tests.sh
+source do_tests_sinexp.sh
 source do_tests_alpha.sh
 ```
 The tests are still targeted to the previous implementation with the workaround so they have to be adapted to the new implementation. `do_tests_sinexp.sh` has all the test for sinexp synaptic plasticity mode. 
