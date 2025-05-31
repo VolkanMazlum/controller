@@ -1,0 +1,10 @@
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/dist.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/custom_stdp_module_module.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/package.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/package_source.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/edit_cache.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/rebuild_cache.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/list_install_components.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/install.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/install/local.dir
+/home/alphabuntu/test2/Tesi/plasticity/build_dir/CMakeFiles/install/strip.dir

@@ -1,0 +1,1 @@
+/home/alphabuntu/workspace/simulation/dependencies/nest-install/lib/nest/custom_stdp_module.so
