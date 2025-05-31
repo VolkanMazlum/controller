@@ -1,7 +1,7 @@
 This folder contains everything that is needed to compile, run and test a preliminary implementation of the sinexp and alpha synaptic plasticity model.
 
 The subfolders `custom_stdp` contains the source code for needed version of the cerebellum that we will test.
-The first one contains four E-GLIF models for Granule cell (`eglif_cond_alpha_multisyn`), Inferior Olivary cell (`eglif_io_nestml`), Purkinje cell (`eglif_pc_nestml`) and, MLI (`eglif_mli_nestml`)
+The first one contains four E-GLIF models for Granule cell (`eglif_cond_alpha_multisyn`), Inferior Olivary cell (`eglif_io_nestml`), Purkinje cell (`eglif_pc_nestml`) and, MLI (`eglif_mli`)
 
 To compile these extension modules, create a build directory at the same level of the folder containing the source code. Inside the `plasticity` folder:
 ```
