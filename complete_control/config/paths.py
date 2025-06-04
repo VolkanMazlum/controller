@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,10 +10,15 @@ REFERENCE_DATA_DIR = COMPLETE_CONTROL / "reference_data"
 
 CONFIG = COMPLETE_CONTROL / "config"
 
-PARAMS = CONFIG / "new_params.json"
 TRAJECTORY = CONFIG / "trajectory.txt"
 MOTOR_COMMANDS = CONFIG / "motor_commands.txt"
 NESTML_BUILD_DIR = ROOT / "nestml" / "target"
+CEREBELLUM = ROOT / "cerebellum"
+CEREBELLUM_CONFIGS = ROOT / "cerebellum_configurations"
+FORWARD = CEREBELLUM_CONFIGS / "forward.yaml"
+INVERSE = CEREBELLUM_CONFIGS / "inverse.yaml"
+BASE = CEREBELLUM_CONFIGS / "microzones_complete_nest.yaml"
+PATH_HDF5 = os.environ.get("BSB_NETWORK_FILE")
 
 
 @dataclass(frozen=True)
