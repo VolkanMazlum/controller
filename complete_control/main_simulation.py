@@ -174,9 +174,8 @@ def coordinate_paths_with_receiver() -> tuple[str, RunPaths]:
     return run_timestamp_str, run_paths
 
 
-# --- Main Execution Block ---
 if __name__ == "__main__":
-    # --- MPI Setup ---
+    # --- Setup ---
     comm = MPI.COMM_WORLD.Create_group(  # last process is for receiver_plant
         MPI.COMM_WORLD.group.Excl([MPI.COMM_WORLD.Get_size() - 1])
     )
@@ -203,6 +202,7 @@ if __name__ == "__main__":
         sim_size=comm.size,
         log_all_ranks=True,
     )
+
     start_script_time = timer()
     nest.ResetKernel()
     run_id = run_paths.run.name
@@ -223,7 +223,6 @@ if __name__ == "__main__":
         master_config_dump=master_config.model_dump_json(indent=2),
     )
 
-    seed = master_config.simulation.seed
     N = master_config.brain.population_size
     njt = master_config.NJT
 
@@ -236,13 +235,11 @@ if __name__ == "__main__":
     main_log.info(f"Using {njt} DoF based on PlantConfig.")
     main_log.info("Input data (trajectory, motor_commands) generated.", dof=njt)
 
-    # --- Time Vectors ---
     res = master_config.simulation.resolution
     time_span_per_trial = master_config.simulation.duration_single_trial_ms
     n_trials = master_config.simulation.n_trials
     total_sim_duration = master_config.simulation.total_duration_all_trials_ms
 
-    # Time vector for a single trial (passed to PopView)
     single_trial_time_vect = np.linspace(
         0,
         time_span_per_trial,
@@ -267,7 +264,9 @@ if __name__ == "__main__":
 
     # --- Network Construction ---
     start_network_time = timer()
-    setup_nest_kernel(master_config.simulation, seed, run_paths.data_nest)
+    setup_nest_kernel(
+        master_config.simulation, master_config.simulation.seed, run_paths.data_nest
+    )
 
     controllers = []
     main_log.info(f"Constructing Network", dof=njt, N_neurons_pop=N)
@@ -296,9 +295,6 @@ if __name__ == "__main__":
         )
         controllers.append(controller)
 
-    # --- Inter-Controller Connections (if any) ---
-    # Add code here if controllers need to be connected to each other
-
     end_network_time = timer()
     main_log.info(
         f"Network Construction Finished",
@@ -313,12 +309,7 @@ if __name__ == "__main__":
     if rank == 0:
         main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
-        try:
-            plot_controller_outputs(
-                controllers, total_time_vect_concat, run_paths.figures
-            )
-        except Exception as e:
-            main_log.error("Error during plotting", error=str(e), exc_info=True)
+        plot_controller_outputs(controllers, total_time_vect_concat, run_paths.figures)
         end_plot_time = timer()
         plot_wall_time = timedelta(seconds=end_plot_time - start_plot_time)
         main_log.info(f"Plotting Finished", wall_time=str(plot_wall_time))
