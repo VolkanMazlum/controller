@@ -227,26 +227,6 @@ if __name__ == "__main__":
     N = master_config.brain.population_size
     njt = master_config.NJT
 
-    main_log.info(
-        "Experiment Parameters from PlantConfig",
-        seed=seed,
-        N_neurons_pop=N,
-        n_joints=njt,
-    )
-    main_log.info(
-        "Simulation Parameters from PlantConfig",
-        resolution=master_config.simulation.resolution,
-        n_trials=master_config.simulation.n_trials,
-    )
-
-    # TODO: hardcoded?
-    music_cfg = {
-        "out_port": "mot_cmd_out",
-        "in_port": "fbk_in",
-        "const": master_config.music.const,
-    }
-    main_log.info("MUSIC Configuration", **music_cfg)
-
     setup_environment()
 
     trj, motor_commands = generate_signals(
@@ -309,7 +289,7 @@ if __name__ == "__main__":
             sim_params=master_config.simulation,
             path_data=run_paths.data_nest,
             label_prefix="",
-            music_cfg=music_cfg,
+            music_cfg=master_config.music,
             use_cerebellum=True,  # TODO move this to parameters
             cerebellum_paths=master_config.bsb_config_paths,
             comm=comm,

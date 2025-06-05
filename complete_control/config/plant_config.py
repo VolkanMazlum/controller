@@ -84,8 +84,8 @@ class PlantConfig:
         )
         if self.MUSIC_ACCEPTABLE_LATENCY_S < 0:
             self.MUSIC_ACCEPTABLE_LATENCY_S = 0.0
-        self.MUSIC_PORT_MOT_CMD_IN: str = "mot_cmd_in"
-        self.MUSIC_PORT_FBK_OUT: str = "fbk_out"
+        self.MUSIC_PORT_MOT_CMD_IN: str = self.master_config.music.port_motcmd_in
+        self.MUSIC_PORT_FBK_OUT: str = self.master_config.music.port_fbk_out
 
         # Sensory Neuron parameters from MasterConfig
         self.SENS_NEURON_BASE_RATE: float = (

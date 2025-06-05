@@ -5,7 +5,7 @@ import numpy as np
 import structlog
 from config.bsb_models import BSBConfigPaths
 from config.connection_params import ConnectionsParams
-from config.core_models import SimulationParams
+from config.core_models import MusicParams, SimulationParams
 from config.module_params import (
     MotorCortexModuleConfig,
     PlannerModuleConfig,
@@ -70,7 +70,7 @@ class Controller:
         sim_params: SimulationParams,
         path_data: str,
         comm: Comm,
-        music_cfg: Dict[str, Any],
+        music_cfg: MusicParams,
         label_prefix: str = "",
         use_cerebellum: bool = False,
         cerebellum_paths: Optional[BSBConfigPaths] = None,
@@ -81,7 +81,7 @@ class Controller:
         Args:
             ...
             use_cerebellum (bool): Flag to enable/disable cerebellum integration.
-            cerebellum_config (Optional[Dict[str, Any]]): Configuration for Cerebellum build (paths etc.), required if use_cerebellum is True.
+            cerebellum_paths: paths for Cerebellum build, required if use_cerebellum is True.
         """
         self.log: structlog.stdlib.BoundLogger = structlog.get_logger(
             f"controller"
@@ -567,9 +567,9 @@ class Controller:
         spine_params_dict = self.spine_params.model_dump()
         n_total_neurons = 2 * self.N
 
-        out_port_name = msc_params["out_port"]
-        in_port_name = msc_params["in_port"]
-        latency_const = msc_params["const"]
+        out_port_name = msc_params.port_motcmd_out
+        in_port_name = msc_params.port_fbk_in
+        latency_const = msc_params.const
 
         # Output proxy
         self.log.info("Creating MUSIC out proxy", port=out_port_name)
