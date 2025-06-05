@@ -31,6 +31,7 @@ class RunPaths:
     figures: Path
     figures_receiver: Path
     logs: Path
+    params_json: Path
 
 
 def setup_run_paths(run_timestamp: str):
@@ -51,6 +52,7 @@ def setup_run_paths(run_timestamp: str):
     figures_dir = run_dir / "figures_pop"
     figures_receiver_dir = run_dir / "figures_rec"
     logs_dir = run_dir / "logs"
+    params_path = run_dir / f"params{run_timestamp}.json"
 
     # Create directories if they don't exist
     for dir_path in [
@@ -70,6 +72,7 @@ def setup_run_paths(run_timestamp: str):
         figures=figures_dir,
         figures_receiver=figures_receiver_dir,
         logs=logs_dir,
+        params_json=params_path,
     )
     return paths_obj
 

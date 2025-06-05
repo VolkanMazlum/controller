@@ -15,4 +15,12 @@ class BSBConfigPaths(BaseModel, frozen=True):
 class BSBConfigCopies(BaseModel, frozen=True):
     forward_yaml_content: str = ""
     inverse_yaml_content: str = ""
-    microzones_complete_nest_yaml_content: str = ""
+    base_yaml_content: str = ""
+
+    @classmethod
+    def create(cls, p: BSBConfigPaths):
+        return cls(
+            forward_yaml_content=p.forward_yaml.read_text(),
+            inverse_yaml_content=p.inverse_yaml.read_text(),
+            base_yaml_content=p.base_yaml.read_text(),
+        )

@@ -209,6 +209,9 @@ if __name__ == "__main__":
     meta_info = MetaInfo(run_id=run_id)
     master_config = MasterParams(meta=meta_info)
 
+    with open(run_paths.params_json, "w") as f:
+        f.write(master_config.model_dump_json(indent=2))
+
     main_log.info("MasterParams initialized in main_simulation.")
 
     module_params = master_config.modules

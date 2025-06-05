@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import ClassVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from .bsb_models import BSBConfigCopies, BSBConfigPaths
 from .connection_params import ConnectionsParams
@@ -28,9 +28,12 @@ class MasterParams(BaseModel):
     brain: BrainParams = Field(default_factory=lambda: BrainParams())
     music: MusicParams = Field(default_factory=lambda: MusicParams())
     bsb_config_paths: BSBConfigPaths = Field(default_factory=lambda: BSBConfigPaths())
-    bsb_config_copies: BSBConfigCopies = Field(
-        default_factory=lambda: BSBConfigCopies()
-    )
+
+    @computed_field
+    @property
+    # stores copies of yamls used
+    def bsb_config_copies(self) -> BSBConfigCopies:
+        return BSBConfigCopies.create(self.bsb_config_paths)
 
     modules: ModuleContainerConfig = Field(
         default_factory=lambda: ModuleContainerConfig()
