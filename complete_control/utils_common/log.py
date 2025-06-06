@@ -22,7 +22,7 @@ import structlog
 from mpi4py import MPI
 from tqdm import tqdm as std_tqdm
 
-rank = MPI.COMM_WORLD.rank
+rank = None
 size = None
 
 COLORS_IN_CONSOLE = True
@@ -187,6 +187,8 @@ def setup_logging(
             jsonl_output_pattern=f"{log_dir_path.name}/log_{timestamp_str}_rank<N>.jsonl",  # Use relative name for pattern clarity
             log_file_output=f"{log_dir_path.name}/log_{timestamp_str}_rank0.log",  # Use relative name for pattern clarity
         )
+    print(f"Rank {rank} has completed its work.")
+
     # Barrier to ensure setup is complete everywhere before proceeding
     comm.Barrier()
 
@@ -275,5 +277,4 @@ if __name__ == "__main__":
     # Final message - only from Rank 0 by default
     log.info("Simulation loop finished.", log_all_ranks=True)
 
-    # You might want a final barrier here depending on your MPI application structure
     comm.Barrier()

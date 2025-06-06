@@ -28,13 +28,15 @@ class Cerebellum:
     ):
         self.log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
         options.verbosity = (
-            0  # TODO how to we handle this verbosity? keep 0 for now but...
+            3  # TODO how to we handle this verbosity? keep 0 for now but...
         )
         self.total_time_vect = total_time_vect
         self.label_prefix = label_prefix
         self.populations = CerebellumPopulations()
         self.forward_model = None
 
+        self.log.warning(
+            f"Loading Cerebellum with comm {comm} rank {comm.Get_rank()} and size {comm.Get_size()}")
         adapter: NestAdapter = get_simulation_adapter("nest", comm)
         # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
 
