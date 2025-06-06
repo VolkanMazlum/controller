@@ -1,17 +1,14 @@
 import numpy as np
+from config.core_models import ExperimentParams, SimulationParams
+from plant.robot1j import Robot1J
 
-from complete_control.config.settings import Experiment, Simulation
 
-
-def generate_signals():
+def generate_signals(exp: ExperimentParams, sim: SimulationParams):
     """Generate trajectory and motor commands for the simulation.
 
     Returns:
         tuple: (trajectory, motor_commands) arrays for the simulation
     """
-
-    exp = Experiment()
-    sim = Simulation()
 
     res = sim.resolution
     n_trials = sim.n_trials
@@ -31,12 +28,12 @@ def generate_signals():
         0, total_time, num=int(np.round(total_time / res)), endpoint=True
     )
 
-    dynSys = exp.dynSys
-    njt = exp.dynSys.numVariables()
+    dynSys = Robot1J(robot=exp.robot_spec)
+    njt = dynSys.numVariables()
 
     # Joint space
-    init_pos = np.array([exp.init_pos_angle])
-    tgt_pos = np.array([exp.tgt_pos_angle])
+    init_pos = np.array([exp.init_pos_angle_rad])
+    tgt_pos = np.array([exp.tgt_pos_angle_rad])
 
     ## Compute minimum jerk trajectory (input to Planner)
     def minimumJerk(x_init, x_des, timespan):
@@ -135,7 +132,7 @@ def generate_signals():
 
 if __name__ == "__main__":
     trj, motorCommands = generate_signals()
-    sim = Simulation()
+    sim = SimulationParams()
     print(f"Generated trajectory shape: {trj.shape}")
     print(trj)
     print(f"Generated motor commands shape: {motorCommands.shape}")
