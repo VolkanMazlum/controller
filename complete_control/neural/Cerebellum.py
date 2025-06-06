@@ -10,22 +10,19 @@ from bsb_nest import NestAdapter
 from bsb_nest.adapter import NestResult
 from mpi4py import MPI
 
-from .CerebellumPopulations import CerebellumPopulations  # Added import
+from complete_control.config.bsb_models import BSBConfigPaths
+
+from .CerebellumPopulations import CerebellumPopulations
 from .population_view import PopView
 
-# maybe these can be moved in a paths object together with other folders!
 SIMULATION_NAME_IN_YAML = "basal_activity"
-PATH_HDF5 = os.environ.get("BSB_NETWORK_FILE")
-PATH_YAML_FORWARD = Path("/sim/controller/conf/forward.yaml")
-PATH_YAML_INVERSE = Path("/sim/controller/conf/inverse.yaml")
 
 
 class Cerebellum:
     def __init__(
         self,
         comm: MPI.Comm,
-        filename_h5,
-        filename_config,
+        paths: BSBConfigPaths,
         total_time_vect: np.ndarray,
         label_prefix: str,
     ):
@@ -33,8 +30,6 @@ class Cerebellum:
         options.verbosity = (
             0  # TODO how to we handle this verbosity? keep 0 for now but...
         )
-        self.filename_h5 = filename_h5
-        self.filename_config = filename_config
         self.total_time_vect = total_time_vect
         self.label_prefix = label_prefix
         self.populations = CerebellumPopulations()
@@ -43,15 +38,15 @@ class Cerebellum:
         adapter: NestAdapter = get_simulation_adapter("nest", comm)
         # hdf5 uses relative paths from itself to find functions, so if we move it it won't work anymore
 
-        self.forward_model = from_storage(str(PATH_HDF5), comm)
-        conf_forward = config.parse_configuration_file(str(PATH_YAML_FORWARD))
+        self.forward_model = from_storage(str(paths.cerebellum_hdf5), comm)
+        conf_forward = config.parse_configuration_file(str(paths.forward_yaml))
         self.forward_model.simulations[SIMULATION_NAME_IN_YAML] = (
             conf_forward.simulations[SIMULATION_NAME_IN_YAML]
         )
         self.log.debug("loaded forward model and its configuration")
 
-        self.inverse_model = from_storage(str(PATH_HDF5), comm)
-        conf_inverse = config.parse_configuration_file(str(PATH_YAML_INVERSE))
+        self.inverse_model = from_storage(str(paths.cerebellum_hdf5), comm)
+        conf_inverse = config.parse_configuration_file(str(paths.inverse_yaml))
         self.inverse_model.simulations[SIMULATION_NAME_IN_YAML] = (
             conf_inverse.simulations[SIMULATION_NAME_IN_YAML]
         )

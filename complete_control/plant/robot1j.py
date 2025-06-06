@@ -7,6 +7,7 @@ __license__ = "GPL"
 __version__ = "1.0.1"
 
 import numpy as np
+from config.core_models import RobotSpecParams
 
 from .body import Body
 
@@ -19,13 +20,16 @@ class Robot1J(Body):
         self,
         IC_pos=np.array([0.0]),
         IC_vel=np.array([0.0]),
-        robot=dict(mass=np.array([1.0]), links=np.array([1.0]), I=np.array([1.0])),
+        robot: RobotSpecParams = RobotSpecParams(),
     ):
 
         if IC_pos.shape != IC_vel.shape:
             raise Exception("Position and velocity need to have the same format")
 
-        self.robot = robot
+        self.robot = dict()
+        self.robot["mass"] = np.array(robot.mass)
+        self.robot["links"] = np.array(robot.links)
+        self.robot["I"] = np.array(robot.I)
         self.pos = IC_pos
         self.vel = IC_vel
         self.I = self.robot["I"]  # mass *link**2

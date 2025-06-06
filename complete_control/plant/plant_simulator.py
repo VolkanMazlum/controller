@@ -390,7 +390,10 @@ class PlantSimulator:
                 : self.step_if_early_exit()
             ],  # Use actual number of steps run
             pos_j_rad_actual=self.data_arrays.pos_j_rad[: self.step_if_early_exit(), :],
-            desired_trj_joint_rad=generate_signals()[0],
+            desired_trj_joint_rad=generate_signals(
+                self.config.master_config.experiment,
+                self.config.master_config.simulation,
+            )[0],
         )
         plant_utils.plot_ee_space(
             config=self.config,

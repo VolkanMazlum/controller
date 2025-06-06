@@ -1,3 +1,4 @@
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,10 +10,15 @@ REFERENCE_DATA_DIR = COMPLETE_CONTROL / "reference_data"
 
 CONFIG = COMPLETE_CONTROL / "config"
 
-PARAMS = CONFIG / "new_params.json"
 TRAJECTORY = CONFIG / "trajectory.txt"
 MOTOR_COMMANDS = CONFIG / "motor_commands.txt"
 NESTML_BUILD_DIR = ROOT / "nestml" / "target"
+CEREBELLUM = ROOT / "cerebellum"
+CEREBELLUM_CONFIGS = ROOT / "cerebellum_configurations"
+FORWARD = CEREBELLUM_CONFIGS / "forward.yaml"
+INVERSE = CEREBELLUM_CONFIGS / "inverse.yaml"
+BASE = CEREBELLUM_CONFIGS / "microzones_complete_nest.yaml"
+PATH_HDF5 = os.environ.get("BSB_NETWORK_FILE")
 
 
 @dataclass(frozen=True)
@@ -25,6 +31,7 @@ class RunPaths:
     figures: Path
     figures_receiver: Path
     logs: Path
+    params_json: Path
 
 
 def setup_run_paths(run_timestamp: str):
@@ -45,6 +52,7 @@ def setup_run_paths(run_timestamp: str):
     figures_dir = run_dir / "figures_pop"
     figures_receiver_dir = run_dir / "figures_rec"
     logs_dir = run_dir / "logs"
+    params_path = run_dir / f"params{run_timestamp}.json"
 
     # Create directories if they don't exist
     for dir_path in [
@@ -64,6 +72,7 @@ def setup_run_paths(run_timestamp: str):
         figures=figures_dir,
         figures_receiver=figures_receiver_dir,
         logs=logs_dir,
+        params_json=params_path,
     )
     return paths_obj
 

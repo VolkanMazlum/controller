@@ -3,7 +3,10 @@ from typing import Any, Dict, Optional
 import nest
 import numpy as np
 import structlog
-from config.settings import Simulation
+from config.bsb_models import BSBConfigPaths
+from config.connection_params import ConnectionsParams
+from config.core_models import SimulationParams
+from config.population_params import PopulationsParams
 from mpi4py.MPI import Comm
 
 from .Cerebellum import Cerebellum
@@ -53,10 +56,10 @@ class CerebellumHandler:
         self,
         N: int,
         total_time_vect: np.ndarray,
-        sim_params: Simulation,
-        pops_params: Dict[str, Any],  # Parameters for interface populations
-        conn_params: Dict[str, Any],  # Parameters for connections
-        cerebellum_config: Dict[str, Any],  # Params for Cerebellum object (paths etc)
+        sim_params: SimulationParams,
+        pops_params: PopulationsParams,  # Parameters for interface populations
+        conn_params: ConnectionsParams,
+        cerebellum_paths: BSBConfigPaths,  # Params for Cerebellum object (paths etc)
         path_data: str,
         comm: Comm,
         controller_pops: Optional[ControllerPopulations],
@@ -86,7 +89,7 @@ class CerebellumHandler:
         self.sim_params = sim_params
         self.pops_params = pops_params
         self.conn_params = conn_params
-        self.cerebellum_config = cerebellum_config
+        self.cerebellum_config = cerebellum_paths
         self.path_data = path_data
         self.comm = comm
         self.label_prefix = label_prefix
@@ -97,18 +100,10 @@ class CerebellumHandler:
         self.interface_pops = CerebellumHandlerPopulations()
 
         # --- Instantiate the Core Cerebellum Model ---
-        self.log.info("Instantiating core Cerebellum object", config=cerebellum_config)
-        # TODO: Pass sim and exp objects if Cerebellum class requires them,
-        # or adapt Cerebellum class to take config dicts directly.
-        # For now, assuming config dicts are sufficient.
-        # Need to mock/pass sim/exp or refactor Cerebellum build if it depends on them heavily.
-
-        # This assumes Cerebellum can be initialized this way.
-        # May need dummy Sim/Exp objects or refactoring.
+        self.log.info("Instantiating core Cerebellum object", config=cerebellum_paths)
         self.cerebellum = Cerebellum(
             comm=comm,
-            filename_h5=cerebellum_config.get("filename_h5"),
-            filename_config=cerebellum_config.get("filename_config"),
+            paths=cerebellum_paths,
             total_time_vect=self.total_time_vect,
             label_prefix=f"{self.label_prefix}core_",
         )
@@ -148,11 +143,11 @@ class CerebellumHandler:
 
         # Feedback Scaling (Input to Fwd Error Calc)
         # prediction_p and prediction_n are now created in Controller
-        params = self.pops_params["feedback"]
+        params = self.pops_params.feedback
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         feedback_p = nest.Create(
@@ -165,11 +160,11 @@ class CerebellumHandler:
         self.interface_pops.feedback_n = self._create_pop_view(feedback_n, "feedback_n")
 
         # Motor Commands Relay (Input to Fwd MFs) - Size N_mossy_forw
-        params = self.pops_params["motor_commands"]
+        params = self.pops_params.motor_commands
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         motor_commands_p = nest.Create("basic_neuron_nestml", self.N_mossy_forw)
@@ -184,11 +179,11 @@ class CerebellumHandler:
         )
 
         # Forward Error Calculation (Input to Fwd IO)
-        params = self.pops_params["error"]
+        params = self.pops_params.error
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         error_p = nest.Create("diff_neuron_nestml", self.N)
@@ -199,11 +194,11 @@ class CerebellumHandler:
         self.interface_pops.error_n = self._create_pop_view(error_n, "error_n")
 
         # Planner Relay (Input to Inv MFs) - Size N_mossy_inv
-        params = self.pops_params["plan_to_inv"]
+        params = self.pops_params.plan_to_inv
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         plan_to_inv_p = nest.Create("basic_neuron_nestml", self.N_mossy_inv)
@@ -220,11 +215,11 @@ class CerebellumHandler:
         # State Estimator Relay (Input to Inv Error Calc) - Size N_mossy_inv? Check brain.py usage
         # Assuming size N_mossy_inv based on plan_to_inv, adjust if needed
         # TODO why is this plan instead of state?
-        params = self.pops_params["plan_to_inv"]
+        params = self.pops_params.plan_to_inv
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         state_to_inv_p = nest.Create("basic_neuron_nestml", self.N_mossy_inv)
@@ -239,11 +234,11 @@ class CerebellumHandler:
         )
 
         # Inverse Error Calculation (Input to Inv IO)
-        params = self.pops_params["error_i"]
+        params = self.pops_params.error_i
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         error_inv_p = nest.Create("diff_neuron_nestml", self.N)
@@ -258,11 +253,11 @@ class CerebellumHandler:
         )
 
         # Motor Prediction Scaling (Output from Inv DCN)
-        params = self.pops_params["motor_pred"]
+        params = self.pops_params.motor_pred
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         motor_prediction_p = nest.Create("diff_neuron_nestml", self.N)
@@ -277,11 +272,11 @@ class CerebellumHandler:
         )
 
         # Feedback Inverse Scaling (Input to Inv Error Calc?) - Check necessity
-        params = self.pops_params["feedback_inv"]
+        params = self.pops_params.feedback_inv
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         feedback_inv_p = nest.Create("diff_neuron_nestml", self.N)
@@ -318,22 +313,23 @@ class CerebellumHandler:
         )
 
         # Fwd Error -> Fwd Inferior Olive
-        conn_spec = self.conn_params["error_io_f"]
-        self.log.debug("Connecting error -> fwd_io", conn_spec=conn_spec)
+        conn_spec_error_io_f = self.conn_params.error_io_f
+        self.log.debug("Connecting error -> fwd_io", conn_spec=conn_spec_error_io_f)
         nest.Connect(
             self.interface_pops.error_p.pop,
             self.cerebellum.populations.forw_io_p_view.pop,
             "all_to_all",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_error_io_f.model_dump(exclude_none=True),
         )
         # Check sign for negative connection
-        conn_spec_n = conn_spec.copy()
-        conn_spec_n["weight"] = -conn_spec_n["weight"]
+        conn_spec_error_io_f_neg = conn_spec_error_io_f.model_copy(
+            update={"weight": -conn_spec_error_io_f.weight}
+        )
         nest.Connect(
             self.interface_pops.error_n.pop,
             self.cerebellum.populations.forw_io_n_view.pop,
             "all_to_all",
-            syn_spec=conn_spec_n,
+            syn_spec=conn_spec_error_io_f_neg.model_dump(exclude_none=True),
         )
 
         # --- Inverse Model Connections ---
@@ -355,28 +351,31 @@ class CerebellumHandler:
         )
 
         # Inv Error -> Inv Inferior Olive
-        conn_spec = self.conn_params["error_inv_io_i"]
-        self.log.debug("Connecting error_inv -> inv_io", conn_spec=conn_spec)
+        conn_spec_error_inv_io_i = self.conn_params.error_inv_io_i
+        self.log.debug(
+            "Connecting error_inv -> inv_io", conn_spec=conn_spec_error_inv_io_i
+        )
         nest.Connect(
             self.interface_pops.error_inv_p.pop,
             self.cerebellum.populations.inv_io_p_view.pop,
             "all_to_all",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_error_inv_io_i.model_dump(exclude_none=True),
         )
         # Assuming same sign convention for negative side
-        conn_spec_n = conn_spec.copy()
-        # conn_spec_n["weight"] = -conn_spec_n["weight"] # TODO: Confirm if negative weight is needed or if IO_minus handles sign
+        # conn_spec_error_inv_io_i_neg = conn_spec_error_inv_io_i.model_copy(update={"weight": -conn_spec_error_inv_io_i.weight}) # TODO: Confirm if negative weight is needed
         nest.Connect(
             self.interface_pops.error_inv_n.pop,
             self.cerebellum.populations.inv_io_n_view.pop,
             "all_to_all",
-            syn_spec=conn_spec_n,  # TODO: Confirm weight sign logic
+            syn_spec=conn_spec_error_inv_io_i.model_dump(
+                exclude_none=True
+            ),  # TODO: Confirm weight sign logic, using original for now
         )
 
         # Inv DCN -> Motor Prediction Scaling Population
-        conn_spec = self.conn_params["dcn_i_motor_pred"]
-        w = conn_spec["weight"]
-        d = conn_spec["delay"]
+        conn_spec_dcn_i_mp = self.conn_params.dcn_i_motor_pred
+        w = conn_spec_dcn_i_mp.weight
+        d = conn_spec_dcn_i_mp.delay
         self.log.debug("Connecting inv_dcn -> motor_prediction", weight=w, delay=d)
         nest.Connect(
             self.cerebellum.populations.inv_dcnp_p_view.pop,
@@ -409,8 +408,8 @@ class CerebellumHandler:
 
         # --- Forward Error Calculation (Error = Feedback - Fwd_DCN_Prediction) ---
         # Connect Feedback -> Error
-        conn_spec_fb = self.conn_params["feedback_error"]
-        w_fb = conn_spec_fb["weight"]
+        conn_spec_fb_err = self.conn_params.feedback_error
+        w_fb = conn_spec_fb_err.weight
         self.log.debug("Connecting feedback -> error", weight=w_fb)
         nest.Connect(
             self.interface_pops.feedback_p.pop,
@@ -438,8 +437,8 @@ class CerebellumHandler:
         )
 
         # Connect Fwd DCN -> Error (Inhibitory)
-        conn_spec_dcn = self.conn_params["dcn_f_error"]
-        w_dcn = conn_spec_dcn["weight"]
+        conn_spec_dcn_f_err = self.conn_params.dcn_f_error
+        w_dcn = conn_spec_dcn_f_err.weight
         self.log.debug("Connecting fwd_dcn -> error (inhibitory)", weight=w_dcn)
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_p_view.pop,
@@ -468,9 +467,9 @@ class CerebellumHandler:
 
         # --- Inverse Error Calculation (Error = Plan - StateEst?) ---
         # Connect Plan -> Inv Error
-        conn_spec_plan = self.conn_params["plan_to_inv_error_inv"]
-        w_plan = conn_spec_plan["weight"]
-        d_plan = conn_spec_plan["delay"]
+        conn_spec_plan_err_inv = self.conn_params.plan_to_inv_error_inv
+        w_plan = conn_spec_plan_err_inv.weight
+        d_plan = conn_spec_plan_err_inv.delay
         self.log.debug(
             "Connecting plan_to_inv -> error_inv", weight=w_plan, delay=d_plan
         )
@@ -500,10 +499,10 @@ class CerebellumHandler:
         )
 
         # Connect StateEst -> Inv Error (Inhibitory?)
-        conn_spec_state = self.conn_params["plan_to_inv_error_inv"]
-        # TODO why is this called "plan" when it is the state?
-        w_state = conn_spec_state["weight"]
-        d_state = conn_spec_state["delay"]
+        # TODO why is this called "plan" when it is the state? Using same spec for now.
+        conn_spec_state_err_inv = self.conn_params.plan_to_inv_error_inv
+        w_state = conn_spec_state_err_inv.weight
+        d_state = conn_spec_state_err_inv.delay
         self.log.debug(
             "Connecting state_to_inv -> error_inv (inhibitory?)",
             weight=w_state,
@@ -546,9 +545,9 @@ class CerebellumHandler:
         self.log.info("Connecting CerebellumHandler to main controller populations")
 
         # --- Connections FROM Cerebellum Controller (Fwd DCN) TO controller_pops.pred_p/n ---
-        conn_spec_dcn_pred = self.conn_params["dcn_forw_prediction"]
-        w_dcn_pred = conn_spec_dcn_pred["weight"]
-        d_dcn_pred = conn_spec_dcn_pred["delay"]
+        conn_spec_dcn_f_pred = self.conn_params.dcn_forw_prediction
+        w_dcn_pred = conn_spec_dcn_f_pred.weight
+        d_dcn_pred = conn_spec_dcn_f_pred.delay
         self.log.debug(
             "Connecting Cerebellum Fwd DCN -> Controller's pred_p/n",
             weight=w_dcn_pred,
@@ -584,9 +583,9 @@ class CerebellumHandler:
 
         # --- Connections TO Cerebellum Controller Interfaces (FROM controller_pops) ---
         # MC Out -> Cereb Motor Commands Input
-        conn_spec_mc_motor = self.conn_params["mc_out_motor_commands"]
-        w_mc_motor = conn_spec_mc_motor["weight"]
-        d_mc_motor = conn_spec_mc_motor["delay"]
+        conn_spec_mc_out_mc = self.conn_params.mc_out_motor_commands
+        w_mc_motor = conn_spec_mc_out_mc.weight
+        d_mc_motor = conn_spec_mc_out_mc.delay
         self.log.debug(
             "Connecting Controller MC Out -> Cereb Motor Cmds",
             weight=w_mc_motor,
@@ -606,9 +605,9 @@ class CerebellumHandler:
         )
 
         # Planner -> Cereb Plan To Inv Input
-        conn_spec_plan_inv = self.conn_params["planner_plan_to_inv"]
-        w_plan_inv = conn_spec_plan_inv["weight"]
-        d_plan_inv = conn_spec_plan_inv["delay"]
+        conn_spec_plan_pti = self.conn_params.planner_plan_to_inv
+        w_plan_inv = conn_spec_plan_pti.weight
+        d_plan_inv = conn_spec_plan_pti.delay
         self.log.debug(
             "Connecting Controller Planner -> Cereb PlanToInv",
             weight=w_plan_inv,
@@ -628,9 +627,9 @@ class CerebellumHandler:
         )
 
         # Sensory -> Cereb Feedback Input
-        conn_spec_sn_fbk = self.conn_params["sn_fbk_smoothed"]
-        w_sn_fbk = conn_spec_sn_fbk["weight"]
-        d_sn_fbk = conn_spec_sn_fbk["delay"]
+        conn_spec_sn_fbk_sm = self.conn_params.sn_fbk_smoothed
+        w_sn_fbk = conn_spec_sn_fbk_sm.weight
+        d_sn_fbk = conn_spec_sn_fbk_sm.delay
         self.log.debug(
             "Connecting Controller Sensory -> Cereb Feedback",
             weight=w_sn_fbk,
@@ -650,9 +649,9 @@ class CerebellumHandler:
         )
 
         # Sensory -> Cereb Feedback Inv Input
-        conn_spec_sn_finv = self.conn_params["sn_feedback_inv"]
-        w_sn_finv = conn_spec_sn_finv["weight"]
-        d_sn_finv = conn_spec_sn_finv["delay"]
+        conn_spec_sn_fbk_inv = self.conn_params.sn_feedback_inv
+        w_sn_finv = conn_spec_sn_fbk_inv.weight
+        d_sn_finv = conn_spec_sn_fbk_inv.delay
         self.log.debug(
             "Connecting Controller Sensory -> Cereb FeedbackInv",
             weight=w_sn_finv,
@@ -673,9 +672,11 @@ class CerebellumHandler:
 
         # StateEst -> Cereb State To Inv Input
         # TODO: Check if "planner_plan_to_inv" is the correct conn_spec or if a dedicated one like "state_state_to_inv" is needed.
-        conn_spec_state_inv = self.conn_params["planner_plan_to_inv"]
-        w_state_inv = conn_spec_state_inv["weight"]
-        d_state_inv = conn_spec_state_inv["delay"]
+        conn_spec_state_sti = (
+            self.conn_params.planner_plan_to_inv
+        )  # Using planner_plan_to_inv as per existing code
+        w_state_inv = conn_spec_state_sti.weight
+        d_state_inv = conn_spec_state_sti.delay
 
         self.log.debug(
             "Connecting Controller StateEst -> Cereb StateToInv",
@@ -698,8 +699,8 @@ class CerebellumHandler:
             )
 
         # --- Connections FROM Cerebellum Controller Interfaces (motor_prediction) TO controller_pops.brainstem ---
-        conn_spec_cereb_bs = self.conn_params["motor_pre_brain_stem"]
-        conn_spec_p_bs = conn_spec_cereb_bs.copy()
+        conn_spec_mp_bs = self.conn_params.motor_pre_brain_stem
+        conn_spec_p_bs = conn_spec_mp_bs.model_dump(exclude_none=True)
         self.log.debug(
             "Connecting Cerebellum motor prediction to Controller brainstem",
             conn_spec=conn_spec_p_bs,
@@ -710,8 +711,9 @@ class CerebellumHandler:
             "all_to_all",
             syn_spec=conn_spec_p_bs,
         )
-        conn_spec_n_bs = conn_spec_cereb_bs.copy()
-        conn_spec_n_bs["weight"] = -conn_spec_n_bs["weight"]
+        conn_spec_n_bs = conn_spec_mp_bs.model_copy(
+            update={"weight": -conn_spec_mp_bs.weight}
+        ).model_dump(exclude_none=True)
         nest.Connect(
             self.interface_pops.motor_prediction_n.pop,
             self.controller_pops.brainstem_n.pop,
