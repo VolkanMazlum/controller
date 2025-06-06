@@ -96,7 +96,7 @@
             },
             "sn_fbk_smoothed": {
                   "weight": 0.028,
-                  "delay": 0.1
+                  "delay": 100.0
             },
             "pred_state": {
                   "weight": 1.0,
@@ -132,11 +132,11 @@
             },
             "dcn_f_error": {
                   "weight": 0.1,
-                  "delay": 0.1
+                  "delay": 100.0
             },
             "feedback_error": {
                   "weight": 0.1,
-                  "delay": 0.1
+                  "delay": 100.0
             },
             "error_io_f": {
                   "weight": 3.0,

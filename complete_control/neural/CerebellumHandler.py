@@ -410,60 +410,63 @@ class CerebellumHandler:
         # --- Forward Error Calculation (Error = Feedback - Fwd_DCN_Prediction) ---
         # Connect Feedback -> Error
         conn_spec_fb = self.conn_params["feedback_error"]
-        w_fb = conn_spec_fb["weight"]
-        self.log.debug("Connecting feedback -> error", weight=w_fb)
+        self.log.debug("Connecting feedback -> error", conn_spec_fb=conn_spec_fb)
         nest.Connect(
             self.interface_pops.feedback_p.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_fb},
+            syn_spec=conn_spec_fb,
         )
         nest.Connect(
             self.interface_pops.feedback_p.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec={"weight": w_fb},
+            syn_spec=conn_spec_fb,
         )
+        conn_spec_fb["weight"] = -conn_spec_fb["weight"]
         nest.Connect(
             self.interface_pops.feedback_n.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec={"weight": -w_fb},
+            syn_spec=conn_spec_fb,
         )
         nest.Connect(
             self.interface_pops.feedback_n.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_fb},
+            syn_spec=conn_spec_fb,
         )
 
         # Connect Fwd DCN -> Error (Inhibitory)
         conn_spec_dcn = self.conn_params["dcn_f_error"]
-        w_dcn = conn_spec_dcn["weight"]
-        self.log.debug("Connecting fwd_dcn -> error (inhibitory)", weight=w_dcn)
-        nest.Connect(
-            self.cerebellum.populations.forw_dcnp_p_view.pop,
-            self.interface_pops.error_p.pop,
-            "all_to_all",
-            syn_spec={"weight": -w_dcn},
-        )
-        nest.Connect(
-            self.cerebellum.populations.forw_dcnp_p_view.pop,
-            self.interface_pops.error_n.pop,
-            "all_to_all",
-            syn_spec={"weight": -w_dcn},
+
+        self.log.debug(
+            "Connecting fwd_dcn -> error (inhibitory)", conn_spec_dcn=conn_spec_dcn
         )
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_dcn},
+            syn_spec=conn_spec_dcn,
         )
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec={"weight": w_dcn},
+            syn_spec=conn_spec_dcn,
+        )
+        conn_spec_dcn["weight"] = -conn_spec_dcn["weight"]
+        nest.Connect(
+            self.cerebellum.populations.forw_dcnp_p_view.pop,
+            self.interface_pops.error_p.pop,
+            "all_to_all",
+            syn_spec=conn_spec_dcn,
+        )
+        nest.Connect(
+            self.cerebellum.populations.forw_dcnp_p_view.pop,
+            self.interface_pops.error_n.pop,
+            "all_to_all",
+            syn_spec=conn_spec_dcn,
         )
 
         # --- Inverse Error Calculation (Error = Plan - StateEst?) ---
