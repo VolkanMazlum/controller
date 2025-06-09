@@ -23,6 +23,11 @@ class MasterParams(BaseModel):
         "arbitrary_types_allowed": True,
     }
     run_paths: RunPaths
+
+    PLOT_AFTER_SIMULATE: bool = False
+    USE_CEREBELLUM: bool = False
+    GUI_PYBULLET: bool = False
+
     NJT: int = 1
     simulation: SimulationParams = Field(default_factory=lambda: SimulationParams())
     experiment: ExperimentParams = Field(default_factory=lambda: ExperimentParams())

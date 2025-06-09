@@ -17,6 +17,8 @@ from mpi4py import MPI
 from plant.plant_simulator import PlantSimulator
 from utils_common.log import setup_logging
 
+from complete_control.plant.plant_plotting import plot_plant_outputs
+
 
 def coordinate_with_simulation():
     shared_data = {
@@ -49,8 +51,9 @@ def main():
 
     try:
         log.info("Initializing PlantSimulator...")
+        config = PlantConfig.from_runpaths(run_paths)
         simulator = PlantSimulator(
-            config=PlantConfig.from_runpaths(run_paths),
+            config=config,
             pybullet_instance=p,
             music_setup=music_setup,
         )
@@ -68,6 +71,9 @@ def main():
         if p.isConnected():  # Check if a connection was made by RoboticPlant
             log.info("Disconnecting PyBullet from receiver plant.")
             p.disconnect()
+
+    if config.master_config.PLOT_AFTER_SIMULATE:
+        plot_plant_outputs(config.run_paths.run.name)
 
     log.info("Receiver plant process finished.")
 

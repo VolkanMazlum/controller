@@ -6,6 +6,9 @@ COMPLETE_CONTROL = Path(__file__).parent.parent.resolve()
 ROOT = COMPLETE_CONTROL.parent
 RUNS_DIR = ROOT / "runs"  # Base directory for all runs
 
+FOLDER_NAME_NEURAL_FIGS = "figs_neural"
+FOLDER_NAME_ROBOTIC_FIGS = "figs_robotic"
+
 REFERENCE_DATA_DIR = COMPLETE_CONTROL / "reference_data"
 
 CONFIG = COMPLETE_CONTROL / "config"
@@ -47,10 +50,10 @@ class RunPaths:
         """
         run_dir = RUNS_DIR / run_timestamp
         data_dir = run_dir / "data"
-        data_nest_dir = data_dir / "nest"
-        data_bullet_dir = data_dir / "bullet"
-        figures_dir = run_dir / "figures_pop"
-        figures_receiver_dir = run_dir / "figures_rec"
+        data_nest_dir = data_dir / "neural"
+        data_bullet_dir = data_dir / "robotic"
+        figures_dir = run_dir / FOLDER_NAME_NEURAL_FIGS
+        figures_receiver_dir = run_dir / FOLDER_NAME_ROBOTIC_FIGS
         logs_dir = run_dir / "logs"
         params_path = run_dir / f"params{run_timestamp}.json"
 

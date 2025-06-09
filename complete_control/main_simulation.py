@@ -287,7 +287,7 @@ if __name__ == "__main__":
             path_data=run_paths.data_nest,
             label_prefix="",
             music_cfg=master_config.music,
-            use_cerebellum=True,  # TODO move this to parameters
+            use_cerebellum=master_config.USE_CEREBELLUM,
             cerebellum_paths=master_config.bsb_config_paths,
             comm=comm,
         )
@@ -304,10 +304,10 @@ if __name__ == "__main__":
     run_simulation(master_config.simulation, run_paths.data_nest, controllers, comm)
 
     # --- Plotting (Rank 0 Only) ---
-    if rank == 0:
+    if rank == 0 and master_config.PLOT_AFTER_SIMULATE:
         main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
-        plot_controller_outputs(run_paths)
+        plot_controller_outputs(run_paths.run.name)
         end_plot_time = timer()
         plot_wall_time = timedelta(seconds=end_plot_time - start_plot_time)
         main_log.info(f"Plotting Finished", wall_time=str(plot_wall_time))

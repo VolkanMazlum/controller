@@ -2,8 +2,11 @@
 
 import argparse
 import dataclasses
+import datetime
 import sys
 from pathlib import Path
+
+from complete_control.config import paths
 
 # Add the project root to the Python path
 # This is necessary to ensure that the script can find the `complete_control` package
@@ -34,7 +37,7 @@ def find_most_recent_run() -> Path | None:
 
 def main():
     """
-    Main function to generate plots from existing simulation data.
+    generates plots from existing simulation data.
     """
     parser = argparse.ArgumentParser(
         description="Generate plots from a completed simulation run directory. "
@@ -68,11 +71,20 @@ def main():
     log.info("Setting up run paths...", run_directory=str(run_dir))
 
     # The timestamp is the name of the run directory
+    current_timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     run_timestamp_str = run_dir.name
     run_paths = RunPaths.from_run_id(run_timestamp_str)
-    path_current_figures = Path("./figs_test")
+    path_current_figures = (
+        run_paths.run
+        / f"manualplots@{current_timestamp}"
+        / paths.FOLDER_NAME_NEURAL_FIGS
+    )
     path_current_figures.mkdir(exist_ok=True)
-    path_current_receiver_figs = Path("./figs_rec_test")
+    path_current_receiver_figs = (
+        run_paths.run
+        / f"manualplots@{current_timestamp}"
+        / paths.FOLDER_NAME_ROBOTIC_FIGS
+    )
     path_current_receiver_figs.mkdir(exist_ok=True)
     run_paths = dataclasses.replace(
         run_paths,
@@ -81,8 +93,8 @@ def main():
     )
 
     log.info("Generating plots...")
-    plot_controller_outputs(run_paths)
-    plot_plant_outputs(run_paths)
+    plot_controller_outputs(run_timestamp_str)
+    plot_plant_outputs(run_timestamp_str)
     log.info("Plotting complete.", output_directory=str(run_paths.figures))
 
 

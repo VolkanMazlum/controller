@@ -51,7 +51,7 @@ class PlantConfig:
         )
 
         self.NJT = self.master_config.NJT
-        self.CONNECT_GUI = False
+        self.CONNECT_GUI = self.master_config.GUI_PYBULLET
 
         self.initial_joint_pos_rad: float = (
             self.master_config.experiment.init_pos_angle_rad
@@ -92,9 +92,7 @@ class PlantConfig:
 
         self.PLOT_DATA_FILENAME = "plant_plot_data.json"
 
-        self.log.info(
-            "PlantConfig initialized successfully with MasterConfig integration"
-        )
+        self.log.info("PlantConfig initialized successfully from MasterConfig")
 
     @classmethod
     def from_runpaths(
