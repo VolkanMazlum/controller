@@ -307,7 +307,7 @@ if __name__ == "__main__":
     if rank == 0 and master_config.PLOT_AFTER_SIMULATE:
         main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
-        plot_controller_outputs(run_paths.run.name)
+        plot_controller_outputs(run_paths)
         end_plot_time = timer()
         plot_wall_time = timedelta(seconds=end_plot_time - start_plot_time)
         main_log.info(f"Plotting Finished", wall_time=str(plot_wall_time))

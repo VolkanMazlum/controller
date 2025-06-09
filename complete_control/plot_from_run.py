@@ -79,13 +79,13 @@ def main():
         / f"manualplots@{current_timestamp}"
         / paths.FOLDER_NAME_NEURAL_FIGS
     )
-    path_current_figures.mkdir(exist_ok=True)
+    path_current_figures.mkdir(exist_ok=True, parents=True)
     path_current_receiver_figs = (
         run_paths.run
         / f"manualplots@{current_timestamp}"
         / paths.FOLDER_NAME_ROBOTIC_FIGS
     )
-    path_current_receiver_figs.mkdir(exist_ok=True)
+    path_current_receiver_figs.mkdir(exist_ok=True, parents=True)
     run_paths = dataclasses.replace(
         run_paths,
         figures=path_current_figures,
@@ -93,8 +93,8 @@ def main():
     )
 
     log.info("Generating plots...")
-    plot_controller_outputs(run_timestamp_str)
-    plot_plant_outputs(run_timestamp_str)
+    plot_controller_outputs(run_paths)
+    plot_plant_outputs(run_paths)
     log.info("Plotting complete.", output_directory=str(run_paths.figures))
 
 
