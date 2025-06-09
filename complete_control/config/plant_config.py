@@ -13,24 +13,15 @@ class PlantConfig:
 
     def __init__(
         self,
-        run_paths: paths.RunPaths,
+        master_params: MasterParams,
     ):
         self.log = structlog.get_logger(type(self).__name__)
         self.log.info("Initializing PlantConfig...")
+        self.master_config = master_params
 
-        self.run_paths: paths.RunPaths = run_paths
+        self.run_paths: paths.RunPaths = master_params.run_paths
         self.trajectory_path = paths.TRAJECTORY
 
-        # --- Populate MasterConfig ---
-        run_id = self.run_paths.run.name
-
-        meta_config = MetaInfo(run_id=run_id)
-
-        self.master_config = MasterParams(
-            meta=meta_config,
-        )
-
-        # --- Extract and Store Key Parameters (now from MasterConfig) ---
         self.SEED = SimulationParams.get_default_seed()
         np.random.seed(self.SEED)
 
@@ -102,10 +93,12 @@ class PlantConfig:
         self.PLOT_DATA_FILENAME = "plant_plot_data.json"
 
         self.log.info(
-            "PlantConfig initialized successfully with MasterConfig integration (Stage 2)"
+            "PlantConfig initialized successfully with MasterConfig integration"
         )
-        # self.log.debug("Config details", config_vars=self.__dict__) # Can be very verbose
-        self.log.debug(
-            "MasterConfig dump",
-            master_config=self.master_config.model_dump_json(indent=2),
-        )
+
+    @classmethod
+    def from_runpaths(
+        cls,
+        run_paths: paths.RunPaths,
+    ):
+        return cls(MasterParams.from_runpaths(run_paths))

@@ -13,6 +13,7 @@ from .core_models import (
     SimulationParams,
 )
 from .module_params import ModuleContainerConfig
+from .paths import RunPaths
 from .population_params import PopulationsParams
 
 
@@ -21,13 +22,18 @@ class MasterParams(BaseModel):
         "frozen": True,
         "arbitrary_types_allowed": True,
     }
-    meta: MetaInfo
+    run_paths: RunPaths
     NJT: int = 1
     simulation: SimulationParams = Field(default_factory=lambda: SimulationParams())
     experiment: ExperimentParams = Field(default_factory=lambda: ExperimentParams())
     brain: BrainParams = Field(default_factory=lambda: BrainParams())
     music: MusicParams = Field(default_factory=lambda: MusicParams())
     bsb_config_paths: BSBConfigPaths = Field(default_factory=lambda: BSBConfigPaths())
+
+    @computed_field
+    @property
+    def meta(self) -> MetaInfo:
+        return MetaInfo(run_id=self.run_paths.run.name)
 
     @computed_field
     @property
@@ -45,3 +51,7 @@ class MasterParams(BaseModel):
         """Serializes the MasterConfig instance to a JSON file."""
         with open(filepath, "w") as f:
             f.write(self.model_dump_json(indent=indent))
+
+    @classmethod
+    def from_runpaths(cls, run_paths: RunPaths):
+        return MasterParams(run_paths=RunPaths.from_run_id(run_paths.run.name))

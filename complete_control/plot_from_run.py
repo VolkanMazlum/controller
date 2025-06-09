@@ -2,7 +2,6 @@
 
 import argparse
 import dataclasses
-import os
 import sys
 from pathlib import Path
 
@@ -13,7 +12,7 @@ project_root = Path(__file__).resolve().parents[1]
 sys.path.append(str(project_root))
 import structlog
 
-from complete_control.config.paths import RUNS_DIR, setup_run_paths
+from complete_control.config.paths import RUNS_DIR, RunPaths
 from complete_control.neural.plot_utils import plot_controller_outputs
 from complete_control.plant.plant_plotting import plot_plant_outputs
 
@@ -70,7 +69,7 @@ def main():
 
     # The timestamp is the name of the run directory
     run_timestamp_str = run_dir.name
-    run_paths = setup_run_paths(run_timestamp_str)
+    run_paths = RunPaths.from_run_id(run_timestamp_str)
     path_current_figures = Path("./figs_test")
     path_current_figures.mkdir(exist_ok=True)
     path_current_receiver_figs = Path("./figs_rec_test")

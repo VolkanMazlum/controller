@@ -50,7 +50,7 @@ def main():
     try:
         log.info("Initializing PlantSimulator...")
         simulator = PlantSimulator(
-            config=PlantConfig(run_paths),
+            config=PlantConfig.from_runpaths(run_paths),
             pybullet_instance=p,
             music_setup=music_setup,
         )
