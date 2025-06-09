@@ -13,9 +13,11 @@ _log = structlog.get_logger(__name__)
 
 # --- Data Processing Functions ---
 @dataclass
-class DataArrays:
-    pos_j_rad: np.ndarray
-    vel_j_rad_s: np.ndarray
+class JointData:
+    """Holds time-series data for a single joint."""
+
+    pos_rad: np.ndarray
+    vel_rad_s: np.ndarray
     pos_ee_m: np.ndarray
     vel_ee_m_s: np.ndarray
     spk_rate_pos_hz: np.ndarray
@@ -24,22 +26,16 @@ class DataArrays:
     input_cmd_torque: np.ndarray
     input_cmd_total_torque: np.ndarray
 
-    def __init__(self, num_total_steps, NJT):
-        self.pos_j_rad = np.zeros([num_total_steps, NJT])
-        self.vel_j_rad_s = np.zeros([num_total_steps, NJT])
+    def __init__(self, num_total_steps: int):
+        self.pos_rad = np.zeros(num_total_steps)
+        self.vel_rad_s = np.zeros(num_total_steps)
         self.pos_ee_m = np.zeros([num_total_steps, 3])
         self.vel_ee_m_s = np.zeros([num_total_steps, 2])
-        self.spk_rate_pos_hz = np.zeros([num_total_steps, NJT])
-        self.spk_rate_neg_hz = np.zeros([num_total_steps, NJT])
-        self.spk_rate_net_hz = np.zeros([num_total_steps, NJT])
-        self.input_cmd_torque = np.zeros([num_total_steps, NJT])
-        self.input_cmd_total_torque = np.zeros([num_total_steps, NJT])
-
-    def __getitem__(self, key):
-        return getattr(self, key)
-
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
+        self.spk_rate_pos_hz = np.zeros(num_total_steps)
+        self.spk_rate_neg_hz = np.zeros(num_total_steps)
+        self.spk_rate_net_hz = np.zeros(num_total_steps)
+        self.input_cmd_torque = np.zeros(num_total_steps)
+        self.input_cmd_total_torque = np.zeros(num_total_steps)
 
     def record_step(
         self,
@@ -52,18 +48,18 @@ class DataArrays:
         spk_rate_neg_hz: float,
         spk_rate_net_hz: float,
         input_cmd_torque: float,
-    ) -> None:
-        """Records data for the current simulation step. Assumes single joint (NJT=1)."""
-        if step < 0 or step >= self.pos_j_rad.shape[0]:
+    ):
+        """Records data for the current simulation step."""
+        if step < 0 or step >= self.pos_rad.shape[0]:
             _log.error(
-                "Step index out of bounds for data_arrays",
+                "Step index out of bounds for data recording",
                 step=step,
-                max_steps=self.pos_j_rad.shape[0],
+                max_steps=self.pos_rad.shape[0],
             )
             return
 
-        self.pos_j_rad[step, 0] = joint_pos_rad
-        self.vel_j_rad_s[step, 0] = joint_vel_rad_s
+        self.pos_rad[step] = joint_pos_rad
+        self.vel_rad_s[step] = joint_vel_rad_s
         self.pos_ee_m[step, :] = ee_pos_m[0:3]
 
         if len(ee_vel_m_s) == 3:
@@ -74,11 +70,11 @@ class DataArrays:
             _log.error("Unexpected ee_vel_m_s length", length=len(ee_vel_m_s))
             raise ValueError("Unexpected ee_vel_m_s length")
 
-        self.spk_rate_pos_hz[step, 0] = spk_rate_pos_hz
-        self.spk_rate_neg_hz[step, 0] = spk_rate_neg_hz
-        self.spk_rate_net_hz[step, 0] = spk_rate_net_hz
-        self.input_cmd_torque[step, 0] = input_cmd_torque
-        self.input_cmd_total_torque[step, 0] = input_cmd_torque
+        self.spk_rate_pos_hz[step] = spk_rate_pos_hz
+        self.spk_rate_neg_hz[step] = spk_rate_neg_hz
+        self.spk_rate_net_hz[step] = spk_rate_net_hz
+        self.input_cmd_torque[step] = input_cmd_torque
+        self.input_cmd_total_torque[step] = input_cmd_torque
 
 
 def compute_spike_rate(
