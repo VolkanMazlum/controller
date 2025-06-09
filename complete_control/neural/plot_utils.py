@@ -133,8 +133,10 @@ def plot_population(
     return fig, ax
 
 
-def plot_controller_outputs(run_paths: RunPaths):
+def plot_controller_outputs(run_id: str):
     """Plots outputs for various populations from a simulation run directory."""
+
+    run_paths = RunPaths.from_run_id(run_id=run_id)
     if MPI.COMM_WORLD.rank != 0:
         return  # Only rank 0 plots
 

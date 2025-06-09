@@ -224,9 +224,10 @@ def plot_errors_per_trial(
     plt.close()
 
 
-def plot_plant_outputs(run_paths: RunPaths):
+def plot_plant_outputs(run_id: str):
     """Loads all plant-related data and generates all plots."""
     log.info("Generating plant plots...")
+    run_paths = RunPaths.from_run_id(run_id=run_id)
     master_params = MasterParams.model_validate_json(run_paths.params_json)
     config = PlantConfig(master_params)
     plant_data = PlantPlotData.load(run_paths.data_bullet)
