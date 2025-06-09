@@ -227,7 +227,7 @@ def plot_errors_per_trial(
 def plot_plant_outputs(run_paths: RunPaths):
     """Loads all plant-related data and generates all plots."""
     log.info("Generating plant plots...")
-    config = PlantConfig(run_paths)
+    config = PlantConfig.from_runpaths(run_paths)
     plant_data = PlantPlotData.load(run_paths.data_bullet)
 
     if not plant_data.joint_data:
