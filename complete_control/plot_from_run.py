@@ -15,6 +15,7 @@ import structlog
 
 from complete_control.config.paths import RUNS_DIR, setup_run_paths
 from complete_control.neural.plot_utils import plot_controller_outputs
+from complete_control.plant.plant_plotting import plot_plant_outputs
 
 log = structlog.get_logger()
 
@@ -72,10 +73,17 @@ def main():
     run_paths = setup_run_paths(run_timestamp_str)
     path_current_figures = Path("./figs_test")
     path_current_figures.mkdir(exist_ok=True)
-    run_paths = dataclasses.replace(run_paths, figures=path_current_figures)
+    path_current_receiver_figs = Path("./figs_rec_test")
+    path_current_receiver_figs.mkdir(exist_ok=True)
+    run_paths = dataclasses.replace(
+        run_paths,
+        figures=path_current_figures,
+        figures_receiver=path_current_receiver_figs,
+    )
 
     log.info("Generating plots...")
     plot_controller_outputs(run_paths)
+    plot_plant_outputs(run_paths)
     log.info("Plotting complete.", output_directory=str(run_paths.figures))
 
 
