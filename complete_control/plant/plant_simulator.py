@@ -289,13 +289,12 @@ class PlantSimulator:
                 self.plant.simulate_step(self.config.RESOLUTION_S)
 
                 # 6. Record data for this step
-                plant_utils.record_step_data(
-                    data_arrays=self.data_arrays,
+                self.data_arrays.record_step(
                     step=step,
                     joint_pos_rad=joint_pos_rad,
                     joint_vel_rad_s=joint_vel_rad_s,
-                    ee_pos_m=ee_pos_m,  # [x,y,z]
-                    ee_vel_m_s=ee_vel_m_list,  # [vx,vy,vz]
+                    ee_pos_m=ee_pos_m,
+                    ee_vel_m_s=ee_vel_m_list,
                     spk_rate_pos_hz=rate_pos_hz,
                     spk_rate_neg_hz=rate_neg_hz,
                     spk_rate_net_hz=net_rate_hz,
@@ -372,7 +371,7 @@ class PlantSimulator:
             sn.spike for sn in self.sensory_neurons_n
         ]
 
-        plant_utils.save_all_data(
+        plot_data = PlantPlotData(
             config=self.config,
             data_arrays=self.data_arrays,
             received_spikes={
@@ -383,15 +382,9 @@ class PlantSimulator:
                 "p": sensory_spikes_p_all_joints,
                 "n": sensory_spikes_n_all_joints,
             },
-        )
-
-        plot_data = PlantPlotData(
             errors_per_trial=self.errors_per_trial,
             init_hand_pos_ee=list(self.plant.init_hand_pos_ee),
             trgt_hand_pos_ee=list(self.plant.trgt_hand_pos_ee),
         )
-        plot_data_path = (
-            self.config.run_paths.data_bullet / self.config.PLOT_DATA_FILENAME
-        )
-        plot_data.save(plot_data_path)
-        self.log.info(f"Saved plotting data to {plot_data_path}")
+        plot_data.save(self.config.run_paths.data_bullet)
+        self.log.info(f"Saved plotting data to {self.config.run_paths.data_bullet}")

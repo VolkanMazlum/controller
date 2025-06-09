@@ -2,7 +2,7 @@ import dataclasses
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import Dict, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,7 +11,7 @@ from config.paths import RunPaths
 from config.plant_config import PlantConfig
 from utils_common.generate_analog_signals import generate_signals
 
-from .plant_utils import DataArrays
+from .plant_utils import DataArrays, _save_spikes_to_file
 
 log = structlog.get_logger(__name__)
 
@@ -20,19 +20,63 @@ log = structlog.get_logger(__name__)
 class PlantPlotData:
     """Holds supplementary data for plotting."""
 
+    config: PlantConfig
+    data_arrays: DataArrays
+    received_spikes: Dict[str, List[List[Tuple[float, int]]]]
+    sensory_spikes: Dict[str, List[List[Tuple[float, int]]]]
     errors_per_trial: List[float]
     init_hand_pos_ee: List[float]
     trgt_hand_pos_ee: List[float]
 
-    def save(self, file_path: Path):
-        with open(file_path, "w") as f:
-            json.dump(dataclasses.asdict(self), f, indent=2)
+    def save(self, directory: Path):
+        """Saves all collected simulation data to files."""
+        log.info(f"Saving all simulation data at {directory}")
+        directory.mkdir(parents=True, exist_ok=True)
+
+        # Save data arrays
+        for field in dataclasses.fields(self.data_arrays):
+            key = field.name
+            array = getattr(self.data_arrays, key)
+            np.savetxt(directory / f"{key}.csv", array, delimiter=",")
+
+        # Save spikes
+        for j in range(self.config.NJT):
+            _save_spikes_to_file(
+                directory / f"motNeur_inSpikes_j{j}_p.txt",
+                self.received_spikes["pos"][j],
+            )
+            _save_spikes_to_file(
+                directory / f"motNeur_inSpikes_j{j}_n.txt",
+                self.received_spikes["neg"][j],
+            )
+            _save_spikes_to_file(
+                directory / f"sensNeur_outSpikes_j{j}_p.txt",
+                self.sensory_spikes["p"][j],
+            )
+            _save_spikes_to_file(
+                directory / f"sensNeur_outSpikes_j{j}_n.txt",
+                self.sensory_spikes["n"][j],
+            )
+
+        # Save metadata
+        metadata = {
+            "errors_per_trial": self.errors_per_trial,
+            "init_hand_pos_ee": self.init_hand_pos_ee,
+            "trgt_hand_pos_ee": self.trgt_hand_pos_ee,
+        }
+        metadata_path = directory / self.config.PLOT_DATA_FILENAME
+        with open(metadata_path, "w") as f:
+            json.dump(metadata, f, indent=2)
+
+        log.info("Finished saving all data.")
 
     @classmethod
     def load(cls, file_path: Path):
         with open(file_path, "r") as f:
             data = json.load(f)
-        return cls(**data)
+        # This load method now only loads metadata.
+        # The full data loading for plotting is handled in plot_plant_outputs.
+        return data
 
 
 def plot_joint_space(
@@ -220,18 +264,19 @@ def plot_plant_outputs(run_paths: RunPaths):
     data_arrays = DataArrays(num_total_steps, config.NJT)
 
     # Load data arrays from files
-    data_arrays.pos_j_rad = np.loadtxt(
-        run_paths.data_bullet / "pos_real_joint.csv", delimiter=","
-    ).reshape(num_total_steps, config.NJT)
-    data_arrays.input_cmd_torque = np.loadtxt(
-        run_paths.data_bullet / "inputCmd_motNeur.csv", delimiter=","
-    ).reshape(num_total_steps, config.NJT)
-    data_arrays.pos_ee_m = np.loadtxt(
-        run_paths.data_bullet / "pos_real_ee.csv", delimiter=","
-    ).reshape(num_total_steps, 3)
+    for field in dataclasses.fields(data_arrays):
+        key = field.name
+        array_path = run_paths.data_bullet / f"{key}.csv"
+        if array_path.exists():
+            loaded_array = np.loadtxt(array_path, delimiter=",")
+            if loaded_array.ndim == 1:
+                loaded_array = loaded_array.reshape(num_total_steps, -1)
+            setattr(data_arrays, key, loaded_array)
 
     # Load supplementary plot data
-    plot_data = PlantPlotData.load(run_paths.data_bullet / "plant_plot_data.json")
+    plot_metadata = PlantPlotData.load(
+        run_paths.data_bullet / config.PLOT_DATA_FILENAME
+    )
 
     # Generate plots
     plot_joint_space(
@@ -245,8 +290,8 @@ def plot_plant_outputs(run_paths: RunPaths):
     )
     plot_ee_space(
         config=config,
-        desired_start_ee=np.array(plot_data.init_hand_pos_ee),
-        desired_end_ee=np.array(plot_data.trgt_hand_pos_ee),
+        desired_start_ee=np.array(plot_metadata["init_hand_pos_ee"]),
+        desired_end_ee=np.array(plot_metadata["trgt_hand_pos_ee"]),
         actual_traj_ee=data_arrays.pos_ee_m,
     )
     plot_motor_commands(
@@ -254,7 +299,9 @@ def plot_plant_outputs(run_paths: RunPaths):
         time_vector_s=config.time_vector_total_s,
         input_cmd_torque_actual=data_arrays.input_cmd_torque,
     )
-    if plot_data.errors_per_trial:
-        plot_errors_per_trial(config=config, errors_list=plot_data.errors_per_trial)
+    if plot_metadata["errors_per_trial"]:
+        plot_errors_per_trial(
+            config=config, errors_list=plot_metadata["errors_per_trial"]
+        )
 
     log.info("Plant plots generated.")

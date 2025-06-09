@@ -41,6 +41,45 @@ class DataArrays:
     def __setitem__(self, key, value):
         setattr(self, key, value)
 
+    def record_step(
+        self,
+        step: int,
+        joint_pos_rad: float,
+        joint_vel_rad_s: float,
+        ee_pos_m: List[float],
+        ee_vel_m_s: List[float],
+        spk_rate_pos_hz: float,
+        spk_rate_neg_hz: float,
+        spk_rate_net_hz: float,
+        input_cmd_torque: float,
+    ) -> None:
+        """Records data for the current simulation step. Assumes single joint (NJT=1)."""
+        if step < 0 or step >= self.pos_j_rad.shape[0]:
+            _log.error(
+                "Step index out of bounds for data_arrays",
+                step=step,
+                max_steps=self.pos_j_rad.shape[0],
+            )
+            return
+
+        self.pos_j_rad[step, 0] = joint_pos_rad
+        self.vel_j_rad_s[step, 0] = joint_vel_rad_s
+        self.pos_ee_m[step, :] = ee_pos_m[0:3]
+
+        if len(ee_vel_m_s) == 3:
+            self.vel_ee_m_s[step, :] = [ee_vel_m_s[0], ee_vel_m_s[2]]
+        elif len(ee_vel_m_s) == 2:
+            self.vel_ee_m_s[step, :] = ee_vel_m_s
+        else:
+            _log.error("Unexpected ee_vel_m_s length", length=len(ee_vel_m_s))
+            raise ValueError("Unexpected ee_vel_m_s length")
+
+        self.spk_rate_pos_hz[step, 0] = spk_rate_pos_hz
+        self.spk_rate_neg_hz[step, 0] = spk_rate_neg_hz
+        self.spk_rate_net_hz[step, 0] = spk_rate_net_hz
+        self.input_cmd_torque[step, 0] = input_cmd_torque
+        self.input_cmd_total_torque[step, 0] = input_cmd_torque
+
 
 def compute_spike_rate(
     spikes: List[Tuple[float, int]],  # List of (timestamp, channel_id)
@@ -89,52 +128,6 @@ def compute_spike_rate(
     return rate_hz, int(weighted_count)
 
 
-def record_step_data(
-    data_arrays: DataArrays,
-    step: int,
-    joint_pos_rad: float,
-    joint_vel_rad_s: float,
-    ee_pos_m: List[float],  # [x,y,z]
-    ee_vel_m_s: List[float],  # [vx, vz] as per original slicing, or [vx,vy,vz]
-    spk_rate_pos_hz: float,
-    spk_rate_neg_hz: float,
-    spk_rate_net_hz: float,
-    input_cmd_torque: float,
-    # Add other data points as needed, e.g., total command if perturbations exist
-) -> None:
-    """
-    Records data for the current simulation step into the data_arrays.
-    Assumes single joint (NJT=1).
-    """
-    if step < 0 or step >= data_arrays.pos_j_rad.shape[0]:
-        _log.error(
-            "Step index out of bounds for data_arrays",
-            step=step,
-            max_steps=data_arrays["pos_j_rad"].shape[0],
-        )
-        return
-
-    data_arrays["pos_j_rad"][step, 0] = joint_pos_rad
-    data_arrays["vel_j_rad_s"][step, 0] = joint_vel_rad_s
-    data_arrays["pos_ee_m"][step, :] = ee_pos_m[0:3]  # Ensure it's [x,y,z]
-
-    # Original code saved ee_vel as [vx, vz]. If ee_vel_m_s is [vx,vy,vz], slice it.
-    if len(ee_vel_m_s) == 3:
-        data_arrays["vel_ee_m_s"][step, :] = [ee_vel_m_s[0], ee_vel_m_s[2]]
-    elif len(ee_vel_m_s) == 2:  # Assumes it's already [vx, vz]
-        data_arrays["vel_ee_m_s"][step, :] = ee_vel_m_s
-    else:
-        _log.error("Unexpected ee_vel_m_s length", length=len(ee_vel_m_s))
-        raise ValueError("Unexpected ee_vel_m_s length")
-
-    data_arrays["spk_rate_pos_hz"][step, 0] = spk_rate_pos_hz
-    data_arrays["spk_rate_neg_hz"][step, 0] = spk_rate_neg_hz
-    data_arrays["spk_rate_net_hz"][step, 0] = spk_rate_net_hz
-    data_arrays["input_cmd_torque"][step, 0] = input_cmd_torque
-    # Assuming input_cmd_total_torque is same as input_cmd_torque if no perturbations
-    data_arrays["input_cmd_total_torque"][step, 0] = input_cmd_torque
-
-
 def _save_spikes_to_file(filepath: Path, spikes: List[Tuple[float, int]]):
     """Helper to save spike data, handling empty lists."""
     if spikes:
@@ -144,87 +137,3 @@ def _save_spikes_to_file(filepath: Path, spikes: List[Tuple[float, int]]):
     else:
         # Create an empty file if no spikes, as per original behavior
         filepath.touch()
-        # np.savetxt(filepath, np.array([])) # This would also work
-
-
-def save_all_data(
-    config: PlantConfig,
-    data_arrays: DataArrays,
-    received_spikes: Dict[
-        str, List[List[Tuple[float, int]]]
-    ],  # {'pos': [spikes_j0, ...], 'neg': [spikes_j0, ...]}
-    sensory_spikes: Dict[
-        str, List[List[Tuple[float, int]]]
-    ],  # {'p': [spikes_j0, ...], 'n': [spikes_j0, ...]}
-) -> None:
-    """
-    Saves all collected simulation data to files.
-    """
-    pth_dat_bullet = config.run_paths.data_bullet
-    _log.info(f"Saving all simulation data at {pth_dat_bullet}")
-
-    # Save spike rates
-    # TODO make all these constants
-    np.savetxt(
-        pth_dat_bullet / "motNeur_rate_pos.csv",
-        data_arrays["spk_rate_pos_hz"],
-        delimiter=",",
-    )
-    np.savetxt(
-        pth_dat_bullet / "motNeur_rate_neg.csv",
-        data_arrays["spk_rate_neg_hz"],
-        delimiter=",",
-    )
-    np.savetxt(
-        pth_dat_bullet / "motNeur_rate_net.csv",
-        data_arrays["spk_rate_net_hz"],
-        delimiter=",",
-    )
-
-    # Save positions and velocities
-    np.savetxt(
-        pth_dat_bullet / "pos_real_joint.csv", data_arrays.pos_j_rad, delimiter=","
-    )
-    np.savetxt(
-        pth_dat_bullet / "vel_real_joint.csv", data_arrays.vel_j_rad_s, delimiter=","
-    )
-    np.savetxt(pth_dat_bullet / "pos_real_ee.csv", data_arrays.pos_ee_m, delimiter=",")
-    np.savetxt(
-        pth_dat_bullet / "vel_real_ee.csv", data_arrays.vel_ee_m_s, delimiter=","
-    )
-
-    # To get full desired EE trajectory, we'd need to apply forward kinematics to the tiled joint trajectory
-    # desired_ee_trj = np.array([config.DYN_SYS.forwardKin(q_joint) for q_joint in tiled_desired_joint_trj])
-    # np.savetxt(pth_dat_bullet / "pos_des_ee.csv", desired_ee_trj, delimiter=",") # Placeholder
-
-    # Save motor commands
-    # np.savetxt(pth_dat_bullet / "inputCmd_des.csv", inputDes, delimiter=",") # 'inputDes' needs to be calculated
-    np.savetxt(
-        pth_dat_bullet / "inputCmd_motNeur.csv",
-        data_arrays.input_cmd_torque,
-        delimiter=",",
-    )
-    np.savetxt(
-        pth_dat_bullet / "inputCmd_tot.csv",
-        data_arrays.input_cmd_total_torque,
-        delimiter=",",
-    )
-
-    # Save received spikes (motor commands from MUSIC)
-    for j in range(config.NJT):
-        _save_spikes_to_file(
-            pth_dat_bullet / f"motNeur_inSpikes_j{j}_p.txt", received_spikes["pos"][j]
-        )
-        _save_spikes_to_file(
-            pth_dat_bullet / f"motNeur_inSpikes_j{j}_n.txt", received_spikes["neg"][j]
-        )
-
-    # Save sensory spikes (output to MUSIC)
-    for j in range(config.NJT):
-        _save_spikes_to_file(
-            pth_dat_bullet / f"sensNeur_outSpikes_j{j}_p.txt", sensory_spikes["p"][j]
-        )
-        _save_spikes_to_file(
-            pth_dat_bullet / f"sensNeur_outSpikes_j{j}_n.txt", sensory_spikes["n"][j]
-        )
-    _log.info("Finished saving all data.")
