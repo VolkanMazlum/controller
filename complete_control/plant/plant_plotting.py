@@ -31,19 +31,18 @@ class PlantPlotData(BaseModel):
         "arbitrary_types_allowed": True,
     }
 
-    def save(self, directory: Path):
+    def save(self, params_path: Path):
         """Saves all collected simulation data to a single JSON file."""
-        log.info(f"Saving all simulation data to {directory / 'plant_data.json'}")
-        directory.mkdir(parents=True, exist_ok=True)
-        with open(directory / "plant_data.json", "w") as f:
+        log.info(f"Saving all simulation data to {params_path}")
+        with open(params_path, "w") as f:
             f.write(self.model_dump_json(indent=2))
         log.info("Finished saving all data.")
 
     @classmethod
-    def load(cls, directory: Path):
+    def load(cls, params_path: Path):
         """Loads the main plant data model from a JSON file."""
-        log.info(f"Loading plant data from {directory / 'plant_data.json'}")
-        with open(directory / "plant_data.json", "r") as f:
+        log.info(f"Loading plant data from {params_path}")
+        with open(params_path, "r") as f:
             return cls.model_validate_json(f.read())
 
 
@@ -224,13 +223,15 @@ def plot_errors_per_trial(
     plt.close()
 
 
-def plot_plant_outputs(run_id: str):
+def plot_plant_outputs(run_paths: RunPaths):
     """Loads all plant-related data and generates all plots."""
     log.info("Generating plant plots...")
-    run_paths = RunPaths.from_run_id(run_id=run_id)
-    master_params = MasterParams.model_validate_json(run_paths.params_json)
+
+    with open(run_paths.params_json, "r") as f:
+        master_params = MasterParams.model_validate_json(f.read())
     config = PlantConfig(master_params)
-    plant_data = PlantPlotData.load(run_paths.data_bullet)
+    config.run_paths = run_paths
+    plant_data = PlantPlotData.load(run_paths.robot_result)
 
     if not plant_data.joint_data:
         log.error("No joint data found.")

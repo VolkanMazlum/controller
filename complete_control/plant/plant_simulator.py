@@ -389,5 +389,5 @@ class PlantSimulator:
             init_hand_pos_ee=list(self.plant.init_hand_pos_ee),
             trgt_hand_pos_ee=list(self.plant.trgt_hand_pos_ee),
         )
-        plot_data.save(self.config.run_paths.data_bullet)
-        self.log.info(f"Saved plotting data to {self.config.run_paths.data_bullet}")
+        plot_data.save(self.config.run_paths.robot_result)
+        self.log.info(f"Saved plotting data to {self.config.run_paths.robot_result}")

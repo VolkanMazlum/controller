@@ -30,7 +30,7 @@ class RunPaths:
 
     run: Path
     data_nest: Path
-    data_bullet: Path
+    robot_result: Path
     figures: Path
     figures_receiver: Path
     logs: Path
@@ -51,7 +51,7 @@ class RunPaths:
         run_dir = RUNS_DIR / run_timestamp
         data_dir = run_dir / "data"
         data_nest_dir = data_dir / "neural"
-        data_bullet_dir = data_dir / "robotic"
+        robot_result = data_dir / "robotic" / "plant_data.json"
         figures_dir = run_dir / FOLDER_NAME_NEURAL_FIGS
         figures_receiver_dir = run_dir / FOLDER_NAME_ROBOTIC_FIGS
         logs_dir = run_dir / "logs"
@@ -61,7 +61,7 @@ class RunPaths:
         for dir_path in [
             run_dir,
             data_nest_dir,
-            data_bullet_dir,
+            robot_result.parent,
             figures_dir,
             figures_receiver_dir,
             logs_dir,
@@ -71,7 +71,7 @@ class RunPaths:
         return cls(
             run=run_dir,
             data_nest=data_nest_dir,
-            data_bullet=data_bullet_dir,
+            robot_result=robot_result,
             figures=figures_dir,
             figures_receiver=figures_receiver_dir,
             logs=logs_dir,
