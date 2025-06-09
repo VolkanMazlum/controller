@@ -12,7 +12,6 @@ _log: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 
 def load_spike_data_from_file(filepath: Path) -> tuple[np.ndarray, np.ndarray]:
-    _log.debug(filepath.name)
     if not filepath.exists():
         _log.warning(
             "Spike data file not found, returning empty arrays.", path=str(filepath)
@@ -26,11 +25,10 @@ def load_spike_data_from_file(filepath: Path) -> tuple[np.ndarray, np.ndarray]:
                 first_line += 1
             else:
                 break
-    _log.debug(first_line)
     try:
         df = pd.read_csv(filepath, sep="\t", header=0, skiprows=first_line)
     except pd.errors.EmptyDataError:
-        _log.warning("empty results file")
+        _log.warning("empty results file", file=filepath)
         return np.array([]), np.array([])
 
     df.columns = ["sender", "time_ms"]
