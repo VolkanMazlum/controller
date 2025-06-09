@@ -210,3 +210,51 @@ def plot_errors_per_trial(
         plt.savefig(filepath)
         log.info(f"Saved error per trial plot at at {filepath}")
     plt.close()
+
+
+def plot_plant_outputs(run_paths: RunPaths):
+    """Loads all plant-related data and generates all plots."""
+    log.info("Generating plant plots...")
+    config = PlantConfig(run_paths)
+    num_total_steps = len(config.time_vector_total_s)
+    data_arrays = DataArrays(num_total_steps, config.NJT)
+
+    # Load data arrays from files
+    data_arrays.pos_j_rad = np.loadtxt(
+        run_paths.data_bullet / "pos_real_joint.csv", delimiter=","
+    ).reshape(num_total_steps, config.NJT)
+    data_arrays.input_cmd_torque = np.loadtxt(
+        run_paths.data_bullet / "inputCmd_motNeur.csv", delimiter=","
+    ).reshape(num_total_steps, config.NJT)
+    data_arrays.pos_ee_m = np.loadtxt(
+        run_paths.data_bullet / "pos_real_ee.csv", delimiter=","
+    ).reshape(num_total_steps, 3)
+
+    # Load supplementary plot data
+    plot_data = PlantPlotData.load(run_paths.data_bullet / "plant_plot_data.json")
+
+    # Generate plots
+    plot_joint_space(
+        config=config,
+        time_vector_s=config.time_vector_total_s,
+        pos_j_rad_actual=data_arrays.pos_j_rad,
+        desired_trj_joint_rad=generate_signals(
+            config.master_config.experiment,
+            config.master_config.simulation,
+        )[0],
+    )
+    plot_ee_space(
+        config=config,
+        desired_start_ee=np.array(plot_data.init_hand_pos_ee),
+        desired_end_ee=np.array(plot_data.trgt_hand_pos_ee),
+        actual_traj_ee=data_arrays.pos_ee_m,
+    )
+    plot_motor_commands(
+        config=config,
+        time_vector_s=config.time_vector_total_s,
+        input_cmd_torque_actual=data_arrays.input_cmd_torque,
+    )
+    if plot_data.errors_per_trial:
+        plot_errors_per_trial(config=config, errors_list=plot_data.errors_per_trial)
+
+    log.info("Plant plots generated.")

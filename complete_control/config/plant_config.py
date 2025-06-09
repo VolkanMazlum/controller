@@ -99,6 +99,8 @@ class PlantConfig:
             self.master_config.modules.spine.wgt_motCtx_motNeur
         )
 
+        self.PLOT_DATA_FILENAME = "plant_plot_data.json"
+
         self.log.info(
             "PlantConfig initialized successfully with MasterConfig integration (Stage 2)"
         )
