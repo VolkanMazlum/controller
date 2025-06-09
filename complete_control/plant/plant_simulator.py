@@ -47,7 +47,10 @@ class PlantSimulator:
         self.log.debug("MUSIC communication and SensorySystem setup complete.")
 
         self.num_total_steps = len(self.config.time_vector_total_s)
-        self.data_arrays = plant_utils.DataArrays(self.num_total_steps, config.NJT)
+        self.joint_data = [
+            plant_utils.JointData.empty(self.num_total_steps)
+            for _ in range(self.config.NJT)
+        ]
         # For storing raw received spikes before processing (per joint)
         self.received_spikes_pos: List[List[Tuple[float, int]]] = [
             [] for _ in range(self.config.NJT)
@@ -289,7 +292,8 @@ class PlantSimulator:
                 self.plant.simulate_step(self.config.RESOLUTION_S)
 
                 # 6. Record data for this step
-                self.data_arrays.record_step(
+                # For NJT=1
+                self.joint_data[0].record_step(
                     step=step,
                     joint_pos_rad=joint_pos_rad,
                     joint_vel_rad_s=joint_vel_rad_s,
@@ -372,8 +376,7 @@ class PlantSimulator:
         ]
 
         plot_data = PlantPlotData(
-            config=self.config,
-            data_arrays=self.data_arrays,
+            joint_data=self.joint_data,
             received_spikes={
                 "pos": self.received_spikes_pos,
                 "neg": self.received_spikes_neg,

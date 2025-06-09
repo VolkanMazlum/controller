@@ -1,41 +1,42 @@
-from dataclasses import dataclass
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import List, Tuple
 
-import matplotlib.pyplot as plt
 import numpy as np
 import structlog
-from config.plant_config import PlantConfig
+from pydantic import BaseModel
+from utils_common.custom_types import NdArray
 
 _log = structlog.get_logger(__name__)
 
 
-# --- Data Processing Functions ---
-@dataclass
-class JointData:
+class JointData(BaseModel):
     """Holds time-series data for a single joint."""
 
-    pos_rad: np.ndarray
-    vel_rad_s: np.ndarray
-    pos_ee_m: np.ndarray
-    vel_ee_m_s: np.ndarray
-    spk_rate_pos_hz: np.ndarray
-    spk_rate_neg_hz: np.ndarray
-    spk_rate_net_hz: np.ndarray
-    input_cmd_torque: np.ndarray
-    input_cmd_total_torque: np.ndarray
+    pos_rad: NdArray
+    vel_rad_s: NdArray
+    pos_ee_m: NdArray
+    vel_ee_m_s: NdArray
+    spk_rate_pos_hz: NdArray
+    spk_rate_neg_hz: NdArray
+    spk_rate_net_hz: NdArray
+    input_cmd_torque: NdArray
+    input_cmd_total_torque: NdArray
 
-    def __init__(self, num_total_steps: int):
-        self.pos_rad = np.zeros(num_total_steps)
-        self.vel_rad_s = np.zeros(num_total_steps)
-        self.pos_ee_m = np.zeros([num_total_steps, 3])
-        self.vel_ee_m_s = np.zeros([num_total_steps, 2])
-        self.spk_rate_pos_hz = np.zeros(num_total_steps)
-        self.spk_rate_neg_hz = np.zeros(num_total_steps)
-        self.spk_rate_net_hz = np.zeros(num_total_steps)
-        self.input_cmd_torque = np.zeros(num_total_steps)
-        self.input_cmd_total_torque = np.zeros(num_total_steps)
+    class Config:
+        arbitrary_types_allowed = True
+
+    @classmethod
+    def empty(cls, num_total_steps: int):
+        return cls(
+            pos_rad=np.zeros(num_total_steps),
+            vel_rad_s=np.zeros(num_total_steps),
+            pos_ee_m=np.zeros([num_total_steps, 3]),
+            vel_ee_m_s=np.zeros([num_total_steps, 2]),
+            spk_rate_pos_hz=np.zeros(num_total_steps),
+            spk_rate_neg_hz=np.zeros(num_total_steps),
+            spk_rate_net_hz=np.zeros(num_total_steps),
+            input_cmd_torque=np.zeros(num_total_steps),
+            input_cmd_total_torque=np.zeros(num_total_steps),
+        )
 
     def record_step(
         self,
@@ -122,14 +123,3 @@ def compute_spike_rate(
 
     rate_hz = weighted_count / (duration * n_neurons)
     return rate_hz, int(weighted_count)
-
-
-def _save_spikes_to_file(filepath: Path, spikes: List[Tuple[float, int]]):
-    """Helper to save spike data, handling empty lists."""
-    if spikes:
-        # Sort by timestamp before saving
-        spikes.sort(key=lambda x: x[0])
-        np.savetxt(filepath, np.array(spikes), fmt="%3.4f\t%d", delimiter="\t")
-    else:
-        # Create an empty file if no spikes, as per original behavior
-        filepath.touch()
