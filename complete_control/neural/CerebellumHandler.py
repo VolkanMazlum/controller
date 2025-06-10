@@ -351,55 +351,55 @@ class CerebellumHandler:
         )
 
         # Inv Error -> Inv Inferior Olive
-        conn_spec_error_inv_io_i = self.conn_params.error_inv_io_i
-        self.log.debug(
-            "Connecting error_inv -> inv_io", conn_spec=conn_spec_error_inv_io_i
-        )
+        conn_spec_p = self.conn_params.error_inv_io_i.model_dump(exclude_none=True)
+        self.log.debug("Connecting error_inv -> inv_io (p)", conn_spec=conn_spec_p)
         nest.Connect(
             self.interface_pops.error_inv_p.pop,
             self.cerebellum.populations.inv_io_p_view.pop,
             "all_to_all",
-            syn_spec=conn_spec_error_inv_io_i.model_dump(exclude_none=True),
+            syn_spec=conn_spec_p,
         )
-        # Assuming same sign convention for negative side
-        # conn_spec_error_inv_io_i_neg = conn_spec_error_inv_io_i.model_copy(update={"weight": -conn_spec_error_inv_io_i.weight}) # TODO: Confirm if negative weight is needed
         nest.Connect(
             self.interface_pops.error_inv_n.pop,
             self.cerebellum.populations.inv_io_n_view.pop,
             "all_to_all",
-            syn_spec=conn_spec_error_inv_io_i.model_dump(
-                exclude_none=True
-            ),  # TODO: Confirm weight sign logic, using original for now
+            syn_spec=conn_spec_p,
         )
 
         # Inv DCN -> Motor Prediction Scaling Population
         conn_spec_dcn_i_mp = self.conn_params.dcn_i_motor_pred
-        w = conn_spec_dcn_i_mp.weight
-        d = conn_spec_dcn_i_mp.delay
-        self.log.debug("Connecting inv_dcn -> motor_prediction", weight=w, delay=d)
+        syn_spec_p = conn_spec_dcn_i_mp.model_dump(exclude_none=True)
+        syn_spec_n = conn_spec_dcn_i_mp.model_copy(
+            update={"weight": -conn_spec_dcn_i_mp.weight}
+        ).model_dump(exclude_none=True)
+        self.log.debug(
+            "Connecting inv_dcn -> motor_prediction",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
+        )
         nest.Connect(
             self.cerebellum.populations.inv_dcnp_p_view.pop,
             self.interface_pops.motor_prediction_p.pop,
             "all_to_all",
-            syn_spec={"weight": w, "delay": d},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.cerebellum.populations.inv_dcnp_p_view.pop,
             self.interface_pops.motor_prediction_n.pop,
             "all_to_all",
-            syn_spec={"weight": w, "delay": d},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.cerebellum.populations.inv_dcnp_n_view.pop,
             self.interface_pops.motor_prediction_p.pop,
             "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.cerebellum.populations.inv_dcnp_n_view.pop,
             self.interface_pops.motor_prediction_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w, "delay": d},
+            syn_spec=syn_spec_n,
         )
 
     def _connect_error_calculation(self):
@@ -408,132 +408,150 @@ class CerebellumHandler:
 
         # --- Forward Error Calculation (Error = Feedback - Fwd_DCN_Prediction) ---
         # Connect Feedback -> Error
-        conn_spec_fb = self.conn_params["feedback_error"]
-        self.log.debug("Connecting feedback -> error", conn_spec_fb=conn_spec_fb)
+        fb_err_spec = self.conn_params.feedback_error
+        syn_spec_p = fb_err_spec.model_dump(exclude_none=True)
+        syn_spec_n = fb_err_spec.model_copy(
+            update={"weight": -fb_err_spec.weight}
+        ).model_dump(exclude_none=True)
+        self.log.debug(
+            "Connecting feedback -> error", syn_spec_p=syn_spec_p, syn_spec_n=syn_spec_n
+        )
         nest.Connect(
             self.interface_pops.feedback_p.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec=conn_spec_fb,
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.interface_pops.feedback_p.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec=conn_spec_fb,
+            syn_spec=syn_spec_p,
         )
         conn_spec_fb["weight"] = -conn_spec_fb["weight"]
         nest.Connect(
             self.interface_pops.feedback_n.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec=conn_spec_fb,
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.interface_pops.feedback_n.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec=conn_spec_fb,
+            syn_spec=syn_spec_n,
         )
 
         # Connect Fwd DCN -> Error (Inhibitory)
-        conn_spec_dcn = self.conn_params["dcn_f_error"]
-
+        dcn_f_err_spec = self.conn_params.dcn_f_error
+        syn_spec_p = dcn_f_err_spec.model_dump(exclude_none=True)
+        syn_spec_n = dcn_f_err_spec.model_copy(
+            update={"weight": -dcn_f_err_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
-            "Connecting fwd_dcn -> error (inhibitory)", conn_spec_dcn=conn_spec_dcn
+            "Connecting fwd_dcn -> error (inhibitory)",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
+        # TODO this agrees with brain.py, but why these signs?
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec=conn_spec_dcn,
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec=conn_spec_dcn,
+            syn_spec=syn_spec_n,
         )
         conn_spec_dcn["weight"] = -conn_spec_dcn["weight"]
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.interface_pops.error_p.pop,
             "all_to_all",
-            syn_spec=conn_spec_dcn,
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.interface_pops.error_n.pop,
             "all_to_all",
-            syn_spec=conn_spec_dcn,
+            syn_spec=syn_spec_p,
         )
 
         # --- Inverse Error Calculation (Error = Plan - StateEst?) ---
         # Connect Plan -> Inv Error
-        conn_spec_plan_err_inv = self.conn_params.plan_to_inv_error_inv
-        w_plan = conn_spec_plan_err_inv.weight
-        d_plan = conn_spec_plan_err_inv.delay
+        plan_err_inv_spec = self.conn_params.plan_to_inv_error_inv
+        syn_spec_p = plan_err_inv_spec.model_dump(exclude_none=True)
+        syn_spec_n = plan_err_inv_spec.model_copy(
+            update={"weight": -plan_err_inv_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
-            "Connecting plan_to_inv -> error_inv", weight=w_plan, delay=d_plan
+            "Connecting plan_to_inv -> error_inv",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.interface_pops.plan_to_inv_p.pop,
             self.interface_pops.error_inv_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_plan, "delay": d_plan},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.interface_pops.plan_to_inv_p.pop,
             self.interface_pops.error_inv_n.pop,
             "all_to_all",
-            syn_spec={"weight": w_plan, "delay": d_plan},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.interface_pops.plan_to_inv_n.pop,
             self.interface_pops.error_inv_p.pop,
             "all_to_all",
-            syn_spec={"weight": -w_plan, "delay": d_plan},
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.interface_pops.plan_to_inv_n.pop,
             self.interface_pops.error_inv_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_plan, "delay": d_plan},
+            syn_spec=syn_spec_n,
         )
 
         # Connect StateEst -> Inv Error (Inhibitory?)
         # TODO why is this called "plan" when it is the state? Using same spec for now.
-        conn_spec_state_err_inv = self.conn_params.plan_to_inv_error_inv
-        w_state = conn_spec_state_err_inv.weight
-        d_state = conn_spec_state_err_inv.delay
+        state_err_inv_spec = self.conn_params.plan_to_inv_error_inv
+        syn_spec_p = state_err_inv_spec.model_dump(exclude_none=True)
+        syn_spec_n = state_err_inv_spec.model_copy(
+            update={"weight": -state_err_inv_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
             "Connecting state_to_inv -> error_inv (inhibitory?)",
-            weight=w_state,
-            delay=d_state,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.interface_pops.state_to_inv_p.pop,
             self.interface_pops.error_inv_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_state, "delay": d_state},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.interface_pops.state_to_inv_p.pop,
             self.interface_pops.error_inv_n.pop,
             "all_to_all",
-            syn_spec={"weight": w_state, "delay": d_state},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.interface_pops.state_to_inv_n.pop,
             self.interface_pops.error_inv_p.pop,
             "all_to_all",
-            syn_spec={"weight": -w_state, "delay": d_state},
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.interface_pops.state_to_inv_n.pop,
             self.interface_pops.error_inv_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_state, "delay": d_state},
+            syn_spec=syn_spec_n,
         )
 
     def connect_to_main_controller_populations(self):
@@ -548,157 +566,169 @@ class CerebellumHandler:
         self.log.info("Connecting CerebellumHandler to main controller populations")
 
         # --- Connections FROM Cerebellum Controller (Fwd DCN) TO controller_pops.pred_p/n ---
-        conn_spec_dcn_f_pred = self.conn_params.dcn_forw_prediction
-        w_dcn_pred = conn_spec_dcn_f_pred.weight
-        d_dcn_pred = conn_spec_dcn_f_pred.delay
+        dcn_f_pred_spec = self.conn_params.dcn_forw_prediction
+        syn_spec_p = dcn_f_pred_spec.model_dump(exclude_none=True)
+        syn_spec_n = dcn_f_pred_spec.model_copy(
+            update={"weight": -dcn_f_pred_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
             "Connecting Cerebellum Fwd DCN -> Controller's pred_p/n",
-            weight=w_dcn_pred,
-            delay=d_dcn_pred,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.controller_pops.pred_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_dcn_pred, "delay": d_dcn_pred},
+            syn_spec=syn_spec_p,
         )
         # DCN minus inhibits Positive Prediction
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.controller_pops.pred_p.pop,
             "all_to_all",
-            syn_spec={"weight": -w_dcn_pred, "delay": d_dcn_pred},
+            syn_spec=syn_spec_n,
         )
         # DCN minus drives Negative Prediction
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_n_view.pop,
             self.controller_pops.pred_n.pop,
             "all_to_all",
-            syn_spec={"weight": w_dcn_pred, "delay": d_dcn_pred},
+            syn_spec=syn_spec_p,
         )
         # DCN plus inhibits Negative Prediction
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.controller_pops.pred_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_dcn_pred, "delay": d_dcn_pred},
+            syn_spec=syn_spec_n,
         )
 
         # --- Connections TO Cerebellum Controller Interfaces (FROM controller_pops) ---
         # MC Out -> Cereb Motor Commands Input
-        conn_spec_mc_out_mc = self.conn_params.mc_out_motor_commands
-        w_mc_motor = conn_spec_mc_out_mc.weight
-        d_mc_motor = conn_spec_mc_out_mc.delay
+        mc_out_mc_spec = self.conn_params.mc_out_motor_commands
+        syn_spec_p = mc_out_mc_spec.model_dump(exclude_none=True)
+        syn_spec_n = mc_out_mc_spec.model_copy(
+            update={"weight": -mc_out_mc_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
             "Connecting Controller MC Out -> Cereb Motor Cmds",
-            weight=w_mc_motor,
-            delay=d_mc_motor,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.controller_pops.mc_out_p.pop,
             self.interface_pops.motor_commands_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_mc_motor, "delay": d_mc_motor},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.controller_pops.mc_out_n.pop,
             self.interface_pops.motor_commands_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_mc_motor, "delay": d_mc_motor},
+            syn_spec=syn_spec_n,
         )
 
         # Planner -> Cereb Plan To Inv Input
-        conn_spec_plan_pti = self.conn_params.planner_plan_to_inv
-        w_plan_inv = conn_spec_plan_pti.weight
-        d_plan_inv = conn_spec_plan_pti.delay
+        plan_pti_spec = self.conn_params.planner_plan_to_inv
+        syn_spec_p = plan_pti_spec.model_dump(exclude_none=True)
+        syn_spec_n = plan_pti_spec.model_copy(
+            update={"weight": -plan_pti_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
             "Connecting Controller Planner -> Cereb PlanToInv",
-            weight=w_plan_inv,
-            delay=d_plan_inv,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.controller_pops.planner_p.pop,
             self.interface_pops.plan_to_inv_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_plan_inv, "delay": d_plan_inv},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.controller_pops.planner_n.pop,
             self.interface_pops.plan_to_inv_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_plan_inv, "delay": d_plan_inv},
+            syn_spec=syn_spec_n,
         )
 
         # Sensory -> Cereb Feedback Input
-        conn_spec_sn_fbk_sm = self.conn_params.sn_fbk_smoothed
-        w_sn_fbk = conn_spec_sn_fbk_sm.weight
-        d_sn_fbk = conn_spec_sn_fbk_sm.delay
+        sn_fbk_sm_spec = self.conn_params.sn_fbk_smoothed
+        syn_spec_p = sn_fbk_sm_spec.model_dump(exclude_none=True)
+        syn_spec_n = sn_fbk_sm_spec.model_copy(
+            update={"weight": -sn_fbk_sm_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
             "Connecting Controller Sensory -> Cereb Feedback",
-            weight=w_sn_fbk,
-            delay=d_sn_fbk,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.controller_pops.sn_p.pop,
             self.interface_pops.feedback_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_sn_fbk, "delay": d_sn_fbk},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.controller_pops.sn_n.pop,
             self.interface_pops.feedback_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_sn_fbk, "delay": d_sn_fbk},
+            syn_spec=syn_spec_n,
         )
 
         # Sensory -> Cereb Feedback Inv Input
-        conn_spec_sn_fbk_inv = self.conn_params.sn_feedback_inv
-        w_sn_finv = conn_spec_sn_fbk_inv.weight
-        d_sn_finv = conn_spec_sn_fbk_inv.delay
+        sn_fbk_inv_spec = self.conn_params.sn_feedback_inv
+        syn_spec_p = sn_fbk_inv_spec.model_dump(exclude_none=True)
+        syn_spec_n = sn_fbk_inv_spec.model_copy(
+            update={"weight": -sn_fbk_inv_spec.weight}
+        ).model_dump(exclude_none=True)
         self.log.debug(
             "Connecting Controller Sensory -> Cereb FeedbackInv",
-            weight=w_sn_finv,
-            delay=d_sn_finv,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         nest.Connect(
             self.controller_pops.sn_p.pop,
             self.interface_pops.feedback_inv_p.pop,
             "all_to_all",
-            syn_spec={"weight": w_sn_finv, "delay": d_sn_finv},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.controller_pops.sn_n.pop,
             self.interface_pops.feedback_inv_n.pop,
             "all_to_all",
-            syn_spec={"weight": -w_sn_finv, "delay": d_sn_finv},
+            syn_spec=syn_spec_n,
         )
 
         # StateEst -> Cereb State To Inv Input
         # TODO: Check if "planner_plan_to_inv" is the correct conn_spec or if a dedicated one like "state_state_to_inv" is needed.
-        conn_spec_state_sti = (
+        state_sti_spec = (
             self.conn_params.planner_plan_to_inv
         )  # Using planner_plan_to_inv as per existing code
-        w_state_inv = conn_spec_state_sti.weight
-        d_state_inv = conn_spec_state_sti.delay
+        syn_spec_p = state_sti_spec.model_dump(exclude_none=True)
+        syn_spec_n = state_sti_spec.model_copy(
+            update={"weight": -state_sti_spec.weight}
+        ).model_dump(exclude_none=True)
 
         self.log.debug(
             "Connecting Controller StateEst -> Cereb StateToInv",
-            weight=w_state_inv,
-            delay=d_state_inv,
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
         )
         if self.controller_pops.state_p and self.interface_pops.state_to_inv_p:
             nest.Connect(
                 self.controller_pops.state_p.pop,
                 self.interface_pops.state_to_inv_p.pop,
                 "all_to_all",
-                syn_spec={"weight": w_state_inv, "delay": d_state_inv},
+                syn_spec=syn_spec_p,
             )
         if self.controller_pops.state_n and self.interface_pops.state_to_inv_n:
             nest.Connect(
                 self.controller_pops.state_n.pop,
                 self.interface_pops.state_to_inv_n.pop,
                 "all_to_all",
-                syn_spec={"weight": -w_state_inv, "delay": d_state_inv},
+                syn_spec=syn_spec_n,
             )
 
         # --- Connections FROM Cerebellum Controller Interfaces (motor_prediction) TO controller_pops.brainstem ---
