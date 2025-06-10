@@ -428,7 +428,6 @@ class CerebellumHandler:
             "all_to_all",
             syn_spec=syn_spec_p,
         )
-        conn_spec_fb["weight"] = -conn_spec_fb["weight"]
         nest.Connect(
             self.interface_pops.feedback_n.pop,
             self.interface_pops.error_p.pop,
@@ -466,7 +465,6 @@ class CerebellumHandler:
             "all_to_all",
             syn_spec=syn_spec_n,
         )
-        conn_spec_dcn["weight"] = -conn_spec_dcn["weight"]
         nest.Connect(
             self.cerebellum.populations.forw_dcnp_p_view.pop,
             self.interface_pops.error_p.pop,
