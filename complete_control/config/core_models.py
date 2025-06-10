@@ -16,8 +16,7 @@ class MetaInfo(BaseModel, frozen=True):
     cerebellum_commit_hash: str = Field(
         default_factory=lambda: get_git_commit_hash(paths.CEREBELLUM)
     )
-    timestamp: datetime = Field(default_factory=datetime.now)
-    run_id: str  # This will be set at runtime
+    run_id: str
 
 
 class RobotSpecParams(BaseModel, frozen=True):

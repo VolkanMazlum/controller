@@ -13,24 +13,15 @@ class PlantConfig:
 
     def __init__(
         self,
-        run_paths: paths.RunPaths,
+        master_params: MasterParams,
     ):
         self.log = structlog.get_logger(type(self).__name__)
         self.log.info("Initializing PlantConfig...")
+        self.master_config = master_params
 
-        self.run_paths: paths.RunPaths = run_paths
+        self.run_paths: paths.RunPaths = master_params.run_paths
         self.trajectory_path = paths.TRAJECTORY
 
-        # --- Populate MasterConfig ---
-        run_id = self.run_paths.run.name
-
-        meta_config = MetaInfo(run_id=run_id)
-
-        self.master_config = MasterParams(
-            meta=meta_config,
-        )
-
-        # --- Extract and Store Key Parameters (now from MasterConfig) ---
         self.SEED = SimulationParams.get_default_seed()
         np.random.seed(self.SEED)
 
@@ -60,7 +51,7 @@ class PlantConfig:
         )
 
         self.NJT = self.master_config.NJT
-        self.CONNECT_GUI = False
+        self.CONNECT_GUI = self.master_config.GUI_PYBULLET
 
         self.initial_joint_pos_rad: float = (
             self.master_config.experiment.init_pos_angle_rad
@@ -99,11 +90,13 @@ class PlantConfig:
             self.master_config.modules.spine.wgt_motCtx_motNeur
         )
 
-        self.log.info(
-            "PlantConfig initialized successfully with MasterConfig integration (Stage 2)"
-        )
-        # self.log.debug("Config details", config_vars=self.__dict__) # Can be very verbose
-        self.log.debug(
-            "MasterConfig dump",
-            master_config=self.master_config.model_dump_json(indent=2),
-        )
+        self.PLOT_DATA_FILENAME = "plant_plot_data.json"
+
+        self.log.info("PlantConfig initialized successfully from MasterConfig")
+
+    @classmethod
+    def from_runpaths(
+        cls,
+        run_paths: paths.RunPaths,
+    ):
+        return cls(MasterParams.from_runpaths(run_paths))

@@ -15,8 +15,7 @@ import config.paths as paths
 import nest
 import numpy as np
 import structlog
-from config.paths import RunPaths, setup_run_paths
-from config.plant_config import PlantConfig
+from config.paths import RunPaths
 from mpi4py import MPI
 from mpi4py.MPI import Comm
 from neural.Controller import Controller
@@ -164,7 +163,7 @@ def coordinate_paths_with_receiver() -> tuple[str, RunPaths]:
         shared_data["timestamp"] = run_timestamp_str = datetime.datetime.now().strftime(
             "%Y%m%d_%H%M%S"
         )
-        shared_data["paths"] = setup_run_paths(run_timestamp_str)
+        shared_data["paths"] = RunPaths.from_run_id(run_timestamp_str)
         print("sending paths to all processes...")
 
     shared_data = MPI.COMM_WORLD.bcast(shared_data, root=0)
@@ -205,9 +204,8 @@ if __name__ == "__main__":
 
     start_script_time = timer()
     nest.ResetKernel()
-    run_id = run_paths.run.name
-    meta_info = MetaInfo(run_id=run_id)
-    master_config = MasterParams(meta=meta_info)
+    master_config = MasterParams.from_runpaths(run_paths=run_paths)
+    run_id = master_config.run_paths.run.name
 
     with open(run_paths.params_json, "w") as f:
         f.write(master_config.model_dump_json(indent=2))
@@ -289,7 +287,7 @@ if __name__ == "__main__":
             path_data=run_paths.data_nest,
             label_prefix="",
             music_cfg=master_config.music,
-            use_cerebellum=True,  # TODO move this to parameters
+            use_cerebellum=master_config.USE_CEREBELLUM,
             cerebellum_paths=master_config.bsb_config_paths,
             comm=comm,
         )
@@ -306,10 +304,10 @@ if __name__ == "__main__":
     run_simulation(master_config.simulation, run_paths.data_nest, controllers, comm)
 
     # --- Plotting (Rank 0 Only) ---
-    if rank == 0:
+    if rank == 0 and master_config.PLOT_AFTER_SIMULATE:
         main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
-        plot_controller_outputs(controllers, total_time_vect_concat, run_paths.figures)
+        plot_controller_outputs(run_paths)
         end_plot_time = timer()
         plot_wall_time = timedelta(seconds=end_plot_time - start_plot_time)
         main_log.info(f"Plotting Finished", wall_time=str(plot_wall_time))
