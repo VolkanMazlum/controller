@@ -412,33 +412,39 @@ class Controller:
 
         # Planner -> Motor Cortex Feedback Input
         # if self.pops.planner_p and self.pops.mc_fbk_p:  # Check populations exist
-        conn_spec_planner_mc_fbk = self.conn_params.planner_mc_fbk
-        w = conn_spec_planner_mc_fbk.weight
-        d = conn_spec_planner_mc_fbk.delay
-        self.log.debug("Connecting Planner to MC Fbk", weight=w, delay=d)
+        conn_spec = self.conn_params.planner_mc_fbk
+        syn_spec_p = conn_spec.model_dump(exclude_none=True)
+        syn_spec_n = conn_spec.model_copy(
+            update={"weight": -conn_spec.weight}
+        ).model_dump(exclude_none=True)
+        self.log.debug(
+            "Connecting Planner to MC Fbk",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
+        )
         nest.Connect(
             self.pops.planner_p.pop,
             self.pops.mc_fbk_p.pop,
             "one_to_one",
-            syn_spec={"weight": w, "delay": d},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.pops.planner_p.pop,
             self.pops.mc_fbk_n.pop,
             "one_to_one",
-            syn_spec={"weight": w, "delay": d},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.pops.planner_n.pop,
             self.pops.mc_fbk_p.pop,
             "one_to_one",
-            syn_spec={"weight": -w, "delay": d},
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.pops.planner_n.pop,
             self.pops.mc_fbk_n.pop,
             "one_to_one",
-            syn_spec={"weight": -w, "delay": d},
+            syn_spec=syn_spec_n,
         )
 
         # State Estimator -> Motor Cortex Feedback Input (Inhibitory)
@@ -497,66 +503,71 @@ class Controller:
         )
 
         # Sensory Input -> Feedback Smoothed Neurons
-        conn_spec_sn_fbk_sm = self.conn_params.sn_fbk_smoothed
-        self.log.debug("Connecting sensory to smoothing", conn_spec=conn_spec_sn_fbk_sm)
+        sn_fbk_sm_spec = self.conn_params.sn_fbk_smoothed
+        syn_spec_p = sn_fbk_sm_spec.model_dump(exclude_none=True)
+        syn_spec_n = sn_fbk_sm_spec.model_copy(
+            update={"weight": -sn_fbk_sm_spec.weight}
+        ).model_dump(exclude_none=True)
+        self.log.debug(
+            "Connecting sensory to smoothing",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
+        )
         nest.Connect(
             self.pops.sn_p.pop,
             self.pops.fbk_smooth_p.pop,
             "all_to_all",
-            syn_spec=conn_spec_sn_fbk_sm.model_dump(exclude_none=True),
-        )
-        conn_spec_sn_fbk_sm_neg = conn_spec_sn_fbk_sm.model_copy(
-            update={"weight": -conn_spec_sn_fbk_sm.weight}
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.pops.sn_n.pop,
             self.pops.fbk_smooth_n.pop,
             "all_to_all",
-            syn_spec=conn_spec_sn_fbk_sm_neg.model_dump(exclude_none=True),
+            syn_spec=syn_spec_n,
         )
 
         # Connections INTO State Estimator (Using receptor types)
         st_p = self.pops.state_p.pop
         st_n = self.pops.state_n.pop
 
-        w_fbk_sm = self.conn_params.fbk_smoothed_state.weight
-        self.log.debug("Connecting smoothed sensory to state", weight=w_fbk_sm)
+        fbk_sm_state_spec = self.conn_params.fbk_smoothed_state.model_dump(
+            exclude_none=True
+        )
+        self.log.debug("Connecting smoothed sensory to state", spec=fbk_sm_state_spec)
         for i, pre in enumerate(self.pops.fbk_smooth_p.pop):
             nest.Connect(
                 pre,
                 st_p,
                 "all_to_all",
-                syn_spec={"weight": w_fbk_sm, "receptor_type": i + 1},
+                syn_spec={**fbk_sm_state_spec, "receptor_type": i + 1},
             )
         for i, pre in enumerate(self.pops.fbk_smooth_n.pop):
             nest.Connect(
                 pre,
                 st_n,
                 "all_to_all",
-                syn_spec={"weight": w_fbk_sm, "receptor_type": i + 1},
+                syn_spec={**fbk_sm_state_spec, "receptor_type": i + 1},
             )
         # Prediction (self.pops.pred_p/n) -> State Estimator (Receptors N+1 to 2N)
         # These connections are always made, as pred_p/n always exist.
         offset = self.N + 1  # Start receptor types after the first N for sensory
-        weight = self.conn_params.pred_state.weight
+        pred_state_spec = self.conn_params.pred_state.model_dump(exclude_none=True)
         self.log.debug(
-            "Connecting self.pops.pred_p/n to state estimator",
-            weight=weight,
-            receptor_offset=offset,
+            "Connecting self.pops.pred_p/n to state estimator", spec=pred_state_spec
         )
         for i, pre in enumerate(self.pops.pred_p.pop):
             nest.Connect(
                 pre,
                 st_p,
                 "all_to_all",
-                syn_spec={"weight": weight, "receptor_type": i + offset},
+                syn_spec={**pred_state_spec, "receptor_type": i + offset},
             )
         for i, pre in enumerate(self.pops.pred_n.pop):
             nest.Connect(
                 pre,
                 st_n,
                 "all_to_all",
-                syn_spec={"weight": weight, "receptor_type": i + offset},
+                syn_spec={**pred_state_spec, "receptor_type": i + offset},
             )
         # Note: The MC Output -> Brainstem connection happens in both cases and is handled above
 

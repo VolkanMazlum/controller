@@ -1,6 +1,6 @@
 from typing import ClassVar, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class SingleSynapseParams(BaseModel):
@@ -12,15 +12,12 @@ class SingleSynapseParams(BaseModel):
 
 class ConnectionsParams(BaseModel):
     model_config: ClassVar = {"frozen": True}
+
+    sensory_delay: float = 100
+
     dcn_forw_prediction: SingleSynapseParams = Field(
         default_factory=lambda: SingleSynapseParams(
             weight=0.3,
-            delay=0.1,
-        )
-    )
-    sn_fbk_smoothed: SingleSynapseParams = Field(
-        default_factory=lambda: SingleSynapseParams(
-            weight=0.028,
             delay=0.1,
         )
     )
@@ -69,18 +66,6 @@ class ConnectionsParams(BaseModel):
     sn_feedback: SingleSynapseParams = Field(
         default_factory=lambda: SingleSynapseParams(
             weight=0.001,
-            delay=0.1,
-        )
-    )
-    dcn_f_error: SingleSynapseParams = Field(
-        default_factory=lambda: SingleSynapseParams(
-            weight=0.1,
-            delay=0.1,
-        )
-    )
-    feedback_error: SingleSynapseParams = Field(
-        default_factory=lambda: SingleSynapseParams(
-            weight=0.1,
             delay=0.1,
         )
     )
@@ -158,3 +143,18 @@ class ConnectionsParams(BaseModel):
             receptor_type=1,
         )
     )
+
+    @computed_field
+    @property
+    def sn_fbk_smoothed(self) -> SingleSynapseParams:
+        return SingleSynapseParams(weight=0.028, delay=self.sensory_delay)
+
+    @computed_field
+    @property
+    def dcn_f_error(self) -> SingleSynapseParams:
+        return SingleSynapseParams(weight=0.1, delay=self.sensory_delay)
+
+    @computed_field
+    @property
+    def feedback_error(self) -> SingleSynapseParams:
+        return SingleSynapseParams(weight=0.1, delay=self.sensory_delay)
