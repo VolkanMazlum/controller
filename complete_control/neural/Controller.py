@@ -3,7 +3,16 @@ from typing import Any, Dict, Optional, Tuple
 import nest
 import numpy as np
 import structlog
-from config.settings import Simulation
+from config.bsb_models import BSBConfigPaths
+from config.connection_params import ConnectionsParams
+from config.core_models import MusicParams, SimulationParams
+from config.module_params import (
+    MotorCortexModuleConfig,
+    PlannerModuleConfig,
+    SpineModuleConfig,
+    StateModuleConfig,
+)
+from config.population_params import PopulationsParams
 from mpi4py.MPI import Comm
 
 from .CerebellumHandler import CerebellumHandler
@@ -52,19 +61,19 @@ class Controller:
         total_time_vect: np.ndarray,
         trajectory_slice: np.ndarray,
         motor_cmd_slice: np.ndarray,
-        mc_params: Dict[str, Any],
-        plan_params: Dict[str, Any],
-        spine_params: Dict[str, Any],
-        state_params: Dict[str, Any],
-        pops_params: Dict[str, Any],
-        conn_params: Dict[str, Any],
-        sim_params: Simulation,
+        mc_params: MotorCortexModuleConfig,
+        plan_params: PlannerModuleConfig,
+        spine_params: SpineModuleConfig,
+        state_params: StateModuleConfig,
+        pops_params: PopulationsParams,
+        conn_params: ConnectionsParams,
+        sim_params: SimulationParams,
         path_data: str,
         comm: Comm,
-        music_cfg: Dict[str, Any],
+        music_cfg: MusicParams,
         label_prefix: str = "",
         use_cerebellum: bool = False,
-        cerebellum_config: Optional[Dict[str, Any]] = None,
+        cerebellum_paths: Optional[BSBConfigPaths] = None,
     ):
         """
         Initializes the controller for one Degree of Freedom.
@@ -72,7 +81,7 @@ class Controller:
         Args:
             ...
             use_cerebellum (bool): Flag to enable/disable cerebellum integration.
-            cerebellum_config (Optional[Dict[str, Any]]): Configuration for Cerebellum build (paths etc.), required if use_cerebellum is True.
+            cerebellum_paths: paths for Cerebellum build, required if use_cerebellum is True.
         """
         self.log: structlog.stdlib.BoundLogger = structlog.get_logger(
             f"controller"
@@ -96,7 +105,7 @@ class Controller:
         self.music_cfg = music_cfg
         self.path_data = path_data
         self.use_cerebellum = use_cerebellum
-        self.cerebellum_config = cerebellum_config
+        self.cerebellum_paths = cerebellum_paths
         self.comm = comm
         self.label = f"{label_prefix}"
 
@@ -113,7 +122,7 @@ class Controller:
             sim_params=sim_params,
             music_cfg=music_cfg,
             use_cerebellum=self.use_cerebellum,
-            cerebellum_config=self.cerebellum_config,
+            cerebellum_config=self.cerebellum_paths,
             comm=self.comm,
         )
 
@@ -149,7 +158,7 @@ class Controller:
     ) -> CerebellumHandler:
         """Instantiates the internal CerebellumHandler."""
         self.log.info("Instantiating internal CerebellumHandler")
-        if self.cerebellum_config is None:
+        if self.cerebellum_paths is None:
             raise ValueError(
                 "Cerebellum config must be provided when use_cerebellum is True"
             )
@@ -192,7 +201,7 @@ class Controller:
                 sim_params=self.sim_params,
                 pops_params=cereb_pops_params,
                 conn_params=cereb_conn_params,
-                cerebellum_config=self.cerebellum_config,
+                cerebellum_paths=self.cerebellum_paths,
                 path_data=self.path_data,
                 label_prefix=f"{self.label}cereb_",
                 dof_id=self.dof_id,
@@ -247,16 +256,16 @@ class Controller:
             "Initializing Planner sub-module",
             N=N,
             njt=NJT,
-            kpl=p_params["kpl"],
-            base_rate=p_params["base_rate"],
-            kp=p_params["kp"],
+            kpl=p_params.kpl,
+            base_rate=p_params.base_rate,
+            kp=p_params.kp,
         )
         tmp_pop_p = nest.Create(
             "tracking_neuron_nestml",
             n=N,
             params={
-                "kp": p_params["kp"],
-                "base_rate": p_params["base_rate"],
+                "kp": p_params.kp,
+                "base_rate": p_params.base_rate,
                 "pos": True,
                 "traj": self.trajectory_slice.tolist(),
                 "simulation_steps": len(self.trajectory_slice),
@@ -266,8 +275,8 @@ class Controller:
             "tracking_neuron_nestml",
             n=N,
             params={
-                "kp": p_params["kp"],
-                "base_rate": p_params["base_rate"],
+                "kp": p_params.kp,
+                "base_rate": p_params.base_rate,
                 "pos": False,
                 "traj": self.trajectory_slice.tolist(),
                 "simulation_steps": len(self.trajectory_slice),
@@ -284,7 +293,11 @@ class Controller:
             mc_params=self.mc_params,
         )
         self.mc = MotorCortex(
-            self.N, NJT, self.total_time_vect, self.motor_cmd_slice, **self.mc_params
+            self.N,
+            NJT,
+            self.total_time_vect,
+            self.motor_cmd_slice,
+            **self.mc_params.model_dump(),
         )
         self.pops.mc_ffwd_p = self.mc.ffwd_p[0]
         self.pops.mc_ffwd_n = self.mc.ffwd_n[0]
@@ -294,26 +307,31 @@ class Controller:
         self.pops.mc_out_n = self.mc.out_n[0]
 
     def _build_state_estimator(self, to_file=False):
-        buf_sz = self.state_params["buffer_size"]
+        buf_sz = self.state_params.buffer_size
         N = self.N
 
-        additional_state_params = {
-            "N_fbk": N,
-            "N_pred": N,
-            "fbk_bf_size": N * int(buf_sz / self.sim_params.resolution),
-            "pred_bf_size": N * int(buf_sz / self.sim_params.resolution),
-            # the nestml model has a hardcoded solution to stop any spikes in time_wait
-            "time_wait": 0,
-        }
-        self.state_params.update(additional_state_params)
+        # Parameters for StateEstimator_mass constructor
+        # It expects a dictionary, so we convert the Pydantic model
+        state_estimator_constructor_params = self.state_params.model_dump()
+        state_estimator_constructor_params.update(
+            {
+                "N_fbk": N,
+                "N_pred": N,
+                "fbk_bf_size": N * int(buf_sz / self.sim_params.resolution),
+                "pred_bf_size": N * int(buf_sz / self.sim_params.resolution),
+                # the nestml model has a hardcoded solution to stop any spikes in time_wait
+                "time_wait": 0,
+            }
+        )
+
         self.log.debug(
             "Initializing StateEstimator_mass",
             N=N,
             njt=NJT,
-            state_params=self.state_params,
+            state_params=state_estimator_constructor_params,
         )
         self.stEst = StateEstimator_mass(
-            N, NJT, self.total_time_vect, **self.state_params
+            N, NJT, self.total_time_vect, **state_estimator_constructor_params
         )
         self.pops.state_p = self.stEst.pops_p[0]
         self.pops.state_n = self.stEst.pops_n[0]
@@ -333,11 +351,11 @@ class Controller:
         which then connects to these pred_p/n neurons.
         """
         self.log.debug("Building prediction scaling neurons (pred_p, pred_n)")
-        params = self.pops_params["prediction"]
+        params = self.pops_params.prediction
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
 
@@ -351,11 +369,11 @@ class Controller:
 
     def _build_fbk_smoothed_neurons(self, to_file=False):
         """Neurons for smoothing feedback"""
-        params = self.pops_params["fbk_smoothed"]
+        params = self.pops_params.fbk_smoothed
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         self.log.debug("Creating feedback neurons", **pop_params)
@@ -370,11 +388,11 @@ class Controller:
 
     def _build_brainstem(self, to_file=False):
         """Basic neurons for output stage"""
-        params = self.pops_params["brain_stem"]
+        params = self.pops_params.brain_stem
         pop_params = {
-            "kp": params["kp"],
-            "buffer_size": params["buffer_size"],
-            "base_rate": params["base_rate"],
+            "kp": params.kp,
+            "buffer_size": params.buffer_size,
+            "base_rate": params.base_rate,
             "simulation_steps": len(self.total_time_vect),
         }
         self.log.debug("Creating output neurons (brainstem)", **pop_params)
@@ -394,144 +412,162 @@ class Controller:
 
         # Planner -> Motor Cortex Feedback Input
         # if self.pops.planner_p and self.pops.mc_fbk_p:  # Check populations exist
-        w = self.conn_params["planner_mc_fbk"]["weight"]
-        d = self.conn_params["planner_mc_fbk"]["delay"]
-        self.log.debug("Connecting Planner to MC Fbk", weight=w, delay=d)
+        conn_spec = self.conn_params.planner_mc_fbk
+        syn_spec_p = conn_spec.model_dump(exclude_none=True)
+        syn_spec_n = conn_spec.model_copy(
+            update={"weight": -conn_spec.weight}
+        ).model_dump(exclude_none=True)
+        self.log.debug(
+            "Connecting Planner to MC Fbk",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
+        )
         nest.Connect(
             self.pops.planner_p.pop,
             self.pops.mc_fbk_p.pop,
             "one_to_one",
-            syn_spec={"weight": w, "delay": d},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.pops.planner_p.pop,
             self.pops.mc_fbk_n.pop,
             "one_to_one",
-            syn_spec={"weight": w, "delay": d},
+            syn_spec=syn_spec_p,
         )
         nest.Connect(
             self.pops.planner_n.pop,
             self.pops.mc_fbk_p.pop,
             "one_to_one",
-            syn_spec={"weight": -w, "delay": d},
+            syn_spec=syn_spec_n,
         )
         nest.Connect(
             self.pops.planner_n.pop,
             self.pops.mc_fbk_n.pop,
             "one_to_one",
-            syn_spec={"weight": -w, "delay": d},
+            syn_spec=syn_spec_n,
         )
 
         # State Estimator -> Motor Cortex Feedback Input (Inhibitory)
         # if self.pops.state_p and self.pops.mc_fbk_p:
-        conn_spec = self.conn_params["state_mc_fbk"]
+        conn_spec_state_mc_fbk = self.conn_params.state_mc_fbk
         self.log.debug(
-            "Connecting StateEst to MC Fbk (Inhibitory)", conn_spec=conn_spec
+            "Connecting StateEst to MC Fbk (Inhibitory)",
+            conn_spec=conn_spec_state_mc_fbk,
         )
         nest.Connect(
             self.pops.state_p.pop,
             self.pops.mc_fbk_p.pop,
             "one_to_one",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_state_mc_fbk.model_dump(exclude_none=True),
         )
         nest.Connect(
             self.pops.state_p.pop,
             self.pops.mc_fbk_n.pop,
             "one_to_one",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_state_mc_fbk.model_dump(exclude_none=True),
         )
-        conn_spec["weight"] = -conn_spec["weight"]
+        # Create a new spec for the negative weight connection
+        conn_spec_state_mc_fbk_neg = conn_spec_state_mc_fbk.model_copy(
+            update={"weight": -conn_spec_state_mc_fbk.weight}
+        )
         nest.Connect(
             self.pops.state_n.pop,
             self.pops.mc_fbk_p.pop,
             "one_to_one",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_state_mc_fbk_neg.model_dump(exclude_none=True),
         )
         nest.Connect(
             self.pops.state_n.pop,
             self.pops.mc_fbk_n.pop,
             "one_to_one",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_state_mc_fbk_neg.model_dump(exclude_none=True),
         )
 
         # Motor Cortex Output -> Brainstem
-        conn_spec = self.conn_params["mc_out_brain_stem"]
-        self.log.debug("Connecting MC out to brainstem", conn_spec=conn_spec)
+        conn_spec_mc_out_bs = self.conn_params.mc_out_brain_stem
+        self.log.debug("Connecting MC out to brainstem", conn_spec=conn_spec_mc_out_bs)
         nest.Connect(
             self.pops.mc_out_p.pop,
             self.pops.brainstem_p.pop,
             "all_to_all",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_mc_out_bs.model_dump(exclude_none=True),
         )
-        # TODO: this is just sick. who on earth would ever think
-        # that a secret minus is better than just putting it in the weight definition??????
-        conn_spec["weight"] = -conn_spec["weight"]
+        conn_spec_mc_out_bs_neg = conn_spec_mc_out_bs.model_copy(
+            update={"weight": -conn_spec_mc_out_bs.weight}
+        )
         nest.Connect(
             self.pops.mc_out_n.pop,
             self.pops.brainstem_n.pop,
             "all_to_all",
-            syn_spec=conn_spec,
+            syn_spec=conn_spec_mc_out_bs_neg.model_dump(exclude_none=True),
         )
 
         # Sensory Input -> Feedback Smoothed Neurons
-        conn_spec = self.conn_params["sn_fbk_smoothed"]
-        self.log.debug("Connecting sensory to smoothing", conn_spec=conn_spec)
+        sn_fbk_sm_spec = self.conn_params.sn_fbk_smoothed
+        syn_spec_p = sn_fbk_sm_spec.model_dump(exclude_none=True)
+        syn_spec_n = sn_fbk_sm_spec.model_copy(
+            update={"weight": -sn_fbk_sm_spec.weight}
+        ).model_dump(exclude_none=True)
+        self.log.debug(
+            "Connecting sensory to smoothing",
+            syn_spec_p=syn_spec_p,
+            syn_spec_n=syn_spec_n,
+        )
         nest.Connect(
             self.pops.sn_p.pop,
             self.pops.fbk_smooth_p.pop,
             "all_to_all",
-            syn_spec=conn_spec,
+            syn_spec=syn_spec_p,
         )
-        conn_spec["weight"] = -conn_spec["weight"]
         nest.Connect(
             self.pops.sn_n.pop,
             self.pops.fbk_smooth_n.pop,
             "all_to_all",
-            syn_spec=conn_spec,
+            syn_spec=syn_spec_n,
         )
 
         # Connections INTO State Estimator (Using receptor types)
         st_p = self.pops.state_p.pop
         st_n = self.pops.state_n.pop
 
-        w_fbk_sm = self.conn_params["fbk_smoothed_state"]["weight"]
-        self.log.debug("Connecting smoothed sensory to state", weight=w_fbk_sm)
+        fbk_sm_state_spec = self.conn_params.fbk_smoothed_state.model_dump(
+            exclude_none=True
+        )
+        self.log.debug("Connecting smoothed sensory to state", spec=fbk_sm_state_spec)
         for i, pre in enumerate(self.pops.fbk_smooth_p.pop):
             nest.Connect(
                 pre,
                 st_p,
                 "all_to_all",
-                syn_spec={"weight": w_fbk_sm, "receptor_type": i + 1},
+                syn_spec={**fbk_sm_state_spec, "receptor_type": i + 1},
             )
         for i, pre in enumerate(self.pops.fbk_smooth_n.pop):
             nest.Connect(
                 pre,
                 st_n,
                 "all_to_all",
-                syn_spec={"weight": w_fbk_sm, "receptor_type": i + 1},
+                syn_spec={**fbk_sm_state_spec, "receptor_type": i + 1},
             )
         # Prediction (self.pops.pred_p/n) -> State Estimator (Receptors N+1 to 2N)
         # These connections are always made, as pred_p/n always exist.
         offset = self.N + 1  # Start receptor types after the first N for sensory
-        weight = self.conn_params["pred_state"]["weight"]
+        pred_state_spec = self.conn_params.pred_state.model_dump(exclude_none=True)
         self.log.debug(
-            "Connecting self.pops.pred_p/n to state estimator",
-            weight=weight,
-            receptor_offset=offset,
+            "Connecting self.pops.pred_p/n to state estimator", spec=pred_state_spec
         )
         for i, pre in enumerate(self.pops.pred_p.pop):
             nest.Connect(
                 pre,
                 st_p,
                 "all_to_all",
-                syn_spec={"weight": weight, "receptor_type": i + offset},
+                syn_spec={**pred_state_spec, "receptor_type": i + offset},
             )
         for i, pre in enumerate(self.pops.pred_n.pop):
             nest.Connect(
                 pre,
                 st_n,
                 "all_to_all",
-                syn_spec={"weight": weight, "receptor_type": i + offset},
+                syn_spec={**pred_state_spec, "receptor_type": i + offset},
             )
         # Note: The MC Output -> Brainstem connection happens in both cases and is handled above
 
@@ -539,12 +575,12 @@ class Controller:
     def create_and_setup_music_interface(self):
         """Creates MUSIC proxies for input and output."""
         msc_params = self.music_cfg
-        spine_params = self.spine_params
+        spine_params_dict = self.spine_params.model_dump()
         n_total_neurons = 2 * self.N
 
-        out_port_name = msc_params["out_port"]
-        in_port_name = msc_params["in_port"]
-        latency_const = msc_params["const"]
+        out_port_name = msc_params.port_motcmd_out
+        in_port_name = msc_params.port_fbk_in
+        latency_const = msc_params.const
 
         # Output proxy
         self.log.info("Creating MUSIC out proxy", port=out_port_name)
@@ -572,7 +608,7 @@ class Controller:
         # to deliver spikes a bit late. This is what makes the loop possible.
         # Set acceptable latency for the input port
         # Use feedback delay from spine parameters
-        fbk_delay = spine_params["fbk_delay"]
+        fbk_delay = spine_params_dict["fbk_delay"]
         latency = fbk_delay - latency_const
         # if latency < nest.GetKernelStatus("min_delay"):
         #     print(
@@ -621,8 +657,8 @@ class Controller:
         idx_end_p = idx_start_p + self.N
         idx_start_n = idx_end_p
         idx_end_n = idx_start_n + self.N
-        delay = self.spine_params["fbk_delay"]
-        wgt = self.spine_params["wgt_sensNeur_spine"]
+        delay = self.spine_params.fbk_delay
+        wgt = self.spine_params.wgt_sensNeur_spine
         self.log.debug(
             "Connecting MUSIC in proxy to sensory inputs",
             start_channel=start_channel_in,

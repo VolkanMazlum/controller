@@ -1,10 +1,9 @@
-import json
-from typing import Any
-
-import config.paths as paths
 import numpy as np
 import structlog
-from config.settings import SEED, Brain, Experiment, MusicCfg, Simulation
+
+from . import paths
+from .core_models import MetaInfo, SimulationParams
+from .MasterParams import MasterParams
 
 
 class PlantConfig:
@@ -14,116 +13,90 @@ class PlantConfig:
 
     def __init__(
         self,
-        run_paths: paths.RunPaths,
+        master_params: MasterParams,
     ):
         self.log = structlog.get_logger(type(self).__name__)
         self.log.info("Initializing PlantConfig...")
+        self.master_config = master_params
 
-        self.run_paths: paths.RunPaths = run_paths
-        self.params_json_path = paths.PARAMS
+        self.run_paths: paths.RunPaths = master_params.run_paths
         self.trajectory_path = paths.TRAJECTORY
 
-        # Load settings from new_params.json
-        try:
-            with open(self.params_json_path) as f:
-                self.params_from_json: dict[str, Any] = json.load(f)
-            self.log.debug(
-                "Loaded parameters from JSON", path=str(self.params_json_path)
-            )
-        except FileNotFoundError:
-            self.log.error(
-                "Parameters JSON file not found", path=str(self.params_json_path)
-            )
-            raise
-        except json.JSONDecodeError:
-            self.log.error(
-                "Error decoding parameters JSON file", path=str(self.params_json_path)
-            )
-            raise
-
-        # Initialize settings objects from complete_control.settings
-        self.sim_settings = Simulation()
-        self.exp_settings = Experiment()
-        self.brain_settings = Brain()
-        self.music_settings = MusicCfg()
-
-        # --- Extract and Store Key Parameters ---
-        self.SEED: int = SEED
+        self.SEED = SimulationParams.get_default_seed()
         np.random.seed(self.SEED)
 
-        # Module-specific params (can be accessed via self.params_from_json['modules']['module_name'])
-        self.module_params: dict[str, Any] = self.params_from_json["modules"]
-        self.spine_params: dict[str, Any] = self.module_params["spine"]
-
-        # Simulation timing
-        self.RESOLUTION_MS: float = self.sim_settings.resolution
+        # Simulation timing from MasterConfig
+        self.RESOLUTION_MS: float = self.master_config.simulation.resolution
         self.RESOLUTION_S: float = self.RESOLUTION_MS / 1000.0
-        self.TIME_MOVE_MS: float = self.sim_settings.time_move
+        self.TIME_MOVE_MS: float = self.master_config.simulation.time_move
         self.TIME_MOVE_S: float = self.TIME_MOVE_MS / 1000.0
-        self.TIME_PREP_MS: float = self.sim_settings._time_prep
+        self.TIME_PREP_MS: float = self.master_config.simulation.time_prep
         self.TIME_PREP_S: float = self.TIME_PREP_MS / 1000.0
-        self.N_TRIALS: int = self.sim_settings.n_trials
-        self.TIME_POST_MS: float = self.sim_settings.time_post
+        self.N_TRIALS: int = self.master_config.simulation.n_trials
+        self.TIME_POST_MS: float = self.master_config.simulation.time_post
         self.TIME_POST_S: float = self.TIME_POST_MS / 1000.0
 
         self.TIME_TRIAL_S: float = (
-            self.TIME_PREP_S + self.TIME_MOVE_S + self.TIME_POST_S
+            self.master_config.simulation.duration_single_trial_ms / 1000.0
         )
-        self.TOTAL_SIM_DURATION_S: float = self.TIME_TRIAL_S * self.N_TRIALS
+        self.TOTAL_SIM_DURATION_S: float = (
+            self.master_config.simulation.total_duration_all_trials_ms / 1000.0
+        )
+
         self.time_vector_total_s: np.ndarray = np.arange(
             0, self.TOTAL_SIM_DURATION_S, self.RESOLUTION_S
         )
-        # Single trial time vector (for one segment of activity + wait)
         self.time_vector_single_trial_s: np.ndarray = np.arange(
             0, self.TIME_TRIAL_S, self.RESOLUTION_S
         )
 
-        # Experiment and Robot
-        self.NJT: int = self.exp_settings.dynSys.numVariables()
-        self.DYN_SYS = self.exp_settings.dynSys
-        self.CONNECT_GUI = False
+        self.NJT = self.master_config.NJT
+        self.CONNECT_GUI = self.master_config.GUI_PYBULLET
 
-        self.initial_joint_pos_rad: float = self.exp_settings.init_pos_angle
-        self.target_joint_pos_rad: float = self.exp_settings.tgt_pos_angle
+        self.initial_joint_pos_rad: float = (
+            self.master_config.experiment.init_pos_angle_rad
+        )
+        self.target_joint_pos_rad: float = (
+            self.master_config.experiment.tgt_pos_angle_rad
+        )
 
-        self.N_NEURONS: int = self.brain_settings.nNeurPop
+        self.N_NEURONS: int = self.master_config.brain.population_size
 
-        # Plant interaction parameters
+        # Plant interaction parameters (remain as is for Stage 1)
         self.SCALE_TORQUE: float = 500000.0
-        self.BUFFER_SIZE_S: float = (
-            10.0 / 1000.0
-        )  # Buffer to calculate spike rate (seconds)
+        self.BUFFER_SIZE_S: float = 10.0 / 1000.0
 
-        # MUSIC configuration
-        self.MUSIC_CONST_S: float = self.music_settings.const / 1000.0
+        # MUSIC configuration from MasterConfig
+        self.MUSIC_CONST_S: float = (
+            self.master_config.music.const / 1000.0
+        )  # Assuming const in MusicConfigModel is in ms
         self.MUSIC_ACCEPTABLE_LATENCY_S: float = 2 * self.RESOLUTION_S - (
             self.RESOLUTION_S - self.MUSIC_CONST_S
         )
         if self.MUSIC_ACCEPTABLE_LATENCY_S < 0:
             self.MUSIC_ACCEPTABLE_LATENCY_S = 0.0
-        self.MUSIC_PORT_MOT_CMD_IN: str = (
-            "mot_cmd_in"  # Corresponds to "out_port" in main_simulation's music_cfg
+        self.MUSIC_PORT_MOT_CMD_IN: str = self.master_config.music.port_motcmd_in
+        self.MUSIC_PORT_FBK_OUT: str = self.master_config.music.port_fbk_out
+
+        # Sensory Neuron parameters from MasterConfig
+        self.SENS_NEURON_BASE_RATE: float = (
+            self.master_config.modules.spine.sensNeur_base_rate
         )
-        self.MUSIC_PORT_FBK_OUT: str = (
-            "fbk_out"  # Corresponds to "in_port" in main_simulation's music_cfg
+        self.SENS_NEURON_KP: float = self.master_config.modules.spine.sensNeur_kp
+        self.SENS_NEURON_ID_START: int = self.master_config.brain.first_id_sens_neurons
+
+        # Weight for motor command calculation from MasterConfig
+        self.WGT_MOTCTX_MOTNEUR: float = (
+            self.master_config.modules.spine.wgt_motCtx_motNeur
         )
 
-        # Sensory Neuron parameters from spine_params
-        self.SENS_NEURON_BASE_RATE: float = self.spine_params.get(
-            "sensNeur_base_rate",
-            # 0.0,
-        )
-        self.SENS_NEURON_KP: float = self.spine_params.get(
-            "sensNeur_kp",
-            # 1200.0,
-        )
-        self.SENS_NEURON_ID_START: int = self.brain_settings.firstIdSensNeurons
+        self.PLOT_DATA_FILENAME = "plant_plot_data.json"
 
-        # Weight for motor command calculation (motor cortex - motor neurons)
-        self.WGT_MOTCTX_MOTNEUR: float = self.spine_params.get(
-            "wgt_motCtx_motNeur",
-            # 1.0,
-        )
+        self.log.info("PlantConfig initialized successfully from MasterConfig")
 
-        self.log.info("PlantConfig initialized successfully")
-        self.log.debug("Config details", config_vars=self.__dict__)
+    @classmethod
+    def from_runpaths(
+        cls,
+        run_paths: paths.RunPaths,
+    ):
+        return cls(MasterParams.from_runpaths(run_paths))

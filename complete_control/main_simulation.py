@@ -15,8 +15,7 @@ import config.paths as paths
 import nest
 import numpy as np
 import structlog
-from config.paths import RunPaths, setup_run_paths
-from config.settings import SEED, Experiment, Simulation
+from config.paths import RunPaths
 from mpi4py import MPI
 from mpi4py.MPI import Comm
 from neural.Controller import Controller
@@ -25,19 +24,13 @@ from neural.plot_utils import plot_controller_outputs
 from utils_common.generate_analog_signals import generate_signals
 from utils_common.log import setup_logging, tqdm
 
+from complete_control.config.core_models import MetaInfo, SimulationParams
+from complete_control.config.MasterParams import MasterParams
+
 nest.set_verbosity("M_ERROR")  # M_WARNING
 
 
 # --- Configuration and Setup ---
-def load_config(json_path):
-    log = structlog.get_logger("main.config")
-    """Loads parameters from JSON file."""
-    with open(json_path) as f:
-        params = json.load(f)
-        log.info("Configuration loaded", path=json_path)
-    return params
-
-
 def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
     log = structlog.get_logger("main.env_setup")
     """Sets up environment variables if needed (e.g., for NESTML)."""
@@ -82,12 +75,12 @@ def setup_environment(nestml_build_dir=paths.NESTML_BUILD_DIR):
 
 
 # --- NEST Kernel Setup ---
-def setup_nest_kernel(sim: Simulation, seed: int, path_data: Path):
+def setup_nest_kernel(simulation_config: SimulationParams, seed: int, path_data: Path):
     log = structlog.get_logger("main.nest_setup")
     """Configures the NEST kernel."""
 
     kernel_status = {
-        "resolution": sim.resolution,
+        "resolution": simulation_config.resolution,
         "overwrite_files": True,  # optional since different data paths
         "data_path": str(path_data),
         # "print_time": True, # Optional: Print simulation progress
@@ -95,22 +88,22 @@ def setup_nest_kernel(sim: Simulation, seed: int, path_data: Path):
     kernel_status["rng_seed"] = seed  # Set seed via kernel status
     nest.SetKernelStatus(kernel_status)
     log.info(
-        f"NEST Kernel: Resolution: {sim.resolution}ms, Seed: {seed}, Data path: {str(path_data)}"
+        f"NEST Kernel: Resolution: {simulation_config.resolution}ms, Seed: {seed}, Data path: {str(path_data)}"
     )
     random.seed(seed)
     np.random.seed(seed)
 
 
 def run_simulation(
-    sim: Simulation,
-    n_trials: int,
+    simulation_config: SimulationParams,
     path_data: Path,
     controllers: list[Controller],
     comm: Comm,
 ):
     log: structlog.stdlib.BoundLogger = structlog.get_logger("main.simulation_loop")
     """Runs the NEST simulation for the specified number of trials."""
-    single_trial_ms = sim.duration_single_trial_ms
+    single_trial_ms = simulation_config.duration_single_trial_ms
+    n_trials = simulation_config.n_trials
 
     # --- Prepare for Data Collapsing ---
     pop_views = []
@@ -170,7 +163,7 @@ def coordinate_paths_with_receiver() -> tuple[str, RunPaths]:
         shared_data["timestamp"] = run_timestamp_str = datetime.datetime.now().strftime(
             "%Y%m%d_%H%M%S"
         )
-        shared_data["paths"] = setup_run_paths(run_timestamp_str)
+        shared_data["paths"] = RunPaths.from_run_id(run_timestamp_str)
         print("sending paths to all processes...")
 
     shared_data = MPI.COMM_WORLD.bcast(shared_data, root=0)
@@ -180,9 +173,8 @@ def coordinate_paths_with_receiver() -> tuple[str, RunPaths]:
     return run_timestamp_str, run_paths
 
 
-# --- Main Execution Block ---
 if __name__ == "__main__":
-    # --- MPI Setup ---
+    # --- Setup ---
     comm = MPI.COMM_WORLD.Create_group(  # last process is for receiver_plant
         MPI.COMM_WORLD.group.Excl([MPI.COMM_WORLD.Get_size() - 1])
     )
@@ -209,70 +201,43 @@ if __name__ == "__main__":
         sim_size=comm.size,
         log_all_ranks=True,
     )
+
     start_script_time = timer()
     nest.ResetKernel()
-    config_source = paths.PARAMS
+    master_config = MasterParams.from_runpaths(run_paths=run_paths)
+    run_id = master_config.run_paths.run.name
 
-    params = load_config(config_source)
-    sim = Simulation()
-    exp = Experiment()
+    with open(run_paths.params_json, "w") as f:
+        f.write(master_config.model_dump_json(indent=2))
 
-    module_params = params["modules"]
-    pops_params = params["pops"]
-    conn_params = params["connections"]
+    main_log.info("MasterParams initialized in main_simulation.")
+
+    module_params = master_config.modules
+    pops_params = master_config.populations
+    conn_params = master_config.connections
+
     main_log.debug(
-        "Loaded Parameters", params=params, sim_settings=sim, exp_settings=exp
+        "MasterConfig loaded via PlantConfig",
+        master_config_dump=master_config.model_dump_json(indent=2),
     )
-    # --- Copy Config to Run Directory (Rank 0 only) ---
-    if rank == 0:
-        try:
-            config_dest = run_paths.run / Path(config_source).name
-            shutil.copy2(config_source, config_dest)  # copy2 preserves metadata
-            main_log.info(
-                "Copied config file to run directory",
-                source=config_source,
-                destination=str(config_dest),
-            )
-        except FileNotFoundError:
-            main_log.warning("Config file not found, skipping copy", path=config_source)
-        except Exception as e:
-            main_log.error("Error copying config file", error=str(e), exc_info=True)
 
-    # TODO: Consider adding an "experiment" section to new_params.json
-    exp_params = {
-        "seed": SEED,  # Generate random seed if not provided
-        "N": 50,  # Default number of neurons per sub-population
-        # Add other experiment-level info if needed
-    }
-    seed = exp_params["seed"]
-    N = exp_params["N"]
-
-    # main_log.info("Simulation Parameters", sim)
-    main_log.info("Experiment Parameters", **exp_params)
-
-    # TODO: Consider adding a "music" section to new_params.json
-    music_cfg = {
-        "out_port": "mot_cmd_out",
-        "in_port": "fbk_in",
-        "const": 1e-6,  # Latency constant
-    }
-    main_log.info("MUSIC Configuration", **music_cfg)
+    N = master_config.brain.population_size
+    njt = master_config.NJT
 
     setup_environment()
 
-    trj, motor_commands = generate_signals()
+    trj, motor_commands = generate_signals(
+        master_config.experiment, master_config.simulation
+    )
 
-    njt = 1
-    main_log.info(f"assuming {njt} DoF.")
+    main_log.info(f"Using {njt} DoF based on PlantConfig.")
+    main_log.info("Input data (trajectory, motor_commands) generated.", dof=njt)
 
-    main_log.info("Input data loaded", dof=njt)
-    # --- Time Vectors ---
-    res = sim.resolution
-    time_span_per_trial = sim.duration_single_trial_ms
-    n_trials = sim.n_trials
-    total_sim_duration = time_span_per_trial * n_trials
+    res = master_config.simulation.resolution
+    time_span_per_trial = master_config.simulation.duration_single_trial_ms
+    n_trials = master_config.simulation.n_trials
+    total_sim_duration = master_config.simulation.total_duration_all_trials_ms
 
-    # Time vector for a single trial (passed to PopView)
     single_trial_time_vect = np.linspace(
         0,
         time_span_per_trial,
@@ -297,16 +262,14 @@ if __name__ == "__main__":
 
     # --- Network Construction ---
     start_network_time = timer()
-    setup_nest_kernel(sim, seed, run_paths.data_nest)
+    setup_nest_kernel(
+        master_config.simulation, master_config.simulation.seed, run_paths.data_nest
+    )
 
     controllers = []
-    main_log.info(f"Constructing Network", dof=njt, N=N)
+    main_log.info(f"Constructing Network", dof=njt, N_neurons_pop=N)
     for j in range(njt):
         main_log.info(f"Creating controller", dof=j)
-        mc_p = module_params["motor_cortex"]
-        plan_p = module_params["planner"]
-        spine_p = module_params["spine"]
-        state_p = module_params["state"]
 
         controller = Controller(
             dof_id=j,
@@ -314,24 +277,21 @@ if __name__ == "__main__":
             total_time_vect=total_time_vect_concat,
             trajectory_slice=trj,
             motor_cmd_slice=motor_commands,
-            mc_params=mc_p,
-            plan_params=plan_p,
-            spine_params=spine_p,
-            state_params=state_p,
+            mc_params=module_params.motor_cortex,
+            plan_params=module_params.planner,
+            spine_params=module_params.spine,
+            state_params=module_params.state,
             pops_params=pops_params,
             conn_params=conn_params,
-            sim_params=sim,
+            sim_params=master_config.simulation,
             path_data=run_paths.data_nest,
             label_prefix="",
-            music_cfg=music_cfg,
-            use_cerebellum=True,  # TODO move this to parameters
-            cerebellum_config={},  # TODO
+            music_cfg=master_config.music,
+            use_cerebellum=master_config.USE_CEREBELLUM,
+            cerebellum_paths=master_config.bsb_config_paths,
             comm=comm,
         )
         controllers.append(controller)
-
-    # --- Inter-Controller Connections (if any) ---
-    # Add code here if controllers need to be connected to each other
 
     end_network_time = timer()
     main_log.info(
@@ -340,18 +300,14 @@ if __name__ == "__main__":
     )
 
     # --- Simulation ---
-    run_simulation(sim, n_trials, run_paths.data_nest, controllers, comm)
+    # Pass simulation_config from master_config to run_simulation
+    run_simulation(master_config.simulation, run_paths.data_nest, controllers, comm)
 
     # --- Plotting (Rank 0 Only) ---
-    if rank == 0:
+    if rank == 0 and master_config.PLOT_AFTER_SIMULATE:
         main_log.info("--- Generating Plots ---")
         start_plot_time = timer()
-        try:
-            plot_controller_outputs(
-                controllers, total_time_vect_concat, run_paths.figures
-            )
-        except Exception as e:
-            main_log.error("Error during plotting", error=str(e), exc_info=True)
+        plot_controller_outputs(run_paths)
         end_plot_time = timer()
         plot_wall_time = timedelta(seconds=end_plot_time - start_plot_time)
         main_log.info(f"Plotting Finished", wall_time=str(plot_wall_time))

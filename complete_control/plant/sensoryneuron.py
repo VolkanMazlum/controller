@@ -9,8 +9,9 @@ __version__ = "1.0.1"
 import matplotlib.pyplot as plt
 import music
 import numpy as np
-from config.settings import SEED
+from config.core_models import SimulationParams
 
+SEED = SimulationParams.get_default_seed()
 np.random.seed(SEED)
 
 

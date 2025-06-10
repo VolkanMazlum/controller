@@ -7,6 +7,7 @@ from utils_common.generate_analog_signals import generate_signals
 from utils_common.log import tqdm
 
 from . import plant_utils
+from .plant_plotting import PlantPlotData
 from .robotic_plant import RoboticPlant
 from .sensoryneuron import SensoryNeuron
 
@@ -46,7 +47,10 @@ class PlantSimulator:
         self.log.debug("MUSIC communication and SensorySystem setup complete.")
 
         self.num_total_steps = len(self.config.time_vector_total_s)
-        self.data_arrays = plant_utils.DataArrays(self.num_total_steps, config.NJT)
+        self.joint_data = [
+            plant_utils.JointData.empty(self.num_total_steps)
+            for _ in range(self.config.NJT)
+        ]
         # For storing raw received spikes before processing (per joint)
         self.received_spikes_pos: List[List[Tuple[float, int]]] = [
             [] for _ in range(self.config.NJT)
@@ -229,6 +233,7 @@ class PlantSimulator:
             # Simulation loop
             # Loop while current_sim_time_s is less than the total duration.
             # Add a small epsilon to ensure the last step is processed if time is exact.
+            # Simulation loop; TODO should this count in num_steps instead?
             while current_sim_time_s < self.config.TOTAL_SIM_DURATION_S - (
                 self.config.RESOLUTION_S / 2.0
             ):
@@ -287,13 +292,13 @@ class PlantSimulator:
                 self.plant.simulate_step(self.config.RESOLUTION_S)
 
                 # 6. Record data for this step
-                plant_utils.record_step_data(
-                    data_arrays=self.data_arrays,
+                # For NJT=1
+                self.joint_data[0].record_step(
                     step=step,
                     joint_pos_rad=joint_pos_rad,
                     joint_vel_rad_s=joint_vel_rad_s,
-                    ee_pos_m=ee_pos_m,  # [x,y,z]
-                    ee_vel_m_s=ee_vel_m_list,  # [vx,vy,vz]
+                    ee_pos_m=ee_pos_m,
+                    ee_vel_m_s=ee_vel_m_list,
                     spk_rate_pos_hz=rate_pos_hz,
                     spk_rate_neg_hz=rate_neg_hz,
                     spk_rate_net_hz=net_rate_hz,
@@ -360,19 +365,18 @@ class PlantSimulator:
         self._finalize_and_process_data()
 
     def _finalize_and_process_data(self) -> None:
-        """Saves all data and generates plots."""
-        self.log.info("Finalizing data and generating plots...")
+        """Saves all data required for post-simulation analysis and plotting."""
+        self.log.info("Finalizing and saving simulation data...")
 
-        # Collect sensory spikes for saving
-        sensory_spikes_p_all_joints: List[List[Tuple[float, int]]] = []
-        sensory_spikes_n_all_joints: List[List[Tuple[float, int]]] = []
-        for j in range(self.config.NJT):
-            sensory_spikes_p_all_joints.append(self.sensory_neurons_p[j].spike)
-            sensory_spikes_n_all_joints.append(self.sensory_neurons_n[j].spike)
+        sensory_spikes_p_all_joints: List[List[Tuple[float, int]]] = [
+            sn.spike for sn in self.sensory_neurons_p
+        ]
+        sensory_spikes_n_all_joints: List[List[Tuple[float, int]]] = [
+            sn.spike for sn in self.sensory_neurons_n
+        ]
 
-        plant_utils.save_all_data(
-            config=self.config,
-            data_arrays=self.data_arrays,
+        plot_data = PlantPlotData(
+            joint_data=self.joint_data,
             received_spikes={
                 "pos": self.received_spikes_pos,
                 "neg": self.received_spikes_neg,
@@ -381,71 +385,9 @@ class PlantSimulator:
                 "p": sensory_spikes_p_all_joints,
                 "n": sensory_spikes_n_all_joints,
             },
+            errors_per_trial=self.errors_per_trial,
+            init_hand_pos_ee=list(self.plant.init_hand_pos_ee),
+            trgt_hand_pos_ee=list(self.plant.trgt_hand_pos_ee),
         )
-
-        # Generate plots
-        plant_utils.plot_joint_space(
-            config=self.config,
-            time_vector_s=self.config.time_vector_total_s[
-                : self.step_if_early_exit()
-            ],  # Use actual number of steps run
-            pos_j_rad_actual=self.data_arrays.pos_j_rad[: self.step_if_early_exit(), :],
-            desired_trj_joint_rad=generate_signals()[0],
-        )
-        plant_utils.plot_ee_space(
-            config=self.config,
-            desired_start_ee=self.plant.init_hand_pos_ee,
-            desired_end_ee=self.plant.trgt_hand_pos_ee,
-            actual_traj_ee=self.data_arrays.pos_ee_m[: self.step_if_early_exit(), :],
-        )
-        plant_utils.plot_motor_commands(
-            config=self.config,
-            time_vector_s=self.config.time_vector_total_s[: self.step_if_early_exit()],
-            input_cmd_torque_actual=self.data_arrays.input_cmd_torque[
-                : self.step_if_early_exit(), :
-            ],
-        )
-        if self.errors_per_trial:
-            plant_utils.plot_errors_per_trial(
-                config=self.config, errors_list=self.errors_per_trial
-            )
-
-        self.log.info("Data saving and plotting complete.")
-
-    def step_if_early_exit(self) -> int:
-        """Returns the number of steps actually run if simulation exited early."""
-        # Find the first row in pos_j_rad that is all zeros (if any, after step 0)
-        # This indicates where data recording stopped if loop exited early.
-        # This is a simple heuristic. A more robust way is to store `step` from the loop.
-        # For now, let's assume self.num_total_steps if loop completed, or refine if needed.
-        # The loop condition `step < self.num_total_steps` should prevent overrun.
-        # If the loop breaks early due to `current_sim_time_s` exceeding duration,
-        # then `step` at the point of break is the number of steps completed.
-        # This method is called after the loop, so `step` isn't directly available.
-        # A simple approach: use the number of recorded trials to estimate steps,
-        # or rely on the fact that arrays are zero-initialized.
-
-        # A better way: the main loop should store the final `step` count.
-        # For now, assume it ran all steps or rely on data_arrays content.
-        # Let's assume the `run_simulation` loop correctly uses `step` and if it breaks,
-        # the data arrays are only filled up to `step`.
-        # The plotting functions should ideally take `num_steps_run` as an argument.
-        # For now, we'll pass the full arrays and let matplotlib handle it, or slice by `self.num_total_steps`.
-        # The `[:self.step_if_early_exit()]` slicing in plotting calls implies `step` is stored.
-        # Let's assume `self.last_completed_step` is stored by `run_simulation`.
-        # For now, returning full length as a placeholder.
-        # The loop condition `while current_sim_time_s < self.config.TOTAL_SIM_DURATION_S - (self.config.RESOLUTION_S / 2.0)`
-        # and `if step >= self.num_total_steps: break` should handle this.
-        # The `step` variable in `run_simulation` will hold the number of iterations.
-        # This method is a bit of a patch. Ideally, `run_simulation` returns the number of steps run.
-
-        # Find first zero entry in a key array to determine actual steps recorded
-        # This is not perfectly robust if actual data can be zero.
-        # A better way is to store the final step count from the loop.
-        # For now, let's assume the loop runs to completion or `step` is implicitly handled by slicing.
-        # The plotting calls are already trying to slice with `[:self.step_if_early_exit()]`.
-        # This implies `self.step_if_early_exit` should return the actual number of steps.
-        # Let's assume `run_simulation` sets a `self.actual_steps_run` attribute.
-        if hasattr(self, "actual_steps_run"):
-            return self.actual_steps_run
-        return self.num_total_steps  # Fallback
+        plot_data.save(self.config.run_paths.robot_result)
+        self.log.info(f"Saved plotting data to {self.config.run_paths.robot_result}")
