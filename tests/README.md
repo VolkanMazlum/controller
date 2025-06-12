@@ -9,7 +9,7 @@ This repository contains everything required to **compile, run, and test** a pre
 
 ## Directory Structure
 
-* The subfolder custom_stdp contains the source code for the needed version of the cerebellum that we will test. The first one contains four E-GLIF models for Granule cell (eglif_cond_alpha_multisyn), Inferior Olivary cell (eglif_io_nestml), Purkinje cell (eglif_pc_nestml) and MLI (eglif_mli)
+* The subfolder custom_stdp (in the repo) contains the source code for the needed version of the cerebellum that we will test. The first one contains four E-GLIF models for Granule cell (eglif_cond_alpha_multisyn), Inferior Olivary cell (eglif_io_nestml), Purkinje cell (eglif_pc_nestml) and MLI (eglif_mli)
 
 * Subfolders include E-GLIF models:
 
@@ -24,7 +24,7 @@ This repository contains everything required to **compile, run, and test** a pre
 
 To compile the extension modules:
 
-1. **Create a build directory** (at the same level as the source folder (inside the plasticity folder)):
+1. **Create a build directory** (at the same level as the source folder (inside the tests folder)):
 
    ```
    mkdir build_dir
