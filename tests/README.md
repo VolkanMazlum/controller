@@ -68,7 +68,7 @@ To test neuron connections and plasticity logic:
    pip install pynest
    ```
 
-2. **Navigate to the test directory** (go to the same directory with e.g., `tests_plasticity/` or `test_neurons/`).
+2. **Navigate to the test directory** (go to the same directory with 'tests').
 
 3. **Run tests using `pytest`**:
 
