@@ -1,6 +1,0 @@
-{
-    "python.defaultInterpreterPath": "/sim/venv/bin/python",
-    "python.analysis.ignore": [
-        "./complete_control/deprecated"
-    ]
-}
