@@ -41,7 +41,7 @@ class RoboticPlant:
         self.robot_id = self.bullet_robot._body_id
         self.is_locked = False
         self.log.info("PyBullet initialized and robot loaded", robot_id=self.robot_id)
-
+        
         # Specific joint ID for the 1-DOF arm
         self.elbow_joint_id: int = RobotArm1Dof.ELBOW_JOINT_ID
 
@@ -55,6 +55,19 @@ class RoboticPlant:
             "RoboticPlant initialized and reset to initial state",
             initial_pos_rad=self.initial_joint_position_rad,
         )
+    def set_gravity(self, enable: bool, magnitude: float = 9.81) -> None:
+        """Enable or disable gravity in the simulation.
+        
+        Args:
+            enable: If True, gravity is enabled with given magnitude
+            magnitude: Gravity acceleration in m/s^2, negative means downward
+        """
+        if enable:
+            self.p.setGravity(0, 0, -magnitude)
+        else:
+            self.p.setGravity(0, 0, 0)
+        
+
 
     def _set_EE_pos(self, position_rad) -> np.ndarray:
         """Sets joint to position_rad and returns EE (cartesian) position"""
@@ -128,8 +141,6 @@ class RoboticPlant:
             raise ValueError(
                 "Torques list must contain exactly one value for 1-DOF arm."
             )
-
-        self.is_locked = False
         self.bullet_robot.SetJointTorques(
             joint_ids=[self.elbow_joint_id], torques=torques
         )
@@ -160,11 +171,13 @@ class RoboticPlant:
         )
 
     def lock_joint(self) -> None:
+        """Lock joint at its current position using position control."""
         if not self.is_locked:
             self.log.debug("setting joint torque to zero")
-            self.set_joint_torques([0])
-            current_joint_pos_rad, vel = self.get_joint_state()
+            current_joint_pos_rad, vel=self.get_joint_state()
             self.log.debug("current joint state", pos=current_joint_pos_rad, vel=vel)
+      
+            # First reset state with zero velocity
             self.p.resetJointState(
                 bodyUniqueId=self.robot_id,
                 jointIndex=self.elbow_joint_id,
@@ -173,6 +186,28 @@ class RoboticPlant:
             )
             self.log.debug(
                 "Plant velocity locked.",
-                target_pos_rad=self.initial_joint_position_rad,
+                target_pos_rad=self.initial_joint_position_rad,vel=vel
             )
+
+            self.p.setJointMotorControl2(
+                bodyIndex=self.robot_id,
+                jointIndex=self.elbow_joint_id,
+                targetPosition=current_joint_pos_rad,
+                controlMode=self.p.VELOCITY_CONTROL,
+                targetVelocity=0.0,
+                force=10000 # whatever is strong enough to hold it
+            )
+            self.log.debug("Joint locked at current position", pos=current_joint_pos_rad, vel=vel)
             self.is_locked = True
+            
+    def unlock_joint(self) -> None:
+        """Unlock joint by setting it to velocity control mode."""
+        current_joint_pos_rad, vel=self.get_joint_state()
+        self.p.setJointMotorControl2(
+                    bodyIndex=self.robot_id,
+                    jointIndex=self.elbow_joint_id,
+                    targetPosition=current_joint_pos_rad,
+                    controlMode=self.p.VELOCITY_CONTROL,
+                    force=0 
+        )
+        self.is_locked = False
