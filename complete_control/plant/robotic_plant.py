@@ -41,7 +41,7 @@ class RoboticPlant:
         self.robot_id = self.bullet_robot._body_id
         self.is_locked = False
         self.log.info("PyBullet initialized and robot loaded", robot_id=self.robot_id)
-        
+
         # Specific joint ID for the 1-DOF arm
         self.elbow_joint_id: int = RobotArm1Dof.ELBOW_JOINT_ID
 
@@ -55,19 +55,6 @@ class RoboticPlant:
             "RoboticPlant initialized and reset to initial state",
             initial_pos_rad=self.initial_joint_position_rad,
         )
-    def set_gravity(self, enable: bool, magnitude: float = 9.81) -> None:
-        """Enable or disable gravity in the simulation.
-        
-        Args:
-            enable: If True, gravity is enabled with given magnitude
-            magnitude: Gravity acceleration in m/s^2, negative means downward
-        """
-        if enable:
-            self.p.setGravity(0, 0, -magnitude)
-        else:
-            self.p.setGravity(0, 0, 0)
-        
-
 
     def _set_EE_pos(self, position_rad) -> np.ndarray:
         """Sets joint to position_rad and returns EE (cartesian) position"""
@@ -88,6 +75,17 @@ class RoboticPlant:
             init=self.init_hand_pos_ee,
             tgt=self.trgt_hand_pos_ee,
         )
+    def set_gravity(self, enable: bool, magnitude: float = 9.81) -> None:
+        """Enable or disable gravity in the simulation.
+        
+        Args:
+            enable: If True, gravity is enabled with given magnitude
+            magnitude: Gravity acceleration in m/s^2, negative means downward
+        """
+        if enable:
+            self.p.setGravity(0, 0, -magnitude)
+        else:
+            self.p.setGravity(0, 0, 0)
 
     def update_stats(self) -> None:
         """Updates the underlying robot's statistics (e.g., joint states)."""
@@ -141,6 +139,8 @@ class RoboticPlant:
             raise ValueError(
                 "Torques list must contain exactly one value for 1-DOF arm."
             )
+
+        
         self.bullet_robot.SetJointTorques(
             joint_ids=[self.elbow_joint_id], torques=torques
         )
